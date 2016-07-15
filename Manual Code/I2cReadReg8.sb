@@ -1,0 +1,25 @@
+//Example :: I2cReadReg8.sb
+
+//**Please ensure that nSlaveAddr is the slave address of your I2C peripheral**
+DIM rc, handle, nSlaveAddr, nRegAddr, nRegVal
+
+
+//--- Open I2C Peripheral
+rc=I2cOpen(100000,0,handle)
+IF rc!= 0 THEN 
+    PRINT "\nFailed to open I2C interface with error code "; INTEGER.H' rc
+ELSE
+    PRINT "\nI2C open success"
+ENDIF
+
+
+//---Read value from address 0x34
+nSlaveAddr=0x6f :  nRegAddr = 23
+rc = I2cReadReg8(nSlaveAddr, nRegAddr, nRegVal)
+IF rc!= 0 THEN 
+    PRINT "\nFailed to Read from slave/register "; INTEGER.H'rc
+ELSE
+    PRINT "\nValue read from register is ";nRegVal
+ENDIF
+
+I2cClose(handle)  //close the port

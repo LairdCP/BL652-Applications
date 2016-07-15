@@ -1,0 +1,17 @@
+//Example :: BleCharDescUserDesc.sb
+
+DIM rc, metaSuccess,usrDesc$ : usrDesc$="A description" 
+DIM charUuid : charUuid = BleHandleUuid16(1)
+DIM charMet : charMet = BleAttrMetaData(1,1,20,0,metaSuccess)
+DIM mdUsrDsc : mdUsrDsc = BleAttrMetaData(1,1,20,0,metaSuccess)
+DIM mdSccd : mdSccd = BleAttrMetadata(1,1,2,0,rc)   //CCCD metadata for char
+           
+//initialise char, write/read enabled, accept signed writes, indicatable
+rc=BleCharNew(0x4B,charUuid,charMet,0,mdSccd)     
+rc=BleCharDescUserDesc(usrDesc$,mdUsrDsc)
+
+IF rc==0 THEN
+    PRINT "\nChar created and User Description '";usrDesc$;"' added"
+ELSE
+    PRINT "\nFailed"
+ENDIF

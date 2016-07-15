@@ -1,0 +1,9 @@
+//Example :: BleAdvRptGetSpace.sb
+dim rc, s$, dn$
+rc=BleScanRptInit(s$)
+dn$ = BleGetDeviceName$()
+
+'//Add device name to scan report
+rc=BleAdvRptAppendAD(s$,0x09,dn$)
+
+print "\nFree space in scan report: "; BleAdvRptGetSpace(s$); " bytes"

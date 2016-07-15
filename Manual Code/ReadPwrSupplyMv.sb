@@ -1,0 +1,4 @@
+//Example :: PwrSupplyMv.sb
+
+//read and print the supply voltage
+PRINT "\nSupply voltage is "; ReadPwrSupplyMv();"mV"   

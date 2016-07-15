@@ -1,0 +1,52 @@
+//Example :: BleCharValueWrite.sb
+DIM hMyChar,rc
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, 
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, hSvc, attr$ : attr$="Hi"
+
+    //commit service
+	rc = BleServiceNew(1, BleHandleUuid16(0x18EE), hSvc)
+    //initialise char, write/read enabled, accept signed writes
+    rc=BleCharNew(0x4A,BleHandleUuid16(1),BleAttrMetaData(1,1,20,0,rc),0,0)     
+    //commit char initialised above, with initial value "hi" to service 'hSvc'
+    rc=BleCharCommit(hSvc,attr$,hMyChar)
+	//commit changes to service
+	rc = BleServiceCommit(hSvc)
+ENDFUNC rc
+
+//==============================================================================
+// Uart Rx handler - write input to characteristic
+//==============================================================================
+FUNCTION HndlrUartRx()
+    TimerStart(0,10,0)    
+ENDFUNC 1      
+
+//==============================================================================
+// Timer0 timeout handler
+//============================================================================== 
+FUNCTION HndlrTmr0()
+    DIM t$ : rc=UartRead(t$)
+	rc = BleCharValueWrite(hMyChar,t$)
+    IF rc==0 THEN
+        PRINT "\nNew characteristic value: ";t$
+    ELSE
+        PRINT "\nFailed to write new characteristic value ";integer.h'rc;"\n"
+    ENDIF
+ENDFUNC 0
+
+IF OnStartup()==0 THEN
+    DIM at$ : rc = BleCharValueRead(hMyChar,at$)
+    PRINT "\nCharacteristic value attribute: ";at$;"\nType a new value\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+ONEVENT EVUARTRX 	 CALL HndlrUartRx
+ONEVENT EVTMR0     CALL HndlrTmr0
+
+WAITEVENT
+
+PRINT "\nExiting..."

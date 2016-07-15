@@ -1,0 +1,7 @@
+//Example :: StrSum.sb
+DIM s$
+s$="0aA%<"
+PRINT StrSum(s$,0,5,0);"\n"     //48+97+65+37+60+0
+PRINT StrSum(s$,0,5,10);"\n"    //48+97+65+37+60+10
+PRINT StrSum(s$,4,1,100);"\n"   //60+100
+PRINT StrSum(s$,3,2,0);"\n"     //37+60+0

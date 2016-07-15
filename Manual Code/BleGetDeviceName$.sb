@@ -1,0 +1,17 @@
+//Example :: BleGetDeviceName$.sb
+
+DIM rc,dvcNme$,nmeWrtble,apprnce,MinConnInt,MaxConnInt,ConnSupTO,sL
+
+PRINT "\n --- DevName : "; BleGetDeviceName$()
+
+// Changing device name manually
+dvcNme$= "My BL652"
+nmeWrtble = 0                
+apprnce = 768            
+MinConnInt = 500000          
+MaxConnInt = 1000000         
+ConnSupTO = 4000000      
+sL = 0                      
+
+rc = BleGapSvcInit(dvcNme$,nmeWrtble,apprnce,MinConnInt,MaxConnInt,ConnSupTO,sL)
+PRINT "\n --- New DevName : "; BleGetDeviceName$()

@@ -1,0 +1,17 @@
+//Example :: BleHandleUuid128.sb
+DIM uuid$
+DIM hUuidCustom
+
+//create a custom uuid for my ble widget
+uuid$ = "ced9d91366924a1287d56f2764762b2a"
+uuid$ = StrDehexize$(uuid$)
+hUuidCustom = BleHandleUuid128(uuid$)
+IF hUuidCustom == 0 THEN
+    PRINT "\nFailed to create a handle"
+ELSE
+    PRINT "Handle for custom Uuid is ";integer.h' hUuidCustom;"(";hUuidCustom;")"
+//    PRINT "Handle for custom Uuid is ";hUuidCustom
+ENDIF
+// hUuidCustom now references an object which points to
+// a base uuid = ced9d91366924a1287d56f2764762b2a  (note 0's in byte position 2/3)
+// and an offset = 0xD913

@@ -1,0 +1,12 @@
+//Example :: ExtractIntToken.sb
+DIM sentence$
+DIM intValue, bytes
+DIM token$, tknlen
+sentence$="0x100 is a hex,value"
+PRINT "\nSentence is :";sentence$
+bytes = ExtractIntToken(sentence$,intValue)
+PRINT "\nintValue (bytes ";bytes;") = :";intValue
+DO
+  tknlen = ExtractStrToken(sentence$,token$)
+  PRINT "\nToken (len ";tknlen;") = :";token$
+UNTIL tknlen==0

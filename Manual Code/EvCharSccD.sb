@@ -1,0 +1,159 @@
+//Example :: EvCharSccd.sb
+DIM hMyChar,rc,chVal$,conHndl
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, hSvc, attr$, adRpt$, addr$, scRpt$  ,rc2
+    attr$="Hi"
+    DIM charMet : charMet = BleAttrMetaData(1,1,20,1,rc)
+    
+    //Create service
+    rc=BleServiceNew(1,BleHandleUuid16(0x18EE),hSvc)    
+    
+    //initialise broadcast capable, readable, writeable
+    rc=BleCharNew(0x0B,BleHandleUuid16(1),charMet,0,BleAttrMetadata(1,1,1,0,rc2))
+    
+    //commit char initialised above, with initial value "hi" to service 'hMyChar'
+    rc=BleCharCommit(hSvc,attr$,hMyChar)
+    
+    //commit service to GATT table
+    rc=BleServiceCommit(hSvc)
+
+    rc=BleAdvertStart(0,addr$,20,300000,0)
+ENDFUNC rc
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+    rc=GpioUnbindEvent(1)
+ENDSUB
+
+//==============================================================================
+// Broadcast characterstic value
+//==============================================================================
+FUNCTION PrepAdvReport()
+    dim adRpt$, scRpt$, svcDta$
+    
+    //initialise new advert report
+    rc=BleAdvRptinit(adRpt$, 2, 0, 0)
+    
+    //encode service UUID into service data string
+    rc=BleEncode16(svcDta$, 0x18EE, 0)
+    
+    //append characteristic value
+    svcDta$ = svcDta$ + chVal$
+    
+    //append service data to advert report
+    rc=BleAdvRptAppendAD(adRpt$, 0x16, svcDta$)
+    
+    //commit new advert report, and empty scan report
+    rc=BleAdvRptsCommit(adRpt$, scRpt$)
+ENDFUNC rc
+
+//==============================================================================
+// Reset advert report
+//==============================================================================
+FUNCTION ResetAdvReport()  
+    dim adRpt$, scRpt$
+    
+    //initialise new advert report
+    rc=BleAdvRptinit(adRpt$, 2, 0, 20)
+    
+    //commit new advert report, and empty scan report
+    rc=BleAdvRptsCommit(adRpt$, scRpt$)
+ENDFUNC rc
+    
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n--- Disconnected from client"
+        dim addr$
+        rc=BleAdvertStart(0,addr$,20,300000,0)
+        IF rc==0 THEN
+            PRINT "\nYou should now see the new characteristic value in the advertisment data"
+        ENDIF
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n--- Connected to client"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// Called when data arrives via UART
+//==============================================================================
+FUNCTION HndlrUartRx()
+ENDFUNC 0
+
+//==============================================================================
+// CCCD descriptor written handler
+//==============================================================================
+FUNCTION HndlrCharSccd(BYVAL charHandle, BYVAL nVal) AS INTEGER
+    DIM value$
+    IF charHandle==hMyChar THEN
+        IF nVal & 0x01 THEN
+            PRINT "\nBroadcasts have been enabled by client" 
+            IF PrepAdvReport()==0 THEN
+                rc=BleDisconnect(conHndl)
+                PRINT "\nDisconnecting..."
+            ELSE
+                PRINT "\nError Committing advert reports: ";integer.h'rc
+            ENDIF
+        ELSE
+            PRINT "\nBroadcasts have been disabled by client"
+            IF ResetAdvReport()==0 THEN
+                PRINT "\nAdvert reports reset"
+            ELSE
+                PRINT "\nError Resetting advert reports: ";integer.h'rc
+            ENDIF
+        ENDIF
+    ELSE
+        PRINT "\nThis is for some other characteristic"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// New char value handler
+//==============================================================================
+FUNCTION HndlrCharVal(BYVAL charHandle, BYVAL offset, BYVAL len) 
+    DIM s$
+    IF charHandle == hMyChar THEN        
+        rc=BleCharValueRead(hMyChar,chVal$)
+        PRINT "\nNew Char Value: ";chVal$
+    ENDIF    
+ENDFUNC 1
+
+//==============================================================================
+// Called after a disconnection
+//==============================================================================
+FUNCTION HndlrDiscon(hConn, nRsn)
+    dim addr$
+    rc=BleAdvertStart(0,addr$,20,300000,0)
+ENDFUNC 1
+
+ONEVENT  EVBLEMSG    CALL HndlrBleMsg
+ONEVENT  EVCHARSCCD  CALL HndlrCharSccd
+ONEVENT  EVUARTRX    CALL HndlrUartRx
+ONEVENT  EVCHARVAL   CALL HndlrCharVal
+ONEVENT  EVDISCON    CALL HndlrDiscon
+
+IF OnStartup()==0 THEN
+    rc = BleCharValueRead(hMyChar,chVal$)
+    PRINT "\nCharacteristic Value: ";chVal$
+    PRINT "\nWrite a new value to the characteristic, then enable broadcasting.\nThe module will then disconnect and broadcast the new characteristic value."
+    PRINT "\n--- Press any key to exit\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+WAITEVENT
+
+CloseConnections()
+
+PRINT "\nExiting..."

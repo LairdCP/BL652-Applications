@@ -1,0 +1,168 @@
+//Example :: BleDiscDescFirst.Next.sb
+//
+//Remote server has 1 prim service with 16 bit uuid and 1 characteristics
+// which contains 8 descriptors, that are ...
+// 5 uuids are 16 bit and 3 are 128 bit
+//  3 of the 16 bit uuid are the same value 0xDEAD and 
+//  2 of the 128 bit uuids are also the same 112233445566778899AABBCCDDEEFF
+//
+// Server created using BleGattcTblDiscDesc.sub invoked in _OpenMcp.scr
+// using Nordic Usb Dongle PC10000
+
+DIM rc,at$,conHndl,uHndl,uuid$,sAttr,eAttr,cValAttr
+
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, adRpt$, addr$, scRpt$  
+	rc=BleAdvRptInit(adRpt$, 2, 0, 10)
+	IF rc==0 THEN : rc=BleScanRptInit(scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvRptsCommit(adRpt$,scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvertStart(0,addr$,50,0,0) : ENDIF
+	//open the gatt client with default notify/indicate ring buffer size
+	IF rc==0 THEN : rc = BleGattcOpen(0,0) : ENDIF
+ENDFUNC rc
+
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+ENDSUB
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
+    DIM uu$ 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n- Disconnected"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n- Connected, so scan remote Gatt Table for first service"
+        PRINT "\n- and a characeristic scan will be initiated in the event"
+		rc = BleDiscServiceFirst(conHndl,0,0)
+		IF rc==0 THEN
+		    //wait for start and end handles for first primary service
+		    WAITEVENT
+			PRINT "\n\nScan for descritors with uuid = 0xDEAD"
+			uHndl = BleHandleUuid16(0xDEAD)
+			rc = BleDiscDescFirst(conHndl,uHndl,cValAttr)
+			IF rc == 0 THEN
+				//HandlerDescDisc() will exit with 0 when operation is complete
+				WAITEVENT
+				uu$ = "112233445566778899AABBCCDDEEFF00"
+				PRINT "\n\nScan for service with custom uuid ";uu$
+				uu$ = StrDehexize$(uu$)
+				uHndl = BleHandleUuid128(uu$)
+				rc = BleDiscDescFirst(conHndl,uHndl,cValAttr)
+				IF rc==0 THEN
+					//HandlerDescDisc() will exit with 0 when operation is complete
+					WAITEVENT
+				ENDIF
+			ENDIF
+		ENDIF
+		CloseConnections()
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// EVDISCPRIMSVC event handler
+//==============================================================================
+FUNCTION HandlerPrimSvc(cHndl,svcUuid,sHndl,eHndl) AS INTEGER
+    PRINT "\nEVDISCPRIMSVC :"
+    PRINT " cHndl=";cHndl
+    PRINT " svcUuid=";integer.h' svcUuid
+    PRINT " sHndl=";sHndl
+    PRINT " eHndl=";eHndl
+	IF sHndl == 0 THEN
+		PRINT "\nPrimary Service Scan complete"
+	    EXITFUNC 0
+	ELSE
+        PRINT "\nGot first primary service so scan for ALL characteristics"
+		sAttr = sHndl
+		eAttr = eHndl
+		rc = BleDiscCharFirst(conHndl,0,sAttr,eAttr)
+		IF rc != 0 THEN
+			PRINT "\nScan characteristics failed"
+			EXITFUNC 0
+		ENDIF
+	ENDIF
+endfunc 1
+
+'//==============================================================================
+// EVDISCCHAR event handler
+'//==============================================================================
+function HandlerCharDisc(cHndl,cUuid,cProp,hVal,isUuid) as integer
+    print "\nEVDISCCHAR :"
+    print " cHndl=";cHndl
+    print " chUuid=";integer.h' cUuid
+    print " Props=";cProp
+    print " valHndl=";hVal
+    print " ISvcUuid=";isUuid
+	IF hVal == 0 THEN
+		PRINT "\nCharacteristic Scan complete"
+	    EXITFUNC 0
+	ELSE
+        PRINT "\nGot first characteristic service at handle ";hVal
+        PRINT "\nScan for ALL Descs"
+		cValAttr = hVal
+		rc = BleDiscDescFirst(conHndl,0,cValAttr)
+		IF rc != 0 THEN
+			PRINT "\nScan descriptors failed"
+			EXITFUNC 0
+		ENDIF
+	ENDIF
+endfunc 1
+
+'//==============================================================================
+// EVDISCDESC event handler
+'//==============================================================================
+function HandlerDescDisc(cHndl,cUuid,hndl) as integer
+    print "\nEVDISCDESC"
+    print " cHndl=";cHndl
+    print " dscUuid=";integer.h' cUuid
+    print " dscHndl=";hndl
+	IF hndl == 0 THEN
+		PRINT "\nDescriptor Scan complete"
+	    EXITFUNC 0
+	ELSE
+		rc = BleDiscDescNext(cHndl)
+		IF rc != 0 THEN
+			PRINT "\nDescriptor scan abort"
+			EXITFUNC 0
+		ENDIF
+	ENDIF
+endfunc 1
+
+
+//==============================================================================
+// Main() equivalent
+//==============================================================================
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+OnEvent  EVDISCPRIMSVC      call HandlerPrimSvc
+OnEvent  EVDISCCHAR         call HandlerCharDisc
+OnEvent  EVDISCDESC         call HandlerDescDisc
+
+//Register base uuids with the underlying stack, otherwise the services with the
+//128bit uuid's will be delivered with a uuid handle == FF000000 == UNKNOWN
+uuid$ = "112233445566778899AABBCCDDEEFF00"
+uuid$ = StrDehexize$(uuid$)
+uHndl = BleHandleUuid128(uuid$)
+uuid$ = "1122DEAD5566778899AABBCCDDBEEF00"
+uuid$ = StrDehexize$(uuid$)
+uHndl = BleHandleUuid128(uuid$)
+
+IF OnStartup()==0 THEN
+    PRINT "\nAdvertising, and Gatt Client is open\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+WAITEVENT
+PRINT "\nExiting..."

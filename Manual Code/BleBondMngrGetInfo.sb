@@ -1,0 +1,14 @@
+//Example :: BleBondMngrGetInfo.sb
+
+#define BLE_INV_INDEX           24619
+
+DIM rc, addr$, exInfo
+
+rc = BleBondMngrGetInfo(0,addr$,exInfo)  //Extract info of device at index 1
+
+IF rc==0 THEN
+    PRINT "\nMAC address: ";addr$
+    PRINT "\nInfo: ";exInfo
+ELSEIF rc==BLE_INV_INDEX   THEN
+    PRINT "\nInvalid index"
+ENDIF

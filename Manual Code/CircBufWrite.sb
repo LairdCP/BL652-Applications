@@ -1,0 +1,21 @@
+// Example :: CircBufWrite.sb
+DIM rc                          
+DIM circHandle                  
+DIM i
+rc = CircBufCreate(16,circHandle)
+IF rc != 0 then 
+    PRINT "\nThe circular buffer was not created\n"
+ELSE
+    PRINT "\nThe circular buffer was created successfully\n"
+ENDIF
+
+//write 3 values into the circular buffer
+FOR i = 1 TO 3 
+    rc = CircBufWrite(circHandle,i)
+    IF rc != 0 then 
+        PRINT "\nFailed to write into the circular buffer\n"
+	ELSE
+		PRINT i;" was successfuly written to the circular buffer\r"
+    ENDIF
+NEXT 
+

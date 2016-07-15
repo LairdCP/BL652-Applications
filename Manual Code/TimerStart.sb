@@ -1,0 +1,29 @@
+//Example :: EVTMRn.sb
+SUB HandlerOnErr()
+  PRINT "Timer Error: ";GetLastError()
+ENDSUB
+
+FUNCTION HandlerTimer1()
+  PRINT "\nTimer 1 has expired"
+ENDFUNC 1 										//remain blocked in WAITEVENT
+
+FUNCTION HandlerTimer2()
+  PRINT "\nTimer 2 has expired"
+ENDFUNC 0 										//exit from WAITEVENT
+
+ONERROR NEXT HandlerOnErr 
+
+ONEVENT EVTMR1 CALL HandlerTimer1
+ONEVENT EVTMR2 CALL HandlerTimer2
+
+TimerStart(0,-500,1)  							//start a -500 millisecond recurring timer
+PRINT "\nStarted Timer 0 with invalid inerval"
+
+TimerStart(1,500,1)  							//start a 500 millisecond recurring timer
+PRINT "\nWaiting for Timer 1"
+
+TimerStart(2,1000,0) 							//start a 1000 millisecond timer
+PRINT "\nWaiting for Timer 2"
+
+WAITEVENT
+PRINT "\nGot here because TIMER 2 expired and Handler returned 0"

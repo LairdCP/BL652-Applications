@@ -1,0 +1,107 @@
+//Example :: BleGattcNotifyRead.sb
+//
+// Server created using BleGattcTblNotifyRead.sub invoked in _OpenMcp.scr
+// using Nordic Usb Dongle PC10000
+//
+// Charactersitic at handle 15 has notify   (16==cccd)
+// Charactersitic at handle 18 has indicate (19==cccd)
+
+DIM rc,at$,conHndl,uHndl,atHndl
+
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, adRpt$, addr$, scRpt$  
+  rc=BleAdvRptInit(adRpt$, 2, 0, 10)
+  IF rc==0 THEN : rc=BleScanRptInit(scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvRptsCommit(adRpt$,scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvertStart(0,addr$,50,0,0) : ENDIF
+  //open the gatt client with default notify/indicate ring buffer size
+  IF rc==0 THEN : rc = BleGattcOpen(0,0) : ENDIF
+ENDFUNC rc
+
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+ENDSUB
+
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n- Disconnected"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n- Connected, so enable notification for char with cccd at 16"
+    atHndl = 16
+    at$="\01\00"
+    rc=BleGattcWrite(conHndl,atHndl,at$)
+    IF rc==0 THEN
+        WAITEVENT
+    ENDIF
+        PRINT "\n- enable indication for char with cccd at 19"
+    atHndl = 19
+    at$="\02\00"
+    rc=BleGattcWrite(conHndl,atHndl,at$)
+    IF rc==0 THEN
+        WAITEVENT
+    ENDIF
+    ENDIF
+ENDFUNC 1
+
+'//==============================================================================
+'//==============================================================================
+function HandlerAttrWrite(cHndl,aHndl,nSts) as integer
+    dim nOfst,nAhndl,at$
+    print "\nEVATTRWRITE "
+    print " cHndl=";cHndl
+    print " attrHndl=";aHndl
+    print " status=";integer.h' nSts
+  if nSts == 0 then
+      print "\nAttribute write OK"
+  else
+      print "\nFailed to write attribute"
+  endif
+endfunc 0
+
+'//==============================================================================
+'//==============================================================================
+function HandlerAttrNotify() as integer
+  dim chndl,aHndl,att$,dscd
+    print "\nEVATTRNOTIFY Event"
+  rc=BleGattcNotifyRead(cHndl,aHndl,att$,dscd)
+  print "\n  BleGattcNotifyRead()"
+  if rc==0 then
+    print " cHndl=";cHndl
+    print " attrHndl=";aHndl
+    print " data=";StrHexize$(att$)
+    print " discarded=";dscd
+  else
+    print " failed with ";integer.h' rc
+  endif
+endfunc 1
+
+//==============================================================================
+// Main() equivalent
+//==============================================================================
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+OnEvent  EVATTRWRITE        call HandlerAttrWrite
+OnEvent  EVATTRNOTIFY       call HandlerAttrNotify
+
+IF OnStartup()==0 THEN
+    PRINT "\nAdvertising, and Gatt Client is open\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+WAITEVENT
+PRINT "\nExiting..."

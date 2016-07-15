@@ -1,0 +1,10 @@
+﻿//Example :: While.sb
+DIM n
+n=0
+
+//now print “Hello” ten times
+
+WHILE n<10
+  PRINT " Hello " ;n
+  n=n+1
+ENDWHILE

@@ -1,0 +1,95 @@
+//Example :: EvAuthDesc.sb
+
+DIM hMyChar,rc,at$,conHndl, hOtherDescr
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup$()
+    DIM rc, hSvc, at$, adRpt$, addr$, scRpt$, hOtherDscr,attr$, attr2$
+    attr$="Hi"
+    DIM charMet : charMet = BleAttrMetaData(1,1,20,0,rc)
+    
+    //Commit svc with handle 'hSvcUuid'
+    rc=BleServiceNew(1,BleHandleUuid16(0x18EE),hSvc)            
+    //Initialise char, read/write enabled, accept signed writes
+    rc=BleCharNew(0x4A,BleHandleUuid16(1),charMet,0,0)         
+
+    //Add another descriptor
+    attr$="descr_value"
+    rc=BleCharDescAdd(0x2905,attr$,BleAttrMetadataex(1,1,20,9,rc))
+    //Commit char initialised above, with initial value "hi" to service 'hMyChar'
+    attr2$="char value"
+    rc=BleCharCommit(hSvc,attr2$,hMyChar)
+    rc=BleServiceCommit(hSvc)
+
+    rc=BleAdvRptInit(adRpt$,0x02,0,20) 
+    rc=BleScanRptInit(scRpt$)
+    //Get UUID handle for other descriptor
+    hOtherDscr=BleHandleUuid16(0x2905)
+    //Add 'hSvc','hMyChar' and the other descriptor to the advert report
+    rc=BleAdvRptAddUuid16(adRpt$,hSvc,hOtherDscr,-1,-1,-1,-1)
+    rc=BleAdvRptAddUuid16(scRpt$,hOtherDscr,-1,-1,-1,-1,-1)
+    //Commit reports to GATT table - adRpt$ is empty
+    rc=BleAdvRptsCommit(adRpt$,scRpt$)
+    rc=BleAdvertStart(0,addr$,20,300000,0)
+    rc=GpioBindEvent(1,11,1)     //Channel 1, bind to low transition on GPIO pin 11
+ENDFUNC attr$
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+    rc=GpioUnbindEvent(1)
+ENDSUB
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n--- Disconnected from client"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n--- Connected to client"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// Handler to service button 0 pressed
+//==============================================================================
+FUNCTION HndlrBtn1Pr() AS INTEGER
+    CloseConnections()
+ENDFUNC 1
+
+//==============================================================================
+// Client has written to writeable descriptor
+//==============================================================================
+FUNCTION HndlrAuthDesc(BYVAL hConn AS INTEGER, BYVAL hChar AS INTEGER, BYVAL hDesc AS INTEGER, BYVAL rw) AS INTEGER
+    dim duid,a$,rc
+    IF hChar == hMyChar THEN
+        rc = BleAuthorizeDesc(hConn, hChar, hDesc, 3)
+        rc = BleCharDescRead(hChar,hDesc,0,512,duid,a$)
+        IF rc ==0 THEN 
+            PRINT "\nNew value for desriptor ";hDesc;" is ";a$
+        ELSE
+            PRINT "\nCould not access the uuid"
+        ENDIF
+    ELSE
+        PRINT "\nThis is for some other characteristic"
+    ENDIF
+ENDFUNC 1
+
+ONEVENT  EVBLEMSG    CALL HndlrBleMsg
+ONEVENT  EVAUTHDESC  CALL HndlrAuthDesc
+ONEVENT  EVGPIOCHAN1 CALL HndlrBtn1Pr
+
+PRINT "\nOther Descriptor Value: ";OnStartup$()
+PRINT "\nWrite a new value \n--- Press button 1 to exit\n"
+
+WAITEVENT
+
+PRINT "\nExiting..."

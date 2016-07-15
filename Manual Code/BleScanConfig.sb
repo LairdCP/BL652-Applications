@@ -1,0 +1,29 @@
+//Example :: BleScanConfig.sb
+DIM rc, startTick
+
+PRINT "\nScan Interval: "; SysInfo(2150)    //get current scan interval
+PRINT "\nScan Window: "; SysInfo(2151)      //get current scan window
+PRINT "\nScan Type: "; 
+IF SysInfo(2152)==0 THEN                  //get current scan type
+    PRINT "Passive"
+ELSE
+    PRINT "Active"
+ENDIF
+PRINT "\nReport Cache Size: "; SysInfo(2153)  //get report cache size
+
+PRINT "\n\nSetting new parameters..."
+rc = BleScanConfig(0, 100)               //set scan interval to 100
+rc = BleScanConfig(1, 50)                //set scan window to 50
+rc = BleScanConfig(2, 0)                 //set scan type to passive
+rc = BleScanConfig(3, 3)                 //set report cache size
+
+PRINT "\n\n--- New Parameters:"
+PRINT "\nScan Interval: "; SysInfo(2150)    //get current scan interval
+PRINT "\nScan Window: "; SysInfo(2151)      //get current scan window
+PRINT "\nScan Type: "; 
+IF SysInfo(2152)==0 THEN                  //get current scan type
+    PRINT "Passive"
+ELSE
+    PRINT "Active"
+ENDIF
+PRINT "\nReport Cache Size: "; SysInfo(2153)  //get report cache size

@@ -1,0 +1,5 @@
+//Example :: ResetLastError.sb
+DIM err
+err = GetLastError()
+ResetLastError()
+PRINT "\nerror  = 0x" ; INTEGER.H'err		

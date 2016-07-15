@@ -1,0 +1,26 @@
+//Example :: TimerRunning.sb
+SUB HandlerOnErr()
+  PRINT "Timer Error ";GetLastError()
+ENDSUB
+
+FUNCTION HandlerTimer0()
+  PRINT "\nTimer 0 has expired"
+  PRINT "\nTimer 1 has ";TimerRunning(1);" milliseconds to go"
+ENDFUNC 1 								//remain blocked in WAITEVENT
+
+FUNCTION HandlerTimer1()
+  PRINT "\nTimer 1 has expired"
+ENDFUNC 0 								//exit from WAITEVENT
+
+ONERROR NEXT HandlerOnErr 
+
+ONEVENT EVTMR0 CALL HandlerTimer0
+ONEVENT EVTMR1 CALL HandlerTimer1
+
+TIMERSTART(0,500,1)  					//start a 500 millisecond recurring timer
+PRINT "\nWaiting for Timer 0"
+
+TIMERSTART(1,2000,0) 					//start a 1000 millisecond timer
+PRINT "\nWaiting for Timer 1"
+
+WAITEVENT

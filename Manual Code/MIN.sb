@@ -1,0 +1,8 @@
+//Example :: MIN.sb
+DIM s1,s2 
+s1=-2 : s2=4
+PRINT s1,s2
+PRINT "\nThe Minimum of these two integers is "; MIN(s1,s2)
+
+
+

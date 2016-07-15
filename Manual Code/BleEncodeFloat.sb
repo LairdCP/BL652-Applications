@@ -1,0 +1,20 @@
+//Example :: BleEncodeFloat.sb
+
+DIM rc
+DIM attr$ : attr$=""
+
+//write 1234567 x 10^-54 as FLOAT to index 2
+PRINT BleEncodeFLOAT(attr$,123456,-54,0)
+
+//write 1234567 x 10^1000 as FLOAT to index 2 and it will fail
+//because the exponent is too large, it has to be < 127
+IF BleEncodeFLOAT(attr$,1234567,1000,2)!=0 THEN
+  PRINT "\nfailed to encode to FLOAT"
+ENDIF
+
+//write 10000000 x 10^0 as FLOAT to index 2 and it will fail
+//because the mantissa is too large, it has to be < 8388600
+IF BleEncodeFLOAT(attr$,10000000,0,2)!=0 THEN
+  PRINT "\nfailed to encode to FLOAT"
+ENDIF
+

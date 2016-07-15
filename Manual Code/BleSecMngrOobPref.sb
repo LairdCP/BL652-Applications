@@ -1,0 +1,6 @@
+//Example :: BleSecMngrOobPref.sb
+dim rc
+rc = BleSecMngrOobPref(1)
+IF (rc == 0) THEN
+    PRINT "OOB Pairing preference has been set."
+ENDIF

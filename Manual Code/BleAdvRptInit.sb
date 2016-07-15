@@ -1,0 +1,9 @@
+//Example :: BleAdvRptInit.sb
+DIM advRpt$ : advRpt$=""
+DIM discovMode : discovMode=0 
+DIM advAppearance : advAppearance = 1
+DIM maxDevName : maxDevName = 10
+
+IF BleAdvRptInit(advRpt$, discovMode, advAppearance, maxDevName)==0 THEN
+	PRINT "\nAdvert report initialised"
+ENDIF

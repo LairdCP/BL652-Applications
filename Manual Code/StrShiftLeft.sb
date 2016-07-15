@@ -1,0 +1,6 @@
+//Example :: StrShiftLeft.sb
+DIM s$
+s$="123456789"
+PRINT s$;"\n"
+StrShiftLeft(s$,4)      //drop leftmost 4 characters
+PRINT s$        

@@ -1,0 +1,38 @@
+//Example :: UartReadMatch.sb
+DIM rc,str$,ret,char,str2$
+ret=1														//Function return value
+char=13														//ASCII decimal value for 'carriage return'
+
+str$="Your name is "
+str2$="\n\nMatch character ' ' not found \nExiting.."
+
+
+FUNCTION HndlrUartRx()
+	TimerStart(0,10,0)										//Allow time for data to reach rx buffer
+ENDFUNC 1
+
+FUNCTION HndlrTmr0()
+	rc = UartReadMatch(str$,char)									
+	PRINT "\n";str$	
+	IF rc==0 THEN
+		rc=StrSetChr(str2$,char,19)							//Insert 'char', the match character
+		PRINT str2$
+		str2$="\n\nMatch character  not found \nExiting.."	//reset str2$
+		ret=0
+	ELSE
+		PRINT "\n\n\nNow type something without the letter 'a'\n"
+		str$="You sent "									//reset str$
+		char=97												//ASCII decimal value for 'a'
+		ret=1
+	ENDIF
+ENDFUNC ret
+	
+ONEVENT EVTMR0 		CALL HndlrTmr0
+ONEVENT EVUARTRX 	CALL HndlrUartRx
+
+PRINT "\nWhat is your name?\n"
+
+WAITEVENT
+
+
+

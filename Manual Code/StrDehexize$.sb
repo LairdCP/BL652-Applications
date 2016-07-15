@@ -1,0 +1,10 @@
+//Example :: StrDehexize$.sb
+
+DIM s$ : s$="40414243"
+
+PRINT "\nHex data: ";s$
+PRINT "\nDehexized: "; StrDehexize$(s$)
+
+//Will stop at first non hex digit 'h'
+s$="4041hello4243"
+PRINT "\n";s$;" Dehexized: "; StrDehexize$(s$)

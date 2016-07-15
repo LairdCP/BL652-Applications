@@ -1,0 +1,27 @@
+//Example :: BleDisconnect.sb
+DIM addr$ : addr$=""
+DIM rc
+
+FUNCTION HndlrBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) 
+    SELECT nMsgId
+        CASE 0
+            PRINT "\nNew Connection ";nCtx
+            rc = BleAuthenticate(nCtx)
+            PRINT BleDisconnect(nCtx)
+        CASE 1
+            PRINT "\nDisconnected ";nCtx;"\n"
+            EXITFUNC 0
+        CASE ELSE
+    ENDSELECT
+ENDFUNC 1
+
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+
+IF BleAdvertStart(0,addr$,100,30000,0)==0 THEN
+    PRINT "\nAdverts Started\n"
+ELSE
+    PRINT "\n\nAdvertisement not successful"
+ENDIF
+
+WAITEVENT
+

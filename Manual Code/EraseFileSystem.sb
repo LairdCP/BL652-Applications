@@ -1,0 +1,11 @@
+//Example :: EraseFileSystem.sb
+DIM rc
+rc = EraseFileSystem(1234)
+IF rc!=0 THEN
+  PRINT "\nFailed to erase file system because incorrect parameter"
+ENDIF
+//Input SIO7 is low
+rc = EraseFileSystem(1)
+IF rc!=0 THEN
+  PRINT "\nFailed to erase file system because SIO7 is low"
+ENDIF

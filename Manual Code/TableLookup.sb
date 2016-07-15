@@ -1,0 +1,12 @@
+//Example :: TableLookup.sb
+DIM t$
+PRINT TableInit(t$);"\n\n"   
+ 
+PRINT TableAdd(t$,"Hello",1);"\n"   
+PRINT TableAdd(t$,"world",2);"\n"   
+PRINT TableAdd(t$,"to",3);"\n"      
+PRINT TableAdd(t$,"you",4);"\n\n"  
+ 
+PRINT TableLookup(t$,"to");"\n"     
+PRINT TableLookup(t$,"Hello");"\n"  
+PRINT TableLookup(t$,"you");"\n" 

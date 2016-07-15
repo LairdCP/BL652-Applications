@@ -1,0 +1,11 @@
+//Example :: BleHandleUuid16.sb
+DIM uuid
+DIM hUuidHRS
+
+uuid = 0x180D  //this is UUID for Heart Rate Service
+hUuidHRS = BleHandleUuid16(uuid)
+IF hUuidHRS == 0 THEN
+    PRINT "\nFailed to create a handle"
+ELSE
+    PRINT "Handle for HRS Uuid is ";integer.h' hUuidHRS;"(";hUuidHRS;")"
+ENDIF

@@ -1,0 +1,48 @@
+//Example :: FileIo.sb
+//
+// First download a file into the module by submitting the following 
+// commands manually (wait for a 00 response after each command) :-
+//
+//     at+fow "myfile.dat"
+//     at+fwr "Hello"
+//     at+fwr " World. "
+//     at+fwr " This is something"
+//     at+fwr " in a file which we can read"
+//     at+fcl
+//
+// You can check you have the file in the file system by submitting
+// the command AT+DIR and you should see myfile.dat listed
+//
+DIM handle,fname$,flen,frlen,data$,fpos,rc
+
+fname$="myfile.dat" : handle = fopen(fname$,"r")
+IF handle != 0 THEN
+  //determine the size of the file
+  flen = filelen(handle)
+  print "\nThe file is ";flen;" bytes long"
+  //get the current position in the file (should be 0)
+  rc = ftell(handle,fpos)
+  print "\nCurrent position is ";fpos
+  //read the first 11 bytes from the file
+  frlen = fread(handle,data$,11)
+  print "\nData from file is : ";data$
+  //get the current position in the file (should be 11)
+  rc = ftell(handle,fpos)
+  print "\nCurrent position is ";fpos
+  //reposition the file pointer to 6 so that we can read 5 bytes again
+  rc = fseek(handle,6,0)
+  //get the current position in the file
+  rc = ftell(handle,fpos)
+  //read 5 bytes
+  frlen = fread(handle,data$,5)
+  print "\nData from file is : ";data$
+  //reposition to the start of 'is' 
+  rc = fseek(handle,19,0)
+  //read until a 'w' is encountered : w = ascii 0x77
+  frlen = freaduntil(handle,data$,0x77,32)
+  print "\nData from file is : ";data$
+  //finally close the file, which on exit will set the handle to 0
+  fclose(handle)  
+ELSE
+  print "\nFailed to open file ";fname$
+ENDIF

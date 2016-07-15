@@ -1,0 +1,6 @@
+//Example :: ABS.sb
+DIM s1 as INTEGER,s2 as INTEGER
+s1 = -2 : s2 = 4
+PRINT s1, ABS(s1);"\n";s2, Abs(s2)
+
+

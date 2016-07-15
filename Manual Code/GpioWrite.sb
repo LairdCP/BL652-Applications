@@ -1,0 +1,54 @@
+//Example :: GpioWrite.sb
+dim rc, i1, i2
+i2 = 1
+i1 = 1
+
+
+'//------------------------------------------------------------------------------
+'// For debugging
+'// --- rc = result code
+'// --- ln = line number         
+'//------------------------------------------------------------------------------
+Sub AssertRC(rc,ln)   
+    if rc!=0 then
+        print "\nFail :";integer.h' rc;" at tag ";ln
+    //else
+        //print "\nOk: line ";ln
+    endif
+EndSub
+
+rc=GpioSetFunc(17,2,1)
+AssertRC(rc,16)
+
+rc=GpioSetFunc(18,2,1)
+AssertRC(rc,19)
+
+
+function HandlerTmr0()
+    i1=!i1
+    GpioWrite(18,i1)
+    AssertRC(rc,30)
+endfunc 1
+
+
+function HandlerTmr1()
+    i2=!i2
+    GpioWrite(17,i2)
+    AssertRC(rc,42)
+endfunc 1
+
+function HandlerUartRx()
+endfunc 0
+
+
+TimerStart(0,500,1)
+TimerStart(1,1000,1)
+
+onevent evuartrx call HandlerUartRx
+onevent evtmr0   call HandlerTmr0
+onevent evtmr1   call HandlerTmr1
+print "\n\nPress any key to exit"
+
+waitevent
+
+print "\nExiting..."

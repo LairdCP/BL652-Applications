@@ -1,0 +1,18 @@
+//Example :: UartFlushRx.sb
+FUNCTION HndlrUartRx()
+	TimerStart(0,2,0)								//Allow time for data to reach rx buffer	
+ENDFUNC 1
+
+FUNCTION HndlrTmr0()
+	PRINT UartInfo(3);" bytes in the rx buffer,\n"
+	UartFlush(01)									//clear rx buffer
+	PRINT UartInfo(3);" bytes in the rx buffer after flushing"
+ENDFUNC 0
+	
+ONEVENT EVUARTRX 	CALL HndlrUartRx
+ONEVENT EVTMR0 		CALL HndlrTmr0
+
+PRINT "\nSend me some data\n"
+
+WAITEVENT
+

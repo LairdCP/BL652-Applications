@@ -1,0 +1,7 @@
+//Example :: TableInit.sb
+DIM t$
+t$="Hello"
+PRINT "\n";"[";t$;"]"           
+PRINT "\n";TableInit(t$)        
+PRINT "\n";"[";t$;"]"           //String variable is now blank after
+                                //being initialised as a table

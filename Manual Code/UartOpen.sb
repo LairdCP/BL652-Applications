@@ -1,0 +1,35 @@
+// Example :: UartOpen.sb
+DIM rc
+
+FUNCTION HndlrUartRx()
+    PRINT "\nData has arrived\r"
+ENDFUNC 1 //remain blocked in WAITEVENT
+
+FUNCTION Btn0Pressed()
+    UartClose()
+ENDFUNC 0
+
+rc = GPIOBindEvent(0,16,1)                  //For button0
+
+ONEVENT EVUARTRX CALL HndlrUartRx
+ONEVENT EVGPIOCHAN0 CALL Btn0Pressed 
+
+UartClose()                                 //Since Uart port is already open we must
+                                            //close it before opening it again with
+                                            //different settings.
+
+//--- Open comport so that DCD and RI are inputs
+rc = UartOpen(9600,0,0,"CE81H")             //Open as DCE, no parity, 8 databits, 
+                                             //1 stopbits, cts/rts flow control
+
+IF rc!= 0 THEN 
+    PRINT "\nFailed to open UART interface with error code ";INTEGER.H' rc
+ELSE
+    PRINT "\nUART open success"
+ENDIF
+
+PRINT "\nPress button 0 to exit this application\n"
+
+WAITEVENT                                   //wait for rx, events
+PRINT "\nExiting..."
+                                                                                                                                                  

@@ -1,0 +1,49 @@
+//Example :: BleConnRssiStart.sb
+
+DIM rc,conHndl
+DIM addr$ : addr$=""    
+
+//==============================================================================
+// Initialise
+//==============================================================================
+FUNCTION OnStartup()
+    rc=BleAdvertStart(0,addr$,50,0,0)
+ENDFUNC rc
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n--- Disconnected from client"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n--- Connected to client"
+		rc=BleConnRssiStart(conHndl,4,10)
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// Connection related RSSI events
+//==============================================================================
+FUNCTION HndlrConnRssi(BYVAL charHandle, BYVAL rssi) AS INTEGER
+    PRINT "\nRSSI=";rssi;" for connection "; integer.h' charHandle
+	IF rssi < -80 then
+	    //too far away so stop monitoring the rssi (this is just an example)
+		//in reality use some other reason to stop 
+	    rc=BleConnRssiStop(conHndl)
+	ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//==============================================================================
+ONEVENT  EVBLEMSG    CALL HndlrBleMsg
+ONEVENT  EVCONNRSSI  CALL HndlrConnRssi
+
+IF OnStartup()!=0 THEN
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+//Wait for events
+WAITEVENT

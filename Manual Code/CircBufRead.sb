@@ -1,0 +1,36 @@
+// Example :: CircBufRead.sb
+DIM rc,circHandle,i,nData
+
+rc = CircBufCreate(4,circHandle)
+IF rc != 0 THEN 
+    PRINT "\nThe circular buffer was not created"
+ELSE
+    PRINT "\nThe circular buffer was created successfully\n"
+	PRINT "Writing..."
+ENDIF
+
+FOR i = 1 TO 5 
+	rc = CircBufOverwrite(circHandle,i)
+	IF rc == 0x5103 THEN
+		PRINT "\nOldest value was discarded to write ";i;"\n"
+	ELSEIF rc !=0 THEN
+		PRINT "\nFailed TO write inTO the circular buffer"
+	ELSE 
+		PRINT "\n";i
+	ENDIF
+NEXT
+
+//read 4 values from the circular buffer
+PRINT "\nReading...\n"
+FOR i = 1 to 4 
+  rc = CircBufRead(circHandle,nData)
+  IF rc == 0x5102 THEN
+    PRINT "The buffer was empty"
+  ELSEIF rc != 0 THEN
+    PRINT "Failed to read from the circular buffer"
+  ELSE
+    PRINT nData;"\n"
+  ENDIF
+NEXT
+
+	

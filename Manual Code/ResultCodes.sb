@@ -1,0 +1,14 @@
+//Example :: ResultCodes.sb
+DIM cB,nItems,rc,s$
+
+rc=CircBufItems(cB,nItems)
+PRINT INTEGER.H'rc
+
+PRINT "\n";             //New line
+
+//Printing return value directly
+PRINT INTEGER.H'CircBufItems(cB,nItems)
+
+//To remove the leading zeros
+SPRINT #s$, INTEGER.H'CircBufItems(cB,nItems)
+StrShiftLeft(s$,4) : PRINT s$

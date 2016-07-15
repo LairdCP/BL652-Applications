@@ -1,0 +1,356 @@
+// Copyright (c) 2015, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// BL652 custom Real Time Clock (RTC) Service
+//       This sample application implements the BLE RTC service with additional
+//       characteristics to allow setting the time remotely.
+//
+//******************************************************************************
+//
+// -> Sends BLE adverts with time from RTC
+// -> Allows remote time setting
+//
+
+#DEFINE BLE_SERVICE_SECONDARY                           0
+#DEFINE BLE_SERVICE_PRIMARY                             1
+
+dim rc                                                     //Result code
+dim I2Ch                                                   //I2C Handle
+DIM Service1                                               //Composite handle for hts primary service
+DIM Service1UUID : Service1UUID = BleHandleUuid16(0x1805)  //HT Svc UUID Handle, 0x1805 for current time service
+DIM Char1                                                  //Characteristic 1 (Current time)
+DIM Char2                                                  //Characteristic 2 (Local time)
+DIM Char3                                                  //Characteristic 3 (Reference time)
+DIM Char4                                                  //Characteristic 6 (Version)
+DIM Timezone : Timezone = 0                                //Hours off from UTC, see https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.time_zone.xml
+DIM DST : DST = 0                                          //0 for no DST, 4 for +1 hour DST, see https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.dst_offset.xml
+DIM SendNotify : SendNotify = 0                            //Set to 1 when notifications are enabled
+dim APP_VERSION$ : APP_VERSION$ = "0.93"
+dim BuzzerFunc : BuzzerFunc = 0                            //Which function to do with the buzzer next
+dim I2CSpeed : I2CSpeed = 250000                           //250KHz
+dim RTCAddr : RTCAddr = 111                                //I2C Address of RTC
+dim AdjustReason : AdjustReason = 0                        //Reason for last time adjustment
+dim DayOfWeek : DayOfWeek = 0                              //The current day of the week (0 = unknown)
+
+//******************************************************************************
+// Command success handler
+//******************************************************************************
+SUB AssertRC(rc,ln)
+    IF rc!=0 THEN
+        PRINT "\nFail :";integer.h' rc;" at tag ";ln
+    ENDIF
+ENDSUB
+
+FUNCTION HndlrTmr0()
+    //Timer function to read RTC and output value
+    dim secVal, minVal, hourVal, dateVal, monthVal, yearVal
+    rc = I2COpen(I2CSpeed, 0, I2Ch)
+    rc = I2CReadReg8(RTCAddr, 0, secVal)
+    rc = I2CReadReg8(RTCAddr, 1, minVal)
+    rc = I2CReadReg8(RTCAddr, 2, hourVal)
+    rc = I2CReadReg8(RTCAddr, 4, dateVal)
+    rc = I2CReadReg8(RTCAddr, 5, monthVal)
+    rc = I2CReadReg8(RTCAddr, 6, yearVal)
+
+    //Close I2C connection
+    I2CClose(I2Ch)
+
+    //Convert I2C RTC values into time & date information
+    dim Seconds, Minutes, Hours, Day, Month, Year
+    Seconds = ((secVal & 15) + ((secVal & 112)>>4)*10)
+    Minutes = ((minVal & 15) + ((minVal & 112)>>4)*10)
+    Hours = ((hourVal & 15) + ((hourVal & 48)>>4)*10)
+    Day = ((dateVal & 15) + ((dateVal & 48)>>4)*10)
+    Month = ((monthVal & 15) + ((monthVal & 16)>>4)*10)
+    Year = (2001 + (yearVal & 15) + ((yearVal & 240)>>4)*10)
+    PRINT Hours;":";Minutes;":";Seconds;" on ";Day;"/";Month;"/";Year;"\n"
+
+    //Check if the day has rolled over
+    IF (Seconds == 0 && Minutes == 0 && Hours == 0 && DayOfWeek > 0) THEN
+        DayOfWeek = DayOfWeek+1
+        IF (DayOfWeek > 7) THEN
+            DayOfWeek = 1
+        ENDIF
+    ENDIF
+
+    //Encode data
+    dim TmpStr$ : TmpStr$ = ""
+    rc = BleEncode8(TmpStr$, AdjustReason, 9)  //Adjust reason
+    rc = BleEncode8(TmpStr$, 0, 8)             //1/256 seconds
+    rc = BleEncode8(TmpStr$, DayOfWeek, 7)     //Day of week
+    rc = BleEncode8(TmpStr$, Seconds, 6)
+    rc = BleEncode8(TmpStr$, Minutes, 5)
+    rc = BleEncode8(TmpStr$, Hours, 4)
+    rc = BleEncode8(TmpStr$, Day, 3)
+    rc = BleEncode8(TmpStr$, Month, 2)
+    rc = BleEncode16(TmpStr$, Year, 0)
+
+    //Update GATT information
+    rc = BleCharValueWrite(Char1, TmpStr$)
+    AssertRC(rc, 110)
+
+    //Update BLE advert with new information
+    DIM advRpt$ : advRpt$ = ""
+    DIM scRpt$ : scRpt$ = ""
+    rc = BleAdvRptInit(advRpt$, 2, 1, 10)
+    AssertRC(rc, 116)
+    rc = BleAdvRptAppendAD(advRpt$, 0x16, TmpStr$)
+    AssertRC(rc, 118)
+    rc = BleAdvRptsCommit(advRpt$, scRpt$)
+    AssertRC(rc, 120)
+
+    //Send notification if enabled
+    IF SendNotify == 1 THEN
+         rc = BleCharValueNotify(Char1, TmpStr$)
+         AssertRC(rc, 125)
+    ENDIF
+ENDFUNC 1
+
+FUNCTION HndlrCharCccd(BYVAL charHandle, BYVAL nVal)
+    //Runs when CCCD has been written
+    IF nVal == 1 THEN
+         SendNotify = 1
+    ELSE
+         SendNotify = 0
+    ENDIF
+ENDFUNC 1
+
+FUNCTION BleEvent(BYVAL msgID, BYVAL msgCtx)
+    //Runs when a BLE connection trigger occurs
+    IF msgID == 0 THEN
+         //Connection
+         PRINT "Connect.\n"
+    ELSEIF msgID == 1 THEN
+         //Disconnection
+         PRINT "End!\n"
+
+         //Stop notifications
+         SendNotify = 0
+
+         //Restart BLE adverts
+         dim addr$ : addr$ = ""
+         PRINT BleAdvertStart(0,addr$,500,0,0)
+    ENDIF
+ENDFUNC 1
+
+FUNCTION HndlrCharVal(BYVAL charHandle, BYVAL offset, BYVAL len)
+    //When characteristic is written
+    dim attr$
+    dim TmpVal, TmpVal2
+    IF charHandle == Char1 THEN
+        //Time & date has been updated
+        rc = BleCharValueRead(charHandle, attr$)
+
+        //Open I2C
+        rc = I2COpen(I2CSpeed, 0, I2Ch)
+
+        //Adjust reason
+        rc = BleDecodeU8(attr$, AdjustReason, 9)
+
+        //Day of the week
+        rc = BleDecodeU8(attr$, DayOfWeek, 7)
+
+        //Seconds
+        rc = BleDecodeU8(attr$, TmpVal, 6)
+        TmpVal2 = 0
+        WHILE TmpVal > 10
+             TmpVal2 = TmpVal2 + 10
+             TmpVal = TmpVal - 10
+        ENDWHILE
+        TmpVal2 = (((TmpVal2/10)<<4) + (TmpVal & 15)) | 128
+        rc = I2CWriteReg8(RTCAddr, 0, TmpVal2) //Seconds
+
+        //Minutes
+        rc = BleDecodeU8(attr$, TmpVal, 5)
+        TmpVal2 = 0
+        WHILE TmpVal > 10
+             TmpVal2 = TmpVal2 + 10
+             TmpVal = TmpVal - 10
+        ENDWHILE
+        TmpVal2 = ((TmpVal2/10)<<4) + (TmpVal & 15)
+        rc = I2CWriteReg8(RTCAddr, 1, TmpVal2) //Minutes
+
+        //Hours
+        rc = BleDecodeU8(attr$, TmpVal, 4)
+        TmpVal2 = 0
+        WHILE TmpVal > 10
+             TmpVal2 = TmpVal2 + 10
+             TmpVal = TmpVal - 10
+        ENDWHILE
+        TmpVal2 = (((TmpVal2/10)<<4) + (TmpVal & 15)) & 63
+        rc = I2CWriteReg8(RTCAddr, 2, TmpVal2) //Hour
+
+        //Day
+        rc = BleDecodeU8(attr$, TmpVal, 3)
+        TmpVal2 = 0
+        WHILE TmpVal > 10
+             TmpVal2 = TmpVal2 + 10
+             TmpVal = TmpVal - 10
+        ENDWHILE
+        TmpVal2 = ((TmpVal2/10)<<4) + (TmpVal & 15)
+        rc = I2CWriteReg8(RTCAddr, 4, TmpVal2) //Day
+
+        //Month
+        rc = BleDecodeU8(attr$, TmpVal, 2)
+        TmpVal2 = 0
+        WHILE TmpVal > 10
+             TmpVal2 = TmpVal2 + 10
+             TmpVal = TmpVal - 10
+        ENDWHILE
+        TmpVal2 = ((TmpVal2/10)<<4) + (TmpVal & 15)
+        rc = I2CWriteReg8(RTCAddr, 5, TmpVal2) //Month
+
+        //Year
+        rc = BleDecodeU16(attr$, TmpVal, 0)
+        TmpVal2 = 0
+        TmpVal = TmpVal - 2001
+        WHILE TmpVal > 10
+             TmpVal2 = TmpVal2 + 10
+             TmpVal = TmpVal - 10
+        ENDWHILE
+        TmpVal2 = ((TmpVal2/10)<<4) + (TmpVal & 15)
+        rc = I2CWriteReg8(RTCAddr, 6, TmpVal2) //Year
+
+        //Close I2C
+        I2CClose(I2Ch)
+    ENDIF
+ENDFUNC 1
+
+//Open I2C
+rc = I2COpen(I2CSpeed, 0, I2Ch)
+IF (rc != 0) THEN
+    //I2C isn't working
+    PRINT "Unable to communicate \n"
+ENDIF
+
+//Check time
+dim secVal, minVal, hourVal, dayVal, monthVal, yearVal
+rc = I2CReadReg8(RTCAddr, 0, secVal)
+rc = I2CReadReg8(RTCAddr, 1, minVal)
+rc = I2CReadReg8(RTCAddr, 4, dayVal)
+rc = I2CReadReg8(RTCAddr, 5, monthVal)
+rc = I2CReadReg8(RTCAddr, 6, yearVal)
+
+IF ((secVal & 112) == 0 && (minVal & 112) == 0 && (dayVal & 63) == 1 && (monthVal & 31) == 1 && yearVal == 1) THEN
+    //No settings configured! Set time to Monday, 8:15am
+    rc = I2CWriteReg8(RTCAddr, 3, 41)    //Power and day of week (day 1/Monday)
+    rc = I2CWriteReg8(RTCAddr, 1, 16+5)  //Minutes
+    rc = I2CWriteReg8(RTCAddr, 2, 8)     //Hours (24-hour format)
+
+    //Set date to 15/04/2014
+    rc = I2CWriteReg8(RTCAddr, 4, 21)    //15th
+    rc = I2CWriteReg8(RTCAddr, 5, 4)     //April
+    rc = I2CWriteReg8(RTCAddr, 6, 19)    //2014 (2014-2001 = 13)
+
+    //Enable RTC
+    rc = I2CWriteReg8(RTCAddr, 0, 128)
+
+    //Output
+    PRINT "RTC not configured, set to 15/04/2014 @ 8:15am.\n"
+ENDIF
+
+//Close I2C
+I2CClose(I2Ch)
+
+//Start a BLE server
+rc = BleGAPSvcInit("CurrentTimeServer", 0, 256, 80000, 100000, 4000000, 0)
+AssertRC(rc, 277)
+rc = BleSvcRegDevInfo("Laird", "BL652", "", "1.0", "1.0", "", "", "")
+AssertRC(rc, 279)
+
+//Create service
+rc = BleServiceNew(BLE_SERVICE_PRIMARY, Service1UUID, Service1)
+AssertRC(rc, 283)
+
+//Add first characteristics
+dim hrs$ : hrs$ = "          "
+rc = BleCharNew(0x1A, BleHandleUuid16(0x2A2B), BleAttrMetadata(1,1,10,0,rc), BleAttrMetadata(1,1,2,0,rc),0) //Current time (Read, write & Notify) with CCCD
+AssertRC(rc, 288)
+rc = BleCharCommit(Service1, hrs$, Char1)
+AssertRC(rc, 290)
+
+//Second characteristic
+hrs$ = "00"
+rc = BleCharNew(0x2, BleHandleUuid16(0x2A0F), BleAttrMetadata(1,0,2,0,rc), 0, 0) //Local time (Read)
+AssertRC(rc, 295)
+rc = BleCharCommit(Service1, hrs$, Char2)
+AssertRC(rc, 297)
+
+//Third characteristic
+hrs$ = "0000"
+rc = BleCharNew(0x2, BleHandleUuid16(0x2A14), BleAttrMetadata(1,0,4,0,rc), 0, 0) //Reference time (Read)
+AssertRC(rc, 302)
+rc = BleCharCommit(Service1, hrs$, Char3)
+AssertRC(rc, 304)
+
+//Forth (and final) characteristic
+rc = BleCharNew(0x2, BleHandleUuid16(0x2B04), BleAttrMetadata(1,0,5,0,rc), 0, 0) //Version (Read)
+AssertRC(rc, 308)
+rc = BleCharCommit(Service1, APP_VERSION$, Char4)
+AssertRC(rc, 310)
+
+//Commit services
+rc = BleServiceCommit(Service1)
+AssertRC(rc, 314)
+
+//Setup local time information characteristic
+dim TmpStr$ : TmpStr$ = ""
+rc = BleEncode8(TmpStr$, DST, 1)      //DST
+rc = BleEncode8(TmpStr$, Timezone, 0) //Timezone
+
+//Update GATT information
+rc = BleCharValueWrite(Char2, TmpStr$)
+
+//Setup reference time information characteristic
+TmpStr$ = ""
+rc = BleEncode8(TmpStr$, 255, 3) //Hours since update
+rc = BleEncode8(TmpStr$, 255, 2) //Days since update
+rc = BleEncode8(TmpStr$, 255, 1) //Accuracy is unknown
+rc = BleEncode8(TmpStr$, 4, 0)   //Source is manual
+
+//Update GATT information
+rc = BleCharValueWrite(Char3, TmpStr$)
+
+//Enable timer to run every seconds
+TimerStart(0, 1000, 1)
+
+//Start BLE adverts
+dim addr$ : addr$ = ""
+rc = BleAdvertStart(0,addr$,500,0,0)
+AssertRC(rc, 340)
+
+//Run initial time send
+rc = HndlrTmr0()
+
+//Startup message
+DIM BTAddr$
+BTAddr$ = SysInfo$(4)
+PRINT "\nrtcs.erver running with Bluetooth address: ";STRHEXIZE$(BTAddr$);"\nNow accepting connections...\n\n"
+
+//Events
+ONEVENT EVTMR0 CALL HndlrTmr0          //Runs when timer0 expires
+ONEVENT EVBLEMSG CALL BleEvent         //Runs on BLE event
+ONEVENT EVCHARCCCD CALL HndlrCharCccd  //Runs when CCCD is written
+ONEVENT EVCHARVAL CALL HndlrCharVal    //Runs when characteristic is written
+
+WAITEVENT

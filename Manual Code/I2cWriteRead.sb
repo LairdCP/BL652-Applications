@@ -1,0 +1,43 @@
+//Example :: I2cWriteRead.sb
+
+//**Please ensure that nSlaveAddr is the slave address of your I2C peripheral**
+DIM rc
+DIM handle
+DIM nSlaveAddr
+DIM stWrite$, stRead$, nReadLen
+
+rc=I2cOpen(100000,0,handle)
+IF rc!= 0 THEN 
+  PRINT "\nFailed to open I2C interface with error code ";integer.h' rc
+ELSE
+  PRINT "\nI2C open success"
+ENDIF
+
+//Write 2 bytes and read 0
+nSlaveAddr=0x6f :  stWrite$ = "\34\35" : stRead$="" : nReadLen = 0
+rc = I2cWriteRead(nSlaveAddr, stWrite$, stRead$, nReadLen)
+IF rc!= 0 THEN 
+  PRINT "\nFailed to WriteRead "; integer.h'rc
+ELSE
+  PRINT "\nWrite = ";StrHexize$(stWrite$);" Read = ";StrHexize$(stRead$)
+ENDIF
+
+//Write 3 bytes and read 4
+nSlaveAddr=0x6f :  stWrite$ = "\34\35\43" : stRead$="" : nReadLen = 4
+rc = I2cWriteRead(nSlaveAddr, stWrite$, stRead$, nReadLen)
+IF rc!= 0 THEN 
+  PRINT "\nFailed to WriteRead "; integer.h'rc
+ELSE
+  PRINT "\nWrite = ";StrHexize$(stWrite$);" Read = ";StrHexize$(stRead$)
+ENDIF
+
+//Write 0 bytes and read 8
+nSlaveAddr=0x6f :  stWrite$ = "" : stRead$="" : nReadLen = 8
+rc = I2cWriteRead(nSlaveAddr, stWrite$, stRead$, nReadLen)
+IF rc!= 0 THEN 
+  PRINT "\nFailed to WriteRead "; integer.h'rc
+ELSE
+  PRINT "\nWrite = ";StrHexize$(stWrite$);" Read = ";StrHexize$(stRead$)
+ENDIF
+
+I2cClose(handle)  //close the port

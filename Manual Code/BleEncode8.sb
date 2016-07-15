@@ -1,0 +1,23 @@
+//Example :: BleEncode8.sb
+
+DIM rc
+DIM attr$
+
+attr$="Laird"
+
+PRINT "\nattr$=";attr$
+
+//Remember: - 4 bytes are used to store an integer on the BL652
+
+//write 'C' to index 2 -- '111' will be ignored
+rc=BleEncode8(attr$,0x11143,2)
+//write 'A' to index 0 
+rc=BleEncode8(attr$,0x41,0)
+//write 'B' to index 1
+rc=BleEncode8(attr$,0x42,1)
+//write 'D' to index 3 
+rc=BleEncode8(attr$,0x44,3)
+//write 'y' to index 10 -- attr$ will be extended
+rc=BleEncode8(attr$,0x67, 7)
+
+PRINT "\nattr$ now = ";attr$   //output will be 'attr$=ABCD'

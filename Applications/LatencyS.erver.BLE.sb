@@ -1,0 +1,188 @@
+// Copyright (c) 2015, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// BLE Latency Tester (Host): This application hosts a simple BLE server and
+//                            forwards values written back to the client device
+//                            as notifications to test the latency of BLE conn-
+//                            -ections with different min/max connection
+//                            intervals.
+//
+// To use: Simply run the LatencyS.erver.BLE.sb application on a BL600, BL652 or
+//         or BT900 and put the device's Bluetooth address in the client files
+//         (LatencyC.lient.BLE.sb) global variable section (in the 
+//         'dim addr$ : addr$ = ""' line), then download and run the client on
+//         a BL620, BL652 or BT900 and it will automatically connect to the
+//         master device.
+//         Once connected, the minimum/maximum connection interval can be
+//         changed from the master device side, and enter can be pressed on the
+//         client device to run a single loop test.
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+#define APP_VERSION         "1.00" //Version of the application
+#define PreferredMinConnInt 7500   //The default preferred minimum connection interval
+#define PreferredMaxConnInt 10000  //The default preferred maximum connection interval
+#define ConnIntIncrement    500    //Amount to increment/decrement the connection interval by
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim rc                                            //Result code variable
+dim addr$                                         //Address of device to connect to
+dim cHndl                                         //Client handle
+dim svcID                                         //Service handle
+dim charID                                        //Characteristic handle
+dim NewConnection                                 //Set to 1 if this is a new connection
+dim MinConnInt : MinConnInt = PreferredMinConnInt //
+dim MaxConnInt : MaxConnInt = PreferredMaxConnInt //
+dim nSuprToutUs                                   //
+dim nSlaveLatency                                 //
+dim Connected
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+SUB AssertRC(rc, line)
+    if (rc != 0) then
+        print "Error, rc = ";integer.h'rc;" on line ";line;"\n"
+    endif
+ENDSUB
+
+//==============================================================================
+//Function when a BLE event occurs
+//==============================================================================
+FUNCTION HndlrBleMsg(nMsgId, nCtx)
+    dim nIntervalUs
+    IF (nMsgId == 0) THEN
+        //Connected - set preferred parameters
+        cHndl = nCtx
+        rc = BLEGETCURCONNPARMS(cHndl, nIntervalUs, nSuprToutUs, nSlaveLatency)
+        PRINT "Connection params: Interval = ";nIntervalUs;", Supervision timeout = ";nSuprToutUs;", Slave latency = ";nSlaveLatency;"\n"
+        rc = BLESETCURCONNPARMS(cHndl, MinConnInt, MaxConnInt, nSuprToutUs, nSlaveLatency)
+        print "Slave device connected!\n";
+        NewConnection = 1
+        Connected = 1
+        print "Command keys: 1) decrease minimum connection interval, 2) increase minimum connection interval, 3) decrease maximum connection interval, 4) increase maximum connection interval, 5) Renegotiate connection parameters (update)\n"
+    ELSEIF (nMsgId == 1) THEN
+        //Client disconnected, restart advertising
+        rc = BleAdvertStart(0, addr$, 250, 0, 0)
+        AssertRC(rc, 92)
+        Connected = 0
+    ELSEIF (nMsgId == 14) THEN
+        //Connection parameter update
+        rc = BLEGETCURCONNPARMS(cHndl, nIntervalUs, nSuprToutUs, nSlaveLatency)
+        PRINT "Connection params update: Interval = ";nIntervalUs;", Supervision timeout = ";nSuprToutUs;", Slave latency = ";nSlaveLatency;"\n"
+        if (nIntervalUs > 30000 && NewConnection == 1) then
+            //Connection parameters are high, attempt to lower them
+            rc = BLESETCURCONNPARMS(cHndl, MinConnInt, MaxConnInt, nSuprToutUs, nSlaveLatency)
+            AssertRC(rc, 101)
+            NewConnection = 0
+        endif
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Function called when a characteristic has been written
+//==============================================================================
+FUNCTION HndlrCharVal(charHandle, offset, len)
+    rc = BLECHARVALUEREAD(charHandle, addr$)
+    AssertRC(rc, 112)
+    rc = BLECHARVALUENOTIFY(charID, addr$)
+    AssertRC(rc, 114)
+ENDFUNC 1
+
+//==============================================================================
+//Function called when a characteristic has been written
+//==============================================================================
+FUNCTION ResetTest()
+    dim TmpStr$, TmpStr2$, DoUpdate
+    rc = uartread(TmpStr$)
+    IF (Connected == 1) THEN
+        //Connection is active
+        TmpStr$ = LEFT$(TmpStr$, 1)
+        TmpStr2$ = "1"
+        IF (STRCMP(TmpStr$, TmpStr2$) == 0 && MinConnInt > 7500) THEN
+            //Decrease minimum connection interval
+            MinConnInt = MinConnInt - ConnIntIncrement
+            PRINT "Minimum connection interval: ";MinConnInt;"\n"
+        ENDIF
+        TmpStr2$ = "2"
+        IF (STRCMP(TmpStr$, TmpStr2$) == 0 && MinConnInt < 100000 && MinConnInt+ConnIntIncrement < MaxConnInt) THEN
+            //Increase minimum connection interval
+            MinConnInt = MinConnInt + ConnIntIncrement
+            PRINT "Minimum connection interval: ";MinConnInt;"\n"
+        ENDIF
+        TmpStr2$ = "3"
+        IF (STRCMP(TmpStr$, TmpStr2$) == 0 && MaxConnInt > 7500 && MaxConnInt-ConnIntIncrement > MinConnInt) THEN
+            //Decrease maximum connection interval
+            MaxConnInt = MaxConnInt - ConnIntIncrement
+            PRINT "Maximum connection interval: ";MaxConnInt;"\n"
+        ENDIF
+        TmpStr2$ = "4"
+        IF (STRCMP(TmpStr$, TmpStr2$) == 0 && MaxConnInt < 100000) THEN
+            //Increase maximum connection interval
+            MaxConnInt = MaxConnInt + ConnIntIncrement
+            PRINT "Maximum connection interval: ";MaxConnInt;"\n"
+        ENDIF
+        TmpStr2$ = "5"
+        IF (STRCMP(TmpStr$, TmpStr2$) == 0) THEN
+            //Renegotiate connection parameters
+            PRINT "Renegotiating...\n"
+            rc = BLESETCURCONNPARMS(cHndl, MinConnInt, MaxConnInt, nSuprToutUs, nSlaveLatency)
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+//Create service with one characteristic
+addr$ = "a"
+rc = BleServiceNew(1, BleHandleUuid16(0x180D), svcID)
+AssertRC(rc, 165)
+rc = BleCharNew(62, BleHandleUuid16(0x2020), BleAttrMetadata(1,1,20,1,rc), BleAttrMetadata(1,1,2,0,rc), 0)
+AssertRC(rc, 167)
+rc = BleCharCommit(svcID, addr$, charID)
+AssertRC(rc, 169)
+rc = BleServiceCommit(svcID)
+AssertRC(rc, 171)
+
+//Start advertising
+rc = BleAdvertStart(0, addr$, 250, 0, 0)
+AssertRC(rc, 175)
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+ONEVENT EVBLEMSG   CALL HndlrBleMsg
+ONEVENT EVCHARVAL  CALL HndlrCharVal
+ONEVENT EVUARTRX   CALL ResetTest
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WAITEVENT

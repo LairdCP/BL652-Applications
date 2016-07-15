@@ -1,0 +1,4 @@
+//Example :: NvRecordGet.sb
+DIM r$
+PRINT NvRecordGet(100,r$);" bytes read"		
+PRINT "\n";r$				

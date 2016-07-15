@@ -1,0 +1,8 @@
+ //Example :: DimEx2.sb
+
+ DIM i$ as STRING
+ DIM a$ as STRING
+ a$ = "Laird"
+ i$ = a$ + "Rocks!"		//Here we are concatenating the two strings
+ 
+ print i$

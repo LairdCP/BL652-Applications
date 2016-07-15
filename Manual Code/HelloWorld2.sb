@@ -1,0 +1,9 @@
+//Example Script "helloworld"
+ 
+DIM i as integer 					//declare our variable
+ 
+for i=1 to 10 				 		//Perform the print ten times
+print "Hello World ";i;"\n"			//The \n forces a new line each time
+									//The ;i; prints integer i directly 
+//after "Hello World " 
+next 								//Increment the value of i

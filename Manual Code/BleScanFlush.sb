@@ -1,0 +1,31 @@
+ //Example :: BleScanFlush.sb
+ DIM rc, startTick
+
+ '//Scan for 20 seconds with no filtering
+ rc = BleScanStart(20000, 0)
+
+ IF rc==0 THEN
+     PRINT "\nScanning"
+ ELSE
+     PRINT "\nError: "; INTEGER.H'rc
+ ENDIF
+
+ '//Wait 2 seconds before aborting scan
+ startTick = GetTickCount()
+ WHILE GetTickSince(startTick) < 2000
+ ENDWHILE
+
+ '//If scan in progress, abort
+ IF SysInfo(2016) == 0x08 THEN
+     PRINT "\nAborting scan"
+     rc = BleScanAbort() 
+     IF SysInfo(2016) == 0 THEN
+         PRINT "\nScan aborted"
+     ENDIF
+     
+     '//Free up memory
+     rc = BleScanFlush()
+     IF (rc == 0) THEN
+        PRINT "\nScan results flushed."
+     ENDIF
+ ENDIF

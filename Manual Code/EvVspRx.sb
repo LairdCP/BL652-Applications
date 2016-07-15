@@ -1,0 +1,19 @@
+//Example :: EvVspRx.sb
+//   echos incoming data back to the peer
+
+//Open the VSP
+DIM hndl,rc
+rc = BleVSpOpen(128,128,0,hndl)
+
+//handler to service data arriving on VSP
+FUNCTION HandlerBleVSpRx() AS INTEGER
+  //echo the data back
+  DIM n,rx$
+  n = BleVSpRead(rx$,20)
+  n = BleVSpWrite(rx$)
+ENDFUNC 1
+
+OnEvent  EVVSPRX  CALL HandlerBleVSpRx
+
+//wait for events and messages
+WAITEVENT

@@ -1,0 +1,13 @@
+//Example :: IfThenElse.sb
+DIM n 
+n=1
+IF n>0 THEN
+  PRINT "Laird Rocks\n"
+ENDIF
+IF n==0 THEN
+  PRINT "n is 0"
+ELSEIF n==1 THEN
+  PRINT "n is 1"
+ELSE
+  PRINT "n is not 0 nor 1"
+ENDIF

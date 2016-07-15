@@ -1,0 +1,13 @@
+//Example :: BleBondingPersistKey.sb
+dim rc, i, j, k, adr$, inf
+
+'//Loop through the bonding manager. Make all entries persistent
+for i=0 to BleBondingStats(j,k)
+    rc=BleBondMngrGetInfo(i,adr$,inf)
+    if rc==0 then
+        rc=BleBondingPersistKey(adr$)
+        print "\n(";i;") : ";StrHexize$(adr$);" Now Persistent"
+    endif
+next
+
+    

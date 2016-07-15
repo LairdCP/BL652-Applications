@@ -1,0 +1,173 @@
+// Copyright (c) 2015, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// BLE Latency Tester (Client): This application connects to a simple BLE server
+//                              and times how long it takes to write a value and
+//                              recieve a notIFication from the GATT server, it
+//                              displays this in number of ticks.
+//
+// To use: Simply run the LatencyS.erver.BLE.BL600orBT900.sb application on a
+//         BL600, BL652 or BT900 and put the device's Bluetooth address in the
+//         client files (LatencyC.lient.BLE.sb) global variable section
+//         (in the 'dim addr$ : addr$ = ""' line), then download and run the
+//         client on a BL620 or BT900 and it will automatically connect to the
+//         master device.
+//         Once connected, the minimum/maximum connection interval can be
+//         changed from the master device side, and enter can be pressed on the
+//         client device to run a single loop test.
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+#define APP_VERSION         "1.00"   //Version of the application
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim addr$ : addr$ = "01D9E61101BF82" //Bluetooth address of the device to connect to
+dim rc                               //Result code variable
+dim cHndl                            //Connection handle variable
+dim charHndl                         //Characteristic handle
+dim descHndl                         //Descriptor handle
+dim Timer                            //Tick counter variable
+dim TmpStr$                          //Temporary string variable
+dim Busy : Busy = 0                  //Busy flag variable, set to 1 if currently busy
+dim Connected : Connected = 0        //Connected flag variable, set to 1 when connected to master device
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+SUB AssertRC(rc, line)
+    IF (rc != 0) THEN
+        print "Error, rc = ";integer.h'rc;" on line ";line;"\n"
+    ENDIF
+ENDSUB
+
+//==============================================================================
+//Function where there is a BLE event
+//==============================================================================
+FUNCTION HndlrBleMsg(nMsgId, nCtx)
+    dim nIntervalUs, nSuprToutUs, nSlaveLatency
+    IF (nMsgId == 0) THEN
+        //Connected - find characteristic
+        Connected = 1
+        cHndl = nCtx
+        rc = BLEGETCURCONNPARMS(cHndl, nIntervalUs, nSuprToutUs, nSlaveLatency)
+        PRINT "Connection params: Interval = ";nIntervalUs;", Supervision timeout = ";nSuprToutUs;", Slave latency = ";nSlaveLatency;"\n"
+        AssertRC(rc, 79)
+        print "Connected to master device, press enter to run a single latency test.\n";
+        rc = BLEGATTCFINDCHAR(cHndl, BleHandleUuid16(0x180D), 0, BleHandleUuid16(0x2020), 0)
+    ELSEIF (nMsgId == 1) THEN
+        //Disconnected
+        Connected = 0
+    ELSEIF (nMsgId == 14) THEN
+        //Connection parameter update
+        rc = BLEGETCURCONNPARMS(cHndl, nIntervalUs, nSuprToutUs, nSlaveLatency)
+        PRINT "Connection params update: Interval = ";nIntervalUs;", Supervision timeout = ";nSuprToutUs;", Slave latency = ";nSlaveLatency;"\n"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Function when a connection attempt times out
+//==============================================================================
+FUNCTION HndlrConnTO()
+    PRINT "Connection attempt timed out.\n"
+ENDFUNC 1
+
+//==============================================================================
+//Function when a chracteristic has been found
+//==============================================================================
+FUNCTION HndlrFindChar(cHndl2, cProp, hVal, isUuid)
+    charHndl = hVal
+    //Find CCCD
+    rc = BLEDISCDESCFIRST(cHndl, 0, hVal)
+    AssertRC(rc, 106)
+ENDFUNC 1
+
+//==============================================================================
+//Function when a descriptor has been found
+//==============================================================================
+FUNCTION HndlrDescDisc(cHndl2, cUuid, hndl)
+    //Write \01 to enable notIFications
+    TmpStr$ = "\01\00"
+    rc = BLEGATTCWRITE(cHndl, hndl, TmpStr$)
+    AssertRC(rc, 116)
+ENDFUNC 1
+
+//==============================================================================
+//
+//==============================================================================
+FUNCTION HndlrNotify()
+    dim connHndl, attrHndl, attrData$, discardCount
+    timer = GETTICKCOUNT()-timer
+    rc = BLEGATTCNOTIFYREAD(connHndl, attrHndl, attrData$, discardCount)
+    print "Test completed in ";timer;" ticks (~";timer;"mS)\n"
+    Busy = 0
+ENDFUNC 1
+
+//==============================================================================
+//
+//==============================================================================
+FUNCTION ResetTest()
+    rc = uartread(TmpStr$)
+    IF (Busy == 0 && Connected == 1) THEN
+        //Start timing, write to characteristic
+        Busy = 1
+        TmpStr$ = "test data"
+        timer = GETTICKCOUNT()
+        rc = BLEGATTCWRITE(cHndl, charHndl, TmpStr$)
+        AssertRC(rc, 141)
+    ELSEIF (Connected == 0) THEN
+        //No connection, attempt to connect to other device
+        rc = BLECONNECT(addr$, 5000, 7500, 100000, 500000)
+        AssertRC(rc, 145)
+    ENDIF
+ENDFUNC 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+//Connect to other device
+addr$ = strdehexize$(addr$)
+rc = BLECONNECT(addr$, 5000, 7500, 100000, 500000)
+AssertRC(rc, 155)
+rc = BLEGATTCOPEN(0, 0)
+AssertRC(rc, 157)
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+ONEVENT EVBLEMSG           CALL HndlrBleMsg
+ONEVENT EVBLE_CONN_TIMEOUT CALL HndlrConnTO
+ONEVENT EVFINDCHAR         CALL HndlrFindChar
+ONEVENT EVDISCDESC         CALL HndlrDescDisc
+ONEVENT EVATTRNOTIFY       CALL HndlrNotIFy
+ONEVENT EVUARTRX           CALL ResetTest
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WAITEVENT

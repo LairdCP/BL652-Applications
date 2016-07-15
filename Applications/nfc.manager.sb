@@ -1,0 +1,991 @@
+// Copyright (c) 2016, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// NFC manager for BL652
+//   Version 0.85
+//
+// This app provides for a command interface over the uart and the protocol is
+// as follows:-
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Convention : (1) Case sensitive, and commands are presented in alphabetic order
+//              (2) If line ends with \ then it continues on next line. That does
+//                  not mean that it should be sent as multiple lines
+//              (3) Replace anything between ##
+//              (4) #INTaaaa# means a number in decimal, hex, octal or binary
+//                      format -> 23 == 0x17 == h'17 == o'23 == b'10111
+//                      aaaa is just a description
+//              (5) #HEXaaaa# means a string without delimitors consisting of hex
+//                      characters only aaaa is just a description
+//              (6) #STRaaaa# means a string without delimitors
+//                      aaaa is just a description
+//              (7) "STRaaaa" means a string which must have the " delimitor
+//                      aaaa is just a description
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// -----------------------------------------------------------------------------
+// nfc open
+//   - Opens the NFC interface.
+//
+// -----------------------------------------------------------------------------
+// nfc close
+//   - Closes the NFC interface.
+//
+// -----------------------------------------------------------------------------
+// nfc enable #INTstate#
+//   - Enables or disables the NFC field for reading by other devices:
+//   -   0: Disable NFC field 
+//   -   1: Enable NFC field
+//   - This needs to be used after tags have been created and committed.
+//
+// -----------------------------------------------------------------------------
+// nfc hardware #INTstate#
+//   - Enables or disables the NFC multifunction pins:
+//   -   0: Disable NFC pin functionality
+//   -   1: Enable NFC pin functionality
+//   - Please note: If NFC pin functionality is disabled, a JLINK reflash of the
+//   - BL652 firmware will be required to re-enable the NFC pin functionality.
+//   - See the BL652 manual for more information.
+//
+// -----------------------------------------------------------------------------
+// nfc tag add
+//   - Adds a new tag, which by default will be a Text tag with the payload
+//   - 'Change Me!'.
+//
+// -----------------------------------------------------------------------------
+// nfc tag remove #INTindex#
+//   - Removes the tag at the specified index.
+//
+// -----------------------------------------------------------------------------
+// nfc tag type #INTindex# #STRtype#
+//   - Changes the type of the tag at the specified index to one of:
+//   -   Text: A text tag (set to English)
+//   -   URL : A URL tag which can be used to open a web browser
+//   -   WApp: A Windows app launcher which can be used to launch a Windows app
+//             UUID format: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+//   -   AApp: An Android app launcher which can be used to launch an Android
+//             app, package format example: com.lairdtech.lairdtoolkit
+//
+// -----------------------------------------------------------------------------
+// nfc tag payload #INTindex# #STRpayload#
+//   - Used to change the payload of the tag at the specified index. The payload
+//   - data is different depending on the tag type, refer to the above help
+//   - segment for information on payloads.
+//
+// -----------------------------------------------------------------------------
+// nfc list
+//   - Lists the tags that have been created in a table showing the index, tag
+//   - type and the payload of the tag.
+//
+// -----------------------------------------------------------------------------
+// nfc space
+//   - Will output the size of the NDEF message. Can only be used once data has
+//   - been commited.
+//
+// -----------------------------------------------------------------------------
+// nfc commit
+//   - Commits all tags that have been created to NDEF records so that they can
+//   - be read using an NFC reader (After the first commit, the NFC field will
+//   - need to be enabled using 'nfc enable 1'
+//
+// -----------------------------------------------------------------------------
+// nfc clear
+//   - Will clear all tags and reset their values to the default.
+//
+// -----------------------------------------------------------------------------
+// misc address
+//   - Outputs the Bluetooth address of the module.
+//
+// -----------------------------------------------------------------------------
+// uart set #INTnewspeed#
+//   - Will change the UART speed to the specified value, valid values are:
+//   -   9600
+//   -   14400
+//   -   19200
+//   -   38400
+//   -   57600
+//   -   115200 (default)
+//   -   230400
+//   -   460800
+//   -   921600
+//
+// -----------------------------------------------------------------------------
+// quit
+//  OR
+// exit
+//   - Will exit the application
+//
+//******************************************************************************
+
+//TODO: make a lowercase() function to put strings into lowercase for string comparisons
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+        //Set this to 0 to disable all debugging messages
+#define ENABLE_DEBUG_PRINTS                             1
+
+        //Size of i[]
+#define NUM_OF_I_PARAMS                                 4
+        //Size of s$[]
+#define NUM_OF_S_PARAMS                                 4
+
+        //Number of NDEF tags to allow
+#define NUM_OF_NDEF                                     8
+
+        //NDEF tag types
+#define NDEF_TYPE_TEXT                                  1
+#define NDEF_TYPE_URL                                   2
+#define NDEF_TYPE_WAPP                                  3
+#define NDEF_TYPE_AAPP                                  4
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+sub HandlerOnErr()
+    if (ENABLE_DEBUG_PRINTS!=0) then
+        print "\n OnErr - ";GetLastError();"\n"
+    endif
+endsub
+onerror next HandlerOnErr
+
+//******************************************************************************
+// Debugging resource as early as possible
+//******************************************************************************
+
+//==============================================================================
+//==============================================================================
+sub AssertRC(byval rc as integer,byval tag as integer)
+    if (ENABLE_DEBUG_PRINTS!=0) && (rc!=0) then
+        print "\nFailed with ";integer.h' rc;" at tag ";tag
+    endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub DbgMsg(byval msg$ as string)
+    if (ENABLE_DEBUG_PRINTS!=0) then
+        print "\n";msg$
+    endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub DbgMsgVal(byval msg$ as string, byval vl as integer)
+    if (ENABLE_DEBUG_PRINTS!=0) then
+        print "\n";msg$;" ";vl
+    endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub DbgPrnAdvReport(byref rp$ as string)
+    if (ENABLE_DEBUG_PRINTS!=0) then
+        print "\nRpt=";strhexize$(rp$)
+    endif
+endsub
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+dim rc                              //Result code
+dim stRsp$ as string                //Uart rx data is stored here
+
+dim ok$,er$,pr$, uc$
+
+dim i[NUM_OF_I_PARAMS]              //Index 0 used for return values
+dim s$[NUM_OF_S_PARAMS]             //Must be at least 8 elements for BleSvcRegDevInfo()
+
+dim urtcmd$                         //CMD line from uart
+dim tkn$,tlen                       //Used by command parser
+
+dim NFCHandle                       //NFC handle
+dim NDEFHandle                      //NDEF handle
+dim NDEFTagType[NUM_OF_NDEF+1]      //List of NDEF tag types
+dim NDEFTagPayload$[NUM_OF_NDEF+1]  //List of NDEF tag payloads
+dim NFCFieldStatus                  //Current status of NFC field
+
+//******************************************************************************
+// Initialisse Global Variable
+//******************************************************************************
+
+ok$    = "\nOK"
+er$    = "\nERROR "
+pr$    = "\r\n>"
+uc$    = "\nUNKNOWN COMMAND"
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//==============================================================================
+//Release all NFC handles
+//==============================================================================
+sub InitNFCHandles()
+    dim z : z = 0
+    while (z < NUM_OF_NDEF)
+        NDEFTagType[z]=-1
+        z = z+1
+    endwhile
+    NFCHandle = -1
+    NDEFHandle = -1
+    NFCFieldStatus = 0
+endsub
+
+//==============================================================================
+//==============================================================================
+function AcqNDEFTagHandle(hTag)
+    dim z : z = 0
+    while (z < NUM_OF_NDEF)
+        if NDEFTagType[z] == -1 then
+            NDEFTagType[z]=hTag
+            exitfunc z
+        endif
+        z = z+1
+    endwhile
+endfunc -1
+
+//==============================================================================
+//==============================================================================
+function RelNDEFTagHandle(hTag)
+    dim z
+    while (z < NUM_OF_NDEF)
+        if NDEFTagType[z] == hTag then
+            NDEFTagType[z]=-1
+            exitfunc z
+        endif
+        z = z+1
+    endwhile
+endfunc -1
+
+//==============================================================================
+//==============================================================================
+function GetNDEFTagHandle(hTag)
+    dim z
+    while (z < NUM_OF_NDEF)
+        if NDEFTagType[z] == hTag then
+            exitfunc z
+        endif
+        z = z+1
+    endwhile
+endfunc -1
+
+//==============================================================================
+//==============================================================================
+sub UartRsp(rsp as integer)
+    if rsp == 0 then
+        print ok$;pr$
+    elseif rsp == -2 then
+        print pr$
+    elseif rsp == -4 then
+        print uc$;pr$
+    elseif rsp > 0 then
+        print er$;integer.h' rsp;pr$
+    endif
+endsub
+
+//==============================================================================
+// for = Y returns -1 and val==Y
+// for ? returns 0
+// otherwise return 1
+//==============================================================================
+function ParseSetQuery(byref val as integer)
+    rc = 1
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen > 0 then
+        if strcmp(tkn$,"?")==0 then
+            rc=0
+        elseif strcmp(tkn$,"=")==0 then
+            tlen = ExtractIntToken(urtcmd$,val)
+            if tlen > 0 then
+                rc=-1
+            endif
+        endif
+    endif
+endfunc rc
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function ExtractIntTokens(u$,stIdx,num)
+    while num>0
+        tlen = ExtractIntToken(u$,i[stIdx])
+        if tlen == 0 then
+            exitfunc 4
+        endif
+        num=num-1
+        stIdx = stIdx+1
+    endwhile
+endfunc 0
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function ExtractStrTokens(u$,stIdx,num)
+    while num>0
+        tlen = ExtractStrToken(u$,s$[stIdx])
+        if tlen == 0 then
+            exitfunc 3
+        endif
+        num=num-1
+        stIdx = stIdx+1
+    endwhile
+endfunc 0
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function strtolower$(Text$)
+    //Takes a string and replaces uppercase letters with lowercase letters
+    dim i, chr
+    i = strlen(Text$)-1
+    while (i >= 0)
+        chr = StrGetChr(Text$, i)
+        if (chr >= 65 && chr <= 90) then
+            rc = StrSetChr(Text$, chr+32, i)
+        endif
+        i = i-1
+    endwhile
+endfunc Text$
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function NFC_AddWP(ndHandle, ByVal AppID$)
+    //Adds a windows phone application opener NFC tag
+    dim Type$ : Type$ = "windows.com/LaunchApp"
+    dim ID$ : ID$ = ""
+    dim Lang$ : Lang$ = ""
+    dim Payload$ : Payload$ = "\00\01\0CWindowsPhone&{" + AppID$ + "}\00\01\20"
+endfunc NfcNdefRecAddGeneric(ndHandle, 3, Type$, ID$, Lang$, 0xFFFFFFFF, Payload$)
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function NFC_AddAndroid(ndHandle, ByVal AppPackage$)
+    //Adds an android application package opener NFC tag
+    dim Type$ : Type$ = "android.com:pkg"
+    dim ID$ : ID$= ""
+    dim Lang$ : Lang$ = ""
+endfunc NfcNdefRecAddGeneric(ndHandle, 4, Type$, ID$, Lang$, 0xFFFFFFFF, AppPackage$)
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function CompressURL$(URL$)
+    //Compresses a URL to use a smaller NDEF record size
+    dim URLTest$
+
+    URLTest$ = left$(URL$, 11)
+    if StrCmp(URLTest$, "http://www.") == 0 then
+        exitfunc "\01" + right$(URL$, strlen(URL$)-11)
+    endif
+
+    URLTest$ = left$(URL$, 12)
+    if StrCmp(URLTest$, "https://www.") == 0 then
+        exitfunc "\02" + right$(URL$, strlen(URL$)-12)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "http://") == 0 then
+        exitfunc "\03" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 8)
+    if StrCmp(URLTest$, "https://") == 0 then
+        exitfunc "\04" + right$(URL$, strlen(URL$)-8)
+    endif
+
+    URLTest$ = left$(URL$, 4)
+    if StrCmp(URLTest$, "tel:") == 0 then
+        exitfunc "\05" + right$(URL$, strlen(URL$)-4)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "mailto:") == 0 then
+        exitfunc "\06" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 26)
+    if StrCmp(URLTest$, "ftp://anonymous:anonymous@") == 0 then
+        exitfunc "\07" + right$(URL$, strlen(URL$)-26)
+    endif
+
+    URLTest$ = left$(URL$, 10)
+    if StrCmp(URLTest$, "ftp://ftp.") == 0 then
+        exitfunc "\08" + right$(URL$, strlen(URL$)-10)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "ftps://") == 0 then
+        exitfunc "\09" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 6)
+    if StrCmp(URLTest$, "sftp://") == 0 then
+        exitfunc "\0A" + right$(URL$, strlen(URL$)-6)
+    elseif StrCmp(URLTest$, "smb://") == 0 then
+        exitfunc "\0B" + right$(URL$, strlen(URL$)-6)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "nfs://") == 0 then
+        exitfunc "\0C" + right$(URL$, strlen(URL$)-7)
+    elseif StrCmp(URLTest$, "ftp://") == 0 then
+        exitfunc "\0D" + right$(URL$, strlen(URL$)-7)
+    elseif StrCmp(URLTest$, "dav://") == 0 then
+        exitfunc "\0E" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 9)
+    if StrCmp(URLTest$, "news://") == 0 then
+        exitfunc "\0F" + right$(URL$, strlen(URL$)-9)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "telnet://") == 0 then
+        exitfunc "\10" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 4)
+    if StrCmp(URLTest$, "imap://") == 0 then
+        exitfunc "\11" + right$(URL$, strlen(URL$)-4)
+    elseif StrCmp(URLTest$, "rtsp://") == 0 then
+        exitfunc "\12" + right$(URL$, strlen(URL$)-4)
+    endif
+
+    URLTest$ = left$(URL$, 5)
+    if StrCmp(URLTest$, "urn:") == 0 then
+        exitfunc "\13" + right$(URL$, strlen(URL$)-5)
+    elseif StrCmp(URLTest$, "pop:") == 0 then
+        exitfunc "\14" + right$(URL$, strlen(URL$)-5)
+    elseif StrCmp(URLTest$, "sip:") == 0 then
+        exitfunc "\15" + right$(URL$, strlen(URL$)-5)
+    endif
+
+    URLTest$ = left$(URL$, 8)
+    if StrCmp(URLTest$, "sips:") == 0 then
+        exitfunc "\16" + right$(URL$, strlen(URL$)-8)
+    elseif StrCmp(URLTest$, "tftp:") == 0 then
+        exitfunc "\17" + right$(URL$, strlen(URL$)-8)
+    endif
+
+    URLTest$ = left$(URL$, 10)
+    if StrCmp(URLTest$, "btspp://") == 0 then
+        exitfunc "\18" + right$(URL$, strlen(URL$)-10)
+    endif
+
+    URLTest$ = left$(URL$, 9)
+    if StrCmp(URLTest$, "btl2cap://") == 0 then
+        exitfunc "\19" + right$(URL$, strlen(URL$)-9)
+    endif
+
+    URLTest$ = left$(URL$, 10)
+    if StrCmp(URLTest$, "btgoep://") == 0 then
+        exitfunc "\1A" + right$(URL$, strlen(URL$)-10)
+    endif
+
+    URLTest$ = left$(URL$, 11)
+    if StrCmp(URLTest$, "tcpobex://") == 0 then
+        exitfunc "\1B" + right$(URL$, strlen(URL$)-11)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "irdaobex://") == 0 then
+        exitfunc "\1C" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 11)
+    if StrCmp(URLTest$, "file://") == 0 then
+        exitfunc "\1D" + right$(URL$, strlen(URL$)-11)
+    endif
+
+    URLTest$ = left$(URL$, 12)
+    if StrCmp(URLTest$, "urn:epc:id:") == 0 then
+        exitfunc "\1E" + right$(URL$, strlen(URL$)-12)
+    elseif StrCmp(URLTest$, "urn:epc:tag:") == 0 then
+        exitfunc "\1F" + right$(URL$, strlen(URL$)-12)
+    elseif StrCmp(URLTest$, "urn:epc:pat:") == 0 then
+        exitfunc "\20" + right$(URL$, strlen(URL$)-12)
+    elseif StrCmp(URLTest$, "urn:epc:raw:") == 0 then
+        exitfunc "\21" + right$(URL$, strlen(URL$)-12)
+    endif
+
+    URLTest$ = left$(URL$, 8)
+    if StrCmp(URLTest$, "urn:epc:") == 0 then
+        exitfunc "\22" + right$(URL$, strlen(URL$)-8)
+    elseif StrCmp(URLTest$, "urn:nfc:") == 0 then
+        exitfunc "\23" + right$(URL$, strlen(URL$)-8)
+    endif
+endfunc "\00" + URL$
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function NFC_AddURL(ndHandle, ByVal URL$)
+    //Adds a URL NFC tag
+    dim Type$ : Type$ = "U"
+    dim ID$ : ID$ = ""
+    dim Lang$ : Lang$ = ""
+    URL$ = CompressURL$(URL$)
+endfunc NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, URL$)
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function NFC_AddText(ndHandle, ByVal Text$)
+    //Adds text NFC tag
+    dim Type$ : Type$ = "T"
+    dim ID$ : ID$ = ""
+    dim Lang$ : Lang$= " en" //This is the language code, change it to your desired language code if not using English text
+    rc = strsetchr(Lang$, strlen(Lang$)-1, 0) //Prepend the language code length and sets encoding to UTF-8
+endfunc NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, Text$)
+
+//-------------------------------------------------------------------------
+//#CMD#//  nfc open                                   - Open NFC
+//#CMD#//  nfc close                                  - Close NFC
+//#CMD#//  nfc hardware    #INTstate#                 - Will enable or disable NFC on the multifunction pins: 1 = enable, 0 = disable. Please note if NFC is disabled, the BL652 firmware will need to be reflashed using the JLINK interface (UART interface will not enable it) to re-enable the NFC pins
+//#CMD#//  nfc tag add                                - Add a new tag (by default TEXT with payload 'Change Me!')
+//#CMD#//  nfc tag remove  #INTindex#                 - Delete NDEF record specified by handle (deletes all data and handle)
+//#CMD#//  nfc tag type    #INTindex# #STRtype#       - Sets the NDEF record type (can be Text, URL, WApp, AApp)
+//#CMD#//  nfc tag payload #INTindex# #STRpayload#    - Sets the payload of the tag at index to the valued specified
+//#CMD#//  nfc clear                                  - Clear all tags
+//#CMD#//  nfc list                                   - List all tags types and payloads
+//#CMD#//  nfc commit                                 - Update and apply changes to NDEF record specified by handle
+//#CMD#//  nfc enable      #INTstate#                 - Enable or disable NFC sensing (1 = enable, 0 = disable. Please note that NFC must be opened and tags must have been committed first)
+//#CMD#//  nfc space                                  - Show used/free NDEF space
+//-------------------------------------------------------------------------
+function _NFC()
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+        //No parameters supplied
+        exitfunc 5
+    endif
+    tkn$ = strtolower$(tkn$)
+    if strcmp(tkn$,"hardware")==0 then
+        //Extract 1 : (enabled) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc NFCHardwareState(0, i[1])
+    elseif strcmp(tkn$,"open")==0 then
+        if (NFCHandle == -1) then
+          //Open NFC
+          rc = NFCOpen(0, "\00", NFCHandle)
+          if rc != 0 then
+              exitfunc rc
+          endif
+
+          //Only one NFC handle
+          print "\nNFC Opened handle=1"
+          exitfunc 0
+        else
+            //Already open
+            print "\nNFC is already open"
+            exitfunc -2
+        endif
+    elseif strcmp(tkn$,"close")==0 then
+        if (NFCHandle != -1) then
+            NFCClose(NFCHandle)
+            NFCHandle = -1
+        endif
+        exitfunc 0
+    elseif strcmp(tkn$,"enable")==0 then
+        //Extract 1 : (enabled) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+
+        if (i[1] != 0 && i[1] != 1) then
+            //Invalid parameter provided
+        elseif (NFCHandle != -1) then
+            //Change NFC field status
+            NFCFieldStatus = i[1]
+            exitfunc NFCFieldSense(NFCHandle, i[1])
+        else
+            //NFC is not open
+            print "\nNFC has not been opened"
+            exitfunc -2
+        endif
+    elseif strcmp(tkn$,"list")==0 then
+        //Output header
+        print "\n# | Type | Payload \n"
+        print "--|------|---------\n"
+
+        //Output each NDEF item
+        dim z : z = 0
+        dim x : x = 1
+        while (z < NUM_OF_NDEF)
+            //Output data
+            print x;" | "
+            if (NDEFTagType[z] == -1) then
+                //Not assigned
+                print "None |   N/A\n"
+            else
+                //Assigned
+                if (NDEFTagType[z] == NDEF_TYPE_TEXT) then
+                    print "Text"
+                elseif (NDEFTagType[z] == NDEF_TYPE_URL) then
+                    print "URL "
+                elseif (NDEFTagType[z] == NDEF_TYPE_WAPP) then
+                    print "WApp"
+                elseif (NDEFTagType[z] == NDEF_TYPE_AAPP) then
+                    print "AApp"
+                endif
+
+                //Output payload
+                print " | ";NDEFTagPayload$[z];"\n"
+            endif
+
+            //Increment counters
+            z = z+1
+            x = x+1
+        endwhile
+        exitfunc -2
+    elseif strcmp(tkn$,"space")==0 then
+        if (NDEFHandle != -1) then
+            dim records, memTotal, memUsed
+            rc = NfcNdefMsgGetInfo(NDEFHandle, records, memTotal, memUsed)
+            if rc != 0 then
+                exitfunc rc
+            endif
+            print "\n";records;" NDEF records (";memUsed;"/";memTotal;" bytes used)"
+            exitfunc 0
+        else
+            print "\nTags have not yet been commited."
+            exitfunc -2
+        endif
+    elseif strcmp(tkn$,"tag")==0 then
+        tlen = ExtractStrToken(urtcmd$,tkn$)
+        if tlen == 0 then
+            exitfunc 5
+        endif
+        if strcmp(tkn$,"add")==0 then
+            dim ind : ind = AcqNDEFTagHandle(1)
+            if (ind == -1) then
+                //No space available
+                print "\nNo available space, delete some records"
+                exitfunc -2
+            endif
+
+            NDEFTagPayload$[ind] = "Change me!"
+            ind = ind+1
+            print "\nTag ID=";ind
+            exitfunc 0
+        elseif strcmp(tkn$,"remove")==0 then
+            //Extract 1 : (enabled) and store starting at i[1]
+            rc = ExtractIntTokens(urtcmd$,1,1)
+            if rc != 0 then
+                exitfunc rc
+            endif
+
+            if (NDEFTagType[i[1]-1] == -1) then
+                //Tag does not exist
+                print "\nThere is no tag at index ";i[1]
+                exitfunc -2
+            else
+                //Clear record
+                NDEFTagType[i[1]-1] = -1
+                NDEFTagPayload$[i[1]-1] = ""
+                exitfunc 0
+            endif
+        elseif strcmp(tkn$,"clear")==0 then
+            //Clear all
+            dim y : y = 0
+            while y < NUM_OF_NDEF
+                NDEFTagType[y] = -1
+                NDEFTagPayload$[y] = ""
+                y = y+1
+            endwhile
+            exitfunc 0
+        elseif strcmp(tkn$,"type")==0 then
+            //Extract 1 : (enabled) and store starting at i[1]
+            rc = ExtractIntTokens(urtcmd$,1,1)
+            if rc != 0 then
+                print "No type provided. Valid types are: Text, URL, WApp, AApp."
+                exitfunc rc
+            endif
+//todo: Should check input here
+            if (NDEFTagType[i[1]-1] == -1) then
+                print "\nThere is no tag at index ";i[1]
+                exitfunc -2
+            else
+                tlen = ExtractStrToken(urtcmd$,tkn$)
+                if tlen == 0 then
+                    //No parameters supplied
+                    exitfunc 5
+                endif
+
+                tkn$ = strtolower$(tkn$)
+                if strcmp(tkn$,"text")==0 then
+                    NDEFTagType[i[1]-1] = NDEF_TYPE_TEXT
+                elseif strcmp(tkn$,"url")==0 then
+                    NDEFTagType[i[1]-1] = NDEF_TYPE_URL
+                elseif strcmp(tkn$,"wapp")==0 then
+                    NDEFTagType[i[1]-1] = NDEF_TYPE_WAPP
+                elseif strcmp(tkn$,"aapp")==0 then
+                    NDEFTagType[i[1]-1] = NDEF_TYPE_AAPP
+                else
+                    //Not valid
+                    print "\nTag type is not valid. Valid types are: Text, URL, WApp, AApp."
+                    exitfunc -5
+                endif
+                exitfunc 0
+            endif
+        elseif strcmp(tkn$,"payload")==0 then
+            //Extract 1 : (enabled) and store starting at i[1]
+            rc = ExtractIntTokens(urtcmd$,1,1)
+            if rc != 0 then
+                exitfunc rc
+            endif
+            if (NDEFTagType[i[1]-1] == -1) then
+                exitfunc -5
+            else
+                NDEFTagPayload$[i[1]-1] = mid$(urtcmd$, 1, strlen(urtcmd$)-2)
+                exitfunc 0
+            endif
+        endif
+    elseif strcmp(tkn$,"commit")==0 then
+        dim NewNDEFHandle
+        if (NFCHandle == -1) then
+            //No NFC handle
+            print "\nNFC is not open"
+            exitfunc -2
+        elseif (NFCFieldStatus == 1) then
+            //Disable field so changes can be committed
+            rc = NFCFieldSense(NFCHandle, 0)
+            if rc != 0 then
+                exitfunc rc
+            endif
+        endif
+
+        dim NDEFSize : NDEFSize = 0
+        dim q : q = 0
+        while q < NUM_OF_NDEF
+            if (NDEFTagType[q] == NDEF_TYPE_TEXT) then
+                NDEFSize = NDEFSize + 10 + strlen(NDEFTagPayload$[q])
+            elseif (NDEFTagType[q] == NDEF_TYPE_URL) then
+                dim TmpStr$ : TmpStr$ = CompressURL$(NDEFTagPayload$[q])
+//                NDEFSize = NDEFSize + 8 + strlen(NDEFTagPayload$[q])
+                NDEFSize = NDEFSize + 8 + strlen(TmpStr$)
+//todo: test if ^ works
+                TmpStr$ = ""
+            elseif (NDEFTagType[q] == NDEF_TYPE_WAPP) then
+                NDEFSize = NDEFSize + 48 + strlen(NDEFTagPayload$[q])
+            elseif (NDEFTagType[q] == NDEF_TYPE_AAPP) then
+                NDEFSize = NDEFSize + 21 + strlen(NDEFTagPayload$[q])
+            endif
+            q = q+1
+        endwhile
+
+        if (NDEFSize == 0) then
+            //No NDEF tags to commit
+            print "\nNo NDEF tags have been created"
+
+            //Enable the NFC field status if it was previously enabled
+            if (NFCFieldStatus == 1) then
+                rc = NFCFieldSense(NFCHandle, 1)
+                if rc != 0 then
+                    exitfunc rc
+                endif
+            endif
+            exitfunc -2
+        elseif (NDEFSize < 32) then
+            //Minimum NDEF size is 32 bytes
+            NDEFSize = 32
+        endif
+
+        //Create new NDEF message with required size
+        rc = NfcNdefMsgNew(NDEFSize, NewNDEFHandle)
+        if rc != 0 then
+            exitfunc rc
+        endif
+
+        //Add all the tags to the NDEF
+        q = 0
+        while q < NUM_OF_NDEF
+            if (NDEFTagType[q] == 1) then
+                rc = NFC_AddText(NewNDEFHandle, NDEFTagPayload$[q])
+            elseif (NDEFTagType[q] == 2) then
+                rc = NFC_AddURL(NewNDEFHandle, NDEFTagPayload$[q])
+            elseif (NDEFTagType[q] == 3) then
+                rc = NFC_AddWP(NewNDEFHandle, NDEFTagPayload$[q])
+            elseif (NDEFTagType[q] == 4) then
+                rc = NFC_AddAndroid(NewNDEFHandle, NDEFTagPayload$[q])
+            else
+                rc = 0
+            endif
+            AssertRC(rc, 1)
+            q = q+1
+        endwhile
+
+        //Commit the NDEF message to the stack
+        rc = NfcNdefMsgCommit(NFCHandle, NewNDEFHandle)
+        if rc != 0 then
+            exitfunc rc
+        endif
+
+        //Delete the old NDEF message to free up the memory
+        if NDEFHandle != -1 then
+            rc = NFCNDEFMsgDelete(NDEFHandle)
+            if rc != 0 then
+                exitfunc rc
+            endif
+        endif
+
+        //Update the NDEF handle
+        NDEFHandle = NewNDEFHandle
+
+        //Enable the NFC field status if it was previously enabled
+        if (NFCFieldStatus == 1) then
+            rc = NFCFieldSense(NFCHandle, 1)
+            if rc != 0 then
+                exitfunc rc
+            endif
+        endif
+      exitfunc 0
+    endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  misc address
+//-------------------------------------------------------------------------
+function _Misc()
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+        exitfunc 5
+    endif
+    tkn$ = strtolower$(tkn$)
+    //=================================================
+    if strcmp(tkn$,"address")==0 then
+        dim Tmp$ : Tmp$ = sysinfo$(4)
+        Tmp$ = strhexize$(Tmp$)
+        print "BLE Address: ";Tmp$;"\n"
+        exitfunc -2
+    endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  uart set #INTnewspeed#
+//-------------------------------------------------------------------------
+function _Uart()
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+        exitfunc 5
+    endif
+    tkn$ = strtolower$(tkn$)
+    //=================================================
+    if strcmp(tkn$,"set")==0 then
+        //Extract 1 (#INTnewspeed#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        if (i[1] != 9600 && i[1] != 14400 && i[1] != 19200 && i[1] != 38400 && i[1] != 57600 && i[1] != 115200 && i[1] != 230400 && i[1] != 460800 && i[1] != 921600) then
+            exitfunc 6
+        endif
+        UartClose()
+        rc = UartOpen(i[1], 0, 0, "CN81H")
+        exitfunc 0
+    endif
+endfunc 5
+
+//==============================================================================
+//==============================================================================
+function OnUartCmd() as integer
+    rc=-2 //Default response is ">"
+    tlen = ExtractStrToken(urtcmd$,tkn$) //Get first token
+    if tlen > 0 then
+        tkn$ = strtolower$(tkn$)
+        if strcmp(tkn$,"nfc")==0 then
+            rc = _NFC()
+
+        elseif strcmp(tkn$,"misc")==0 then
+            rc = _misc()
+
+        elseif strcmp(tkn$,"uart")==0 then
+            rc = _Uart()
+
+        elseif strcmp(tkn$,"exit")==0 || strcmp(tkn$,"quit")==0  then
+            exitfunc 0
+
+        else
+            rc=-4 //Send an "UNKNOWN COMMAND" response to user
+        endif
+    endif
+
+    //Send a response back to the user
+    UartRsp(rc)
+endfunc 1
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+//==============================================================================
+function HandlerUartRxCmd() as integer
+    dim nMatch
+
+    //Check if CR has been received
+    nMatch=UartReadMatch(stRsp$,13)
+    if nMatch!=0 then
+        //CR exists in the input buffer
+        urtcmd$ = strsplitleft$(stRsp$,nMatch)
+        exitfunc OnUartCmd()
+    endif
+endfunc 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVUARTRX                 call HandlerUartRxCmd
+
+//------------------------------------------------------------------------------
+// Initialise Services and then wait for events
+//------------------------------------------------------------------------------
+
+//==============================================================================
+//==============================================================================
+sub Initialise()
+    InitNFCHandles()
+endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+Initialise()
+
+//Send user prompt for uart based command interface
+dim Tmp$ : Tmp$ = sysinfo$(4)
+Tmp$ = strhexize$(Tmp$)
+print "\n\r";BleGetDeviceName$();" - ";Tmp$;"\n\r\n\r"
+Tmp$ = ""
+//Send an OK response
+UartRsp(0)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WaitEvent

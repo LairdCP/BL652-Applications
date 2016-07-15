@@ -1,0 +1,22 @@
+//Example :: I2cWriteReg32.sb
+
+//**Please ensure that nSlaveAddr is the slave address of your I2C peripheral**
+DIM handle
+DIM nSlaveAddr, nRegAddr,nRegVal
+DIM rc : rc=I2cOpen(100000,0,handle)
+
+IF rc!= 0 THEN 
+	PRINT "\nFailed to open I2C interface with error code ";INTEGER.h' rc
+ELSE
+	PRINT "\nI2C open success"
+ENDIF
+
+nSlaveAddr = 0x6f :  nRegAddr = 0x56 : nRegVal = 0x4210FEDC
+rc = I2cWriteReg32(nSlaveAddr, nRegAddr, nRegVal)
+IF rc!= 0 THEN 
+    PRINT "\nFailed to Write to slave/register "; INTEGER.H'rc
+ELSE
+    PRINT "\n";nRegVal; " written successfully to register ";nRegAddr
+ENDIF
+	
+I2cClose(handle)  //close the port

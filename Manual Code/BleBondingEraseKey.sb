@@ -1,0 +1,11 @@
+//Example :: BleBondingEraseKey.sb
+dim rc, i, adr$, inf
+
+//delete link key at index 0
+rc=BleBondMngrGetInfo(0,adr$,inf)       //get the BT address
+rc=BleBondingEraseKey(adr$)
+if rc==0 then
+    print "\nLink key for device ";StrHexize$(adr$);" erased"
+else
+    print "\nError erasing link key ";integer.h'rc
+endif

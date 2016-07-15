@@ -1,0 +1,18 @@
+//Example :: BleTxPwrWhilePairing.sb
+DIM rc,dp
+
+dp=1000 : rc = BleTxPwrWhilePairing(dp)
+PRINT "\nrc = ";rc
+PRINT "\nTx power while pairing: desired= ";dp," actual= "; SysInfo(2018)
+dp=8 : rc = BleTxPwrWhilePairing(dp)
+PRINT "\nTx power while pairing: desired= ";dp," "," actual= "; SysInfo(2018)
+dp=2 : rc = BleTxPwrWhilePairing(dp)
+PRINT "\nTx power while pairing: desired= ";dp," "," actual= "; SysInfo(2018)
+dp=-10 : rc = BleTxPwrWhilePairing(dp)
+PRINT "\nTx power while pairing: desired= ";dp," actual= "; SysInfo(2018)
+dp=-25 : rc = BleTxPwrWhilePairing(dp)
+PRINT "\nTx power while pairing: desired= ";dp," actual= "; SysInfo(2018)
+dp=-45 : rc = BleTxPwrWhilePairing(dp)
+PRINT "\nTx power while pairing: desired= ";dp," actual= "; SysInfo(2018)
+dp=-1000 : rc = BleTxPwrWhilePairing(dp)
+PRINT "\nTx power while pairing: desired= ";dp," actual= "; SysInfo(2018)

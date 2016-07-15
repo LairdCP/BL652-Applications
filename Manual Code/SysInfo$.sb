@@ -1,0 +1,6 @@
+//Example :: SysInfo$.sb
+PRINT "\nSysInfo$(4)   = ";SysInfo$(4)   // address of module
+PRINT "\nSysInfo$(14)  = ";SysInfo$(14)  // public random address
+PRINT "\nSysInfo$(0)   = ";SysInfo$(0)   
+
+

@@ -1,0 +1,24 @@
+//Example :: TimerCancel.sb
+DIM i,x 
+i=0 : x=1 			//'x' is HandlerTimer0's return value
+					//Will switch to 0 when timer0 has stoppped
+					//so that the application can stop
+
+FUNCTION HandlerTimer0()
+	PRINT "\nTimer 0 has expired, starting again"
+	IF i==4 THEN
+		PRINT "\nCancelling Timer 0"
+		TimerCancel(0)
+		PRINT "\nTimer 0 ran ";i+1;" times"
+		x=0
+	ENDIF	
+	i=i+1
+ENDFUNC x 
+
+ONEVENT EVTMR0 CALL HandlerTimer0
+
+TimerStart(0,800,1)  
+PRINT "\nWaiting for Timer 0. Should run 5 times"
+
+WAITEVENT
+

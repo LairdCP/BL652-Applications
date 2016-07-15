@@ -1,0 +1,5 @@
+//Example :: StrPos.sb
+DIM s1$,s2$
+s1$="Are you there"
+s2$="there"
+PRINT "\nIn '";S1$;"' the word '";S2$;"' occurs at position ";StrPos(S1$,S2$,0)

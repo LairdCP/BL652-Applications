@@ -1,0 +1,314 @@
+// Copyright (c) 2015, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// BL652 custom VSP service: This application will host a VSP service and allow
+//                           connections and communication similar to how VSP
+//                           bridge mode on the BL600/BL652/BT900 works.
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+#define BASEUUID "\56\9a\11\01\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //VSP base UUID
+#define MIUUID   "\56\9a\20\03\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Modem in UUID
+#define MOUUID   "\56\9a\20\02\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Modem out UUID
+#define RXUUID   "\56\9a\20\01\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Receive VSP UUID
+#define TXUUID   "\56\9a\20\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Transmit VSP UUID
+#define Version  "1.02"                                              //Version
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim rc                             //Result code
+dim svcID                          //Service ID
+dim TXchar                         //TX characteristic
+dim RXchar                         //RX characteristic
+dim MOchar                         //Modem Out characteristic
+dim MIchar                         //Modem In characteristic
+dim MIval                          //Modem In value
+dim SendData$                      //Data from the UART waiting to be sent out
+dim UARTBlocked : UARTBlocked = 0  //When set to 1 will not read data from the UART
+dim RecBuf$ : RecBuf$ = ""         //VSP receive buffer
+dim BufferFull : BufferFull = 0
+dim DataQueued : DataQueued = 1
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+SUB assertRC(rc, line)
+    IF rc != 0 THEN
+        PRINT "\nError on line ";line;", code: ";INTEGER.H'rc
+    ENDIF
+ENDSUB
+
+//==============================================================================
+//Function to create the VSP service
+//==============================================================================
+FUNCTION CreateVSPService()
+    dim UUIDStr$, mdCccd, mdVal, s$
+    s$ = "\00" //Default value for characteristics
+
+    //Create the VSP service
+    UUIDStr$ = BASEUUID
+    rc = BleServiceNew(1, BleHandleUuid128(UUIDStr$), svcID)
+    AssertRC(rc, 75)
+
+    //Create the ModemIn characteristic
+    mdVal = BleAttrMetadata(0,1,2,0,rc)
+    UUIDStr$ = MIUUID
+    rc = BleCharNew(8, BleHandleUuid128(UUIDStr$), mdVal, 0, 0)
+    AssertRC(rc, 81)
+    s$ = "\01" //Enabled by default
+    rc = BleCharCommit(svcID, s$, MIchar)
+    AssertRC(rc, 84)
+
+    //Create the ModemOut characteristic
+    mdVal = BleAttrMetadata(0,0,2,0,rc)
+    mdCccd = BleAttrMetadata(1,1,2,0,rc) //Metadata for CCCD attribute of Characteristic
+    UUIDStr$ = MOUUID
+    rc = BleCharNew(16, BleHandleUuid128(UUIDStr$), mdVal, mdCccd, 0)
+    AssertRC(rc, 91)
+    rc = BleCharCommit(svcID, s$, MOchar)
+    AssertRC(rc, 93)
+
+    //Create the RX characteristic
+    mdVal = BleAttrMetadata(0,1,20,1,rc)
+    UUIDStr$ = RXUUID
+    rc = BleCharNew(8, BleHandleUuid128(UUIDStr$), mdVal, 0, 0)
+    AssertRC(rc, 99)
+    rc = BleCharCommit(svcID, s$, RXchar)
+    AssertRC(rc, 101)
+
+    //Create the TX characteristic
+    mdVal = BleAttrMetadata(0,0,20,1,rc)
+    mdCccd = BleAttrMetadata(1,1,2,0,rc) //Metadata for CCCD attribute of Characteristic
+    UUIDStr$ = TXUUID
+    rc = BleCharNew(16, BleHandleUuid128(UUIDStr$), mdVal, mdCccd, 0)
+    AssertRC(rc, 108)
+    rc = BleCharCommit(svcID, s$, TXchar)
+    AssertRC(rc, 110)
+
+    //Commit the service
+    rc = BleServiceCommit(svcID)
+    AssertRC(rc, 114)
+ENDFUNC 1
+
+//==============================================================================
+//Function to start VSP advertising over BLE
+//==============================================================================
+FUNCTION StartVSPAdvert()
+    dim addr$, scRpt$, adRpt$, UUIDStr$
+    //Start sending adverts containing the VSP service
+    scRpt$ = ""
+    rc = BleScanRptInit(scRpt$)
+    AssertRC(rc, 125)
+
+    //Advertise the 128 bit uuid in a scan report
+    UUIDStr$ = BASEUUID
+    rc = BleAdvRptAddUuid128(scRpt$, BleHandleUuid128(UUIDStr$))
+    AssertRC(rc, 130)
+    adRpt$ = ""
+
+    //Commit the advert report
+    rc = BleAdvRptsCommit(adRpt$,scRpt$)
+    AssertRC(rc, 135)
+
+    //Start advertising
+    addr$ = ""  //because we are not doing a DIRECT advert
+    rc = BleAdvertStart(0,addr$,100,0,0)
+    AssertRC(rc, 140)
+ENDFUNC 1
+
+//==============================================================================
+//Function handler for UART data receive
+//==============================================================================
+FUNCTION HndlrUartRx()
+    //UART data received
+    dim RdLen, Rd$
+
+    IF UARTBlocked == 0 && DataQueued == 1 THEN
+        //UART is not blocked
+        rc = BleCharValueRead(MIchar, Rd$)
+        AssertRC(rc, 153)
+        IF strcmp(Rd$, "\01") == 0 THEN
+            //Other device is able to accept
+            RdLen = UARTREADN(SendData$, 20)
+
+            IF RdLen > 0 THEN
+                //Write this data to the characteristic
+                rc = BLECHARVALUENOTIFY(TXchar, SendData$)
+                IF rc != 0 THEN
+                    //Failed to send data
+                    UARTBlocked = 1
+                    RdLen = 0
+                ELSE
+                    //Data queued, clear variable
+                    SendData$ = ""
+                    DataQueued = 0
+                ENDIF
+            ENDIF
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Handler for characteristic value written
+//==============================================================================
+FUNCTION HndlrCharVal(charHandle, offset, len)
+    //Characteristic written
+    dim Rd$, arc
+    arc = BleCharValueRead(charHandle, Rd$)
+    AssertRC(arc, 182)
+
+        IF charHandle == RXchar THEN
+            //RX
+            dim SLen, SWritten
+            SLen = strlen(Rd$)
+            SWritten = uartwrite(Rd$)
+            IF (SLen != SWritten) then
+                //Not enough buffer space - tell client to stop sending data
+                dim Rd2$
+                Rd2$ = "\00"
+                rc = BLECHARVALUENOTIFY(MOchar, Rd2$)
+                BufferFull = 1
+
+                //Shift left
+                STRSHIFTLEFT(Rd$, SWritten)
+                RecBuf$ = Rd$
+            ENDIF
+        ELSEIF charHandle == MIchar THEN
+            rc = BleCharValueRead(MIchar, Rd$)
+            AssertRC(rc, 202)
+            IF strcmp(Rd$, "\01") == 0 THEN
+                rc = HndlrUartRx()
+            ENDIF
+        ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Handler for characteristic notification
+//==============================================================================
+FUNCTION HndlrNtfyBuf()
+    //BLE notIFy buffer has free space
+    DataQueued = 1
+    IF UARTBlocked == 1 THEN
+        //UART is blocked but we now have free space
+        IF strlen(SendData$) > 0 THEN
+            //Data in variable to send
+            rc = BLECHARVALUENOTIFY(TXchar, SendData$)
+            IF rc != 0 THEN
+                //Use a timer to send the next data chunk
+                TIMERSTART(0, 400, 0)
+            ELSE
+                //Data sent - clear data
+                SendData$ = ""
+                UARTBlocked = 0
+            ENDIF
+        ELSE
+            //No data in variable to send, check UART
+            UARTBlocked = 0
+            rc = HndlrUartRx()
+        ENDIF
+    ELSE
+        //Check for UART data
+        rc = HndlrUartRx()
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Handler for UART transmit buffer becoming empty
+//==============================================================================
+FUNCTION HndlrUartTxEmpty()
+    //TX buffer empty - send rest of string
+    IF BufferFull == 1 THEN
+        dim SLen, SWritten, Rd$
+        SLen = strlen(RecBuf$)
+        SWritten = uartwrite(RecBuf$)
+        IF (SLen == SWritten) then
+            //All written
+            BufferFull = 0
+            Rd$ = "\01"
+            rc = BLECHARVALUENOTIFY(MOchar, Rd$)
+        ELSE
+            //Shift left
+            STRSHIFTLEFT(RecBuf$, SWritten)
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Handler for BLE events
+//==============================================================================
+FUNCTION HndlrBleMsg(nMsgId, nCtn)
+    IF nMsgId == 1 THEN
+        //Disconnect - restart advertising
+        rc = StartVSPAdvert()
+        ONEVENT  EVUARTRX       DISABLE            //Recieved UART data
+        BufferFull = 0
+        UARTBlocked = 0
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Handler for CCCD written
+//==============================================================================
+FUNCTION HndlrCharCccd(charHandle, nVal)
+    IF (charHandle == TXchar && nVal == 1) THEN
+        //TX CCCD written, enable handler to read from the UART
+        ONEVENT  EVUARTRX       CALL HndlrUartRx   //Recieved UART data
+        rc = HndlrUartRx()
+    ENDIF
+ENDFUNC 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//Create the VSP service and start advertising it
+rc = CreateVSPService()
+rc = StartVSPAdvert()
+
+//Open UART if closed
+rc = UARTINFO(0)
+IF (rc == 0) THEN
+    //UART is closed, open at default
+    rc = UartOpen(115200, 0, 0, "CN81H")
+ENDIF
+
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+ONEVENT  EVCHARVAL      CALL HndlrCharVal      //BLE characteristic written
+ONEVENT  EVNOTIFYBUF    CALL HndlrNtfyBuf      //BLE NotIFy buffer free
+ONEVENT  EVTMR0         CALL HndlrNtfyBuf      //Timer 0 expired
+ONEVENT  EVUARTTXEMPTY  CALL HndlrUartTxEmpty  //UART transmit buffer empty
+ONEVENT  EVBLEMSG       CALL HndlrBleMsg       //BLE event message
+ONEVENT  EVCHARCCCD     CALL HndlrCharCccd     //CCCD written
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WAITEVENT

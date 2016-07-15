@@ -1,0 +1,9 @@
+//Example :: PRINT.sb
+PRINT  "Hello \n"
+DIM a
+a=100
+PRINT a		   
+PRINT "\nIn Hex", "0x"; INTEGER.H' 100 ;"\n"	
+PRINT "In Octal ", INTEGER.O' 100 ;"\n"	
+PRINT "In Binary ", INTEGER.B' 100 ;"\n"		
+ 

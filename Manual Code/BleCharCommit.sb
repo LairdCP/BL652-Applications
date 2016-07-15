@@ -1,0 +1,38 @@
+//Example :: BleCharCommit.sb
+
+#DEFINE BLE_SERVICE_SECONDARY                           0
+#DEFINE BLE_SERVICE_PRIMARY                             1
+ 
+DIM rc 
+DIM attr$,usrDesc$ : usrDesc$="A description" 
+DIM hHtsSvc    //composite handle for hts primary service
+DIM mdCharVal : mdCharVal = BleAttrMetaData(1,1,20,0,rc)
+DIM mdCccd : mdCccd = BleAttrMetadata(1,1,2,0,rc)
+DIM mdUsrDsc : mdUsrDsc = BleAttrMetaData(1,1,20,0,rc)
+DIM hHtsMeas    //composite handle for htsMeas characteristic
+
+
+//----------------------------------------------------------------------------
+//Create a Health Thermometer PRIMARY service attribute which has a uuid of 0x1809
+//----------------------------------------------------------------------------
+rc=BleServiceNew(BLE_SERVICE_PRIMARY, BleHandleUuid16(0x1809), hHtsSvc)
+
+//----------------------------------------------------------------------------
+//Create the Measurement Characteristic object, add user description descriptor
+//----------------------------------------------------------------------------
+rc=BleCharNew(0x2A,BleHandleUuid16(0x2A1C),mdCharVal,mdCccd,0)
+rc=BleCharDescUserDesc(usrDesc$,mdUsrDsc)   
+
+//----------------------------------------------------------------------------
+//Commit the characteristics with some initial data
+//----------------------------------------------------------------------------
+attr$="hello\00worl\64" 
+IF BleCharCommit(hHtsSvc,attr$,hHtsMeas)==0 THEN
+    PRINT "\nCharacteristic Commited"
+ELSE
+    PRINT "\nFailed"
+ENDIF
+rc=BleServiceCommit(hHtsSvc)
+
+//the characteristic will now be visible in the GATT table
+//and is refrenced by ‘hHtsMeas’for subsequent calls

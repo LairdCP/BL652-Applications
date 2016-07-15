@@ -1,0 +1,10 @@
+//Example :: BleEncodeSFloatEx.sb
+
+DIM rc, mantissa, exp
+DIM attr$ : attr$=""
+
+//write 2,147,483,647 as SFLOAT to index 0
+rc=BleEncodeSFLOATEX(attr$,2147483647,0)
+rc=BleDecodeSFloat(attr$,mantissa,exp,0)
+PRINT "\nThe number stored is ";mantissa;" x 10^";exp
+

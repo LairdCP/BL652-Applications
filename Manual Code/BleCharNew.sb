@@ -1,0 +1,18 @@
+//Example :: BleCharNew.sb
+
+DIM rc
+DIM charUuid : charUuid = BleHandleUuid16(2)       //Characteristic's UUID
+DIM mdVal : mdVal = BleAttrMetadata(1,0,20,0,rc)   //Metadata for value attribute
+DIM mdCccd : mdCccd = BleAttrMetadata(1,1,2,0,rc)  //Metadata for CCCD attribute of Characteristic
+
+
+//==============================================================================
+// Create a new char:
+// --- Indicatable, not Broadcastable (so mdCccd is included, but not mdSccd)
+// --- Can be read, not written (shown in mdVal as well)
+//==============================================================================
+IF BleCharNew(0x22,charUuid,mdVal,mdCccd,0)==0 THEN
+    PRINT "\nNew Characteristic created"
+ELSE
+    PRINT "\nFailed"
+ENDIF

@@ -1,0 +1,8 @@
+//Example :: StrDeescape.sb
+DIM s$,t$
+s$="Hello\\world"
+PRINT s$;"\n"
+PRINT StrLen(s$);"\n"           
+StrDeescape(s$)
+PRINT s$;"\n"
+PRINT StrLen(s$);"\n"  

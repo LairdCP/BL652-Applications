@@ -1,0 +1,779 @@
+// Copyright (c) 2016, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// BL652 custom Real Time Clock (RTC) Service
+//       This sample application implements the BLE RTC service with additional
+//       characteristics to allow control of the alarm and setting the time
+//       remotely.
+//
+// This app provides for a command interface over the uart and the protocol is
+// as follows:-
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Convention : (1) Case sensitive, and commands are presented in alphabetic order
+//              (2) If line ends with \ then it continues on next line. That does
+//                  not mean that it should be sent as multiple lines
+//              (3) Replace anything between ##
+//              (4) #INTaaaa# means a number in decimal, hex, octal or binary
+//                      format -> 23 == 0x17 == h'17 == o'23 == b'10111
+//                      aaaa is just a description
+//              (5) #HEXaaaa# means a string without delimitors consisting of hex
+//                      characters only aaaa is just a description
+//              (6) #STRaaaa# means a string without delimitors
+//                      aaaa is just a description
+//              (7) "STRaaaa" means a string which must have the " delimitor
+//                      aaaa is just a description
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// -----------------------------------------------------------------------------
+//
+// show time
+//    - Shows the current remote time on the connected RTC server
+//    -> (Requires a connection to an RTC host)
+//
+// -----------------------------------------------------------------------------
+//
+// show alarm time
+//    - Shows the current remote alarm time on the connected RTC server
+//    -> (Requires a connection to an RTC host)
+//
+// -----------------------------------------------------------------------------
+//
+// show alarm mode
+//    - Shows the current remote alarm mode and match eventon the connected RTC
+//       server
+//    -> (Requires a connection to an RTC host)
+//
+// -----------------------------------------------------------------------------
+//
+// show version
+//    - Shows the version of the remote RTC server application
+//    -> (Requires a connection to an RTC host)
+//
+// -----------------------------------------------------------------------------
+//
+// show addr
+//    - Shows the Bluetooth address of the target RTC server to connect to
+//
+// -----------------------------------------------------------------------------
+//
+// scan
+//    - Scan for RTC adverts. When an advert is detected, the Bluetooth of the
+//       server that sent it and the RTC data will be displayed.
+//
+// -----------------------------------------------------------------------------
+//
+// set time <timestamp>
+//    - Sets the time on the connected device to be that of the provided
+//       timestamp
+//
+// -----------------------------------------------------------------------------
+//
+// set alarm time <timestamp>
+//    - Sets the alarm time on the connected device to be that of the provided
+//       timestamp
+//
+// -----------------------------------------------------------------------------
+//
+// set alarm mode <on/off> <match>
+//    - Enables or disables the alarm on the connected device, and changes what
+//       the alarm should match on which can be one of: seconds, minutes,
+//       hours, date
+//
+// -----------------------------------------------------------------------------
+//
+// set addr <BTAddr>
+//    - Sets the bluetooth address of the host device to connect to using the
+//       `connect` command
+//
+// -----------------------------------------------------------------------------
+//
+// set notifications <on/off>
+//    - Enables or disables time notifications from the remote time server.
+//
+// -----------------------------------------------------------------------------
+//
+// connect
+//    - Connects to an RTC host if a Bluetooth
+//
+// -----------------------------------------------------------------------------
+//
+// disconnect
+//    - Disconnects from an RTC host if there is a connection to one
+//
+// -----------------------------------------------------------------------------
+//
+// help
+//    - Not currently implemented
+//
+// -----------------------------------------------------------------------------
+//
+// timestamp
+//    - Shows the format that timestamps need to be entered in
+//
+// -----------------------------------------------------------------------------
+//
+// version
+//    - Shows the version of the RTC client application
+//
+// -----------------------------------------------------------------------------
+// quit or exit
+//    - Exits the application and returns the interactive mode.
+//
+// -----------------------------------------------------------------------------
+
+//Defines for the DoFunc variable
+#define READ_TIME              0
+#define READ_VERSION           1
+#define READ_ALARMTIME         2
+#define READ_ALARMMODE         3
+#define WRITE_ALARMTIME        4
+#define WRITE_ALARMMODE        5
+#define WRITE_TIME             6
+#define ENABLE_NOTIFICATIONS   7
+#define DISABLE_NOTIFICATIONS  8
+
+dim rc                                          //Function return code
+dim TargetBT$ : TargetBT$ = "000016a4093a99"    //Bluetooth address` of the device to connect too
+dim Status : Status = 0                         //0 = waiting for user input, 1 = scanning
+dim ConnectionStatus : ConnectionStatus = 0     //0 = disconnected, 1 = connected
+dim nCtxG //Global BLE handler
+dim APP_VERSION$ : APP_VERSION$ = "0.98"        //Version of client program
+dim TmpStr$ : TmpStr$ = ""                      //Temporary string for inter-function passing
+
+//List of UUID's
+dim TimeUUID : TimeUUID = 0
+dim VersionUUID : VersionUUID = 0
+dim AlarmTimeUUID : AlarmTimeUUID = 0
+dim AlarmModeUUID : AlarmModeUUID = 0
+dim NotificationUUID : NotificationUUID = 0
+
+//List of service handle IDs
+dim TimeHID : TimeHID = 0x2A2B
+dim VersionHID : VersionHID = 0x2B04
+dim AlarmTimeHID : AlarmTimeHID = 0x2B03
+dim AlarmModeHID : AlarmModeHID = 0x2B02
+
+dim DoFunc : DoFunc = 0                         //Temporary variable for what function to perform when characteristic is found
+
+//Global variables for timestamps
+dim TS_HH, TS_MM1, TS_SS, TS_DD, TS_MM2, TS_YYYY
+
+//Global variables for UART
+dim nMatch, stRsp$, urtcmd$, tkn$
+
+FUNCTION HndlrCnTOut()
+    //Runs on connection timeout
+    PRINT "Error: Connection attempt timed out."
+ENDFUNC 1
+
+FUNCTION HndlrBleMsg(nMsgId, nCtx)
+    //Runs on BLE message
+    IF nMsgId == 0 THEN
+        //Connected!
+        PRINT "Connected!\n"
+        nCtxG = nCtx
+        ConnectionStatus = 1
+    ELSEIF nMsgId == 1 THEN
+        //Disconnected
+        ConnectionStatus = 0
+        PRINT "Disconnected!\n"
+
+        //Reset all handler UUIDs back to default (unset)
+        TimeUUID = 0
+        VersionUUID = 0
+        AlarmTimeUUID = 0
+        AlarmModeUUID = 0
+    ENDIF
+ENDFUNC 1
+
+FUNCTION ValidateTimestamp()
+    //Returns 0 if the timestamp provided is invalid
+    IF (TS_HH >= 0 && TS_HH < 24 && TS_MM1 >= 0 && TS_MM1 < 60 && TS_SS >= 0 && TS_SS < 60 && TS_DD > 0 && TS_DD < 32 && TS_MM2 > 0 && TS_MM2 < 13 && TS_YYYY > 2000 && TS_YYYY < 2399) THEN
+        //Valid!
+    ELSE
+        //Invalid
+        EXITFUNC 0
+    ENDIF
+ENDFUNC 1
+
+FUNCTION SplitTimestamp(TS$)
+    //Splits up a timestamp into the individual parts and stores them in global variables
+    dim Tmp$
+    Tmp$ = MID$(TS$, 0, 2)
+    TS_HH = StrValDec(Tmp$)
+    Tmp$ = MID$(TS$, 3, 2)
+    TS_MM1 = StrValDec(Tmp$)
+    Tmp$ = MID$(TS$, 6, 2)
+    TS_SS = StrValDec(Tmp$)
+    Tmp$ = MID$(TS$, 9, 2)
+    TS_DD = StrValDec(Tmp$)
+    Tmp$ = MID$(TS$, 12, 2)
+    TS_MM2 = StrValDec(Tmp$)
+    Tmp$ = MID$(TS$, 15, 4)
+    TS_YYYY = StrValDec(Tmp$)
+ENDFUNC 1
+
+FUNCTION EnableScan()
+    //Scan infinitely with no filtering
+    Status = 1
+    rc = BleScanStart(0, 0)
+
+    IF rc==0 THEN
+        PRINT "Scanning (Press enter to stop)\n"
+    ELSE
+        PRINT "Error: "; INTEGER.H'rc;"\n"
+    ENDIF
+ENDFUNC 1
+
+FUNCTION HndlrScanTO()
+    //Runs when scanning times out
+    PRINT "Scan timeout\n"
+    Status = 0
+ENDFUNC 1
+
+//This handler will be called when an advert is received
+FUNCTION HndlrAdvRpt()
+    DIM periphAddr$, advData$, nDiscarded, nRssi
+    //Read all cached advert reports
+    DO
+   rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
+//       IF strcmp(TargetBT$, periphAddr$) == 0 THEN
+           //Decode time and date data
+           dim adval$
+           dim Tmp
+           rc=BLEGETADBYTAG(advData$, 0x16, ADval$)
+           IF (strlen(ADval$) == 10) THEN
+               PRINT "From: "; StrHexize$(periphAddr$);" (RSSI: ";nRssi;")\n"
+               PRINT "Date & Time: "
+               rc=BleDecodeU8(ADVal$,Tmp,4)
+               PRINT Tmp;":"
+               rc=BleDecodeU8(ADVal$,Tmp,5)
+               PRINT Tmp;":"
+               rc=BleDecodeU8(ADVal$,Tmp,6)
+               PRINT Tmp;" on "
+               rc=BleDecodeU8(ADVal$,Tmp,3)
+               PRINT Tmp;"/"
+               rc=BleDecodeU8(ADVal$,Tmp,2)
+               PRINT Tmp;"/"
+               rc=BleDecodeU16(ADVal$,Tmp,0)
+               PRINT Tmp;"\n"
+           ENDIF
+//       ENDIF
+    UNTIL rc!=0
+ENDFUNC 1
+
+FUNCTION DoConnect()
+    //Makes a connection to the host device
+    IF ConnectionStatus == 0 THEN
+        //Not connected
+        rc = BleConnect(TargetBT$, 5000, 10000, 40000, 5000000)
+    ELSE
+        PRINT "Error: Already connected to target device.\n"
+    ENDIF
+ENDFUNC 1
+
+FUNCTION DoDisconnect()
+    //Disconnects from the host device
+        IF ConnectionStatus == 1 THEN
+        rc = BleDisconnect(nCtxG)
+    ELSE
+        PRINT "Error: Not connected to a device.\n"
+    ENDIF
+ENDFUNC 1
+
+FUNCTION IsConnected()
+    //Returns a message if not connected to the device
+    IF ConnectionStatus == 0 THEN
+        PRINT "Error: you must be connected to the target BL652/BT900 to use this function.\n"
+        EXITFUNC 2
+    ENDIF
+ENDFUNC 1
+
+FUNCTION OnUartCmd()
+    dim tlen, tkn$, Buf$
+    rc=-2 //Assume there is no error
+    tlen = ExtractStrToken(urtcmd$,tkn$) //Get first token
+    IF tlen > 0 THEN
+        IF strcmp(tkn$, "show")==0 THEN
+            tlen = ExtractStrToken(urtcmd$,tkn$) //Get next token
+            IF strcmp(tkn$, "addr")==0 THEN
+                //Show target Bluetooth address
+                PRINT "Target Bluetooth address: ";STRHEXIZE$(TargetBT$);"\n"
+                EXITFUNC 1
+            ENDIF
+            IF IsConnected() == 1 THEN
+                IF strcmp(tkn$, "time")==0 THEN
+                    //Show remote time
+                    IF (TimeUUID > 0) THEN
+                        rc = BleGattcRead(nCtxG, TimeUUID, 0)
+                    ELSE
+                        DoFunc = READ_TIME
+                        rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(TimeHID), 0)
+                    ENDIF
+                ELSEIF strcmp(tkn$, "version")==0 THEN
+                    //Show remote version
+                    IF (VersionUUID > 0) THEN
+                        rc = BleGattcRead(nCtxG, VersionUUID, 0)
+                    ELSE
+                        DoFunc = READ_VERSION
+                        rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(VersionHID), 0)
+                    ENDIF
+                ELSEIF strcmp(tkn$, "alarm")==0 THEN
+                    tlen = ExtractStrToken(urtcmd$,tkn$)
+                    IF strcmp(tkn$, "time")==0 THEN
+                        //Show remote alarm time
+                        IF (AlarmTimeUUID > 0) THEN
+                            rc = BleGattcRead(nCtxG, AlarmTimeUUID, 0)
+                        ELSE
+                            DoFunc = READ_ALARMTIME
+                            rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(AlarmTimeHID), 0)
+                        ENDIF
+                    ELSEIF strcmp(tkn$, "mode")==0 THEN
+                        //Show remote alarm mode
+                        IF (AlarmModeUUID > 0) THEN
+                            rc = BleGattcRead(nCtxG, AlarmModeUUID, 0)
+                        ELSE
+                            DoFunc = READ_ALARMMODE
+                            rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(AlarmModeHID), 0)
+                        ENDIF
+                    ENDIF
+                ENDIF
+            ENDIF
+'            rc = _at()
+        ELSEIF strcmp(tkn$, "set")==0 THEN
+            tlen = ExtractStrToken(urtcmd$,tkn$) //Get next token
+            IF strcmp(tkn$, "addr")==0 THEN
+                //Change BT address to connect to
+                tlen = ExtractStrToken(urtcmd$,tkn$) //Get next token
+                IF (strlen(tkn$) == 14) THEN
+                    //Update BT addr
+                    TargetBT$ = STRDEHEXIZE$(tkn$)
+                    PRINT "Target Bluetooth address updated to ";tkn$;"\n"
+                ELSE
+                    //Invalid address
+                    PRINT "\nInvalid Bluetooth address provided."
+                ENDIF
+                urtcmd$ = ""
+                EXITFUNC 1
+            ELSEIF IsConnected() == 1 THEN
+                IF strcmp(tkn$, "time")==0 THEN
+                    //Update time on server
+                    tkn$ = mid$(urtcmd$, 1, strlen(urtcmd$)-2)
+                    IF STRLEN(tkn$) == 19 THEN
+                        rc = SplitTimestamp(tkn$)
+                        IF ValidateTimestamp() == 1 THEN
+                            //Valid timestamp
+                            IF (TimeUUID > 0) THEN
+                                rc = BleEncode8(Buf$, 1, 9) //Adjust reason (manual)
+                                rc = BleEncode8(Buf$, 0, 8) //1/256 seconds (0)
+                                rc = BleEncode8(Buf$, 0, 7) //Day of the week (unknown)
+                                rc = BleEncode8(Buf$, TS_SS, 6)
+                                rc = BleEncode8(Buf$, TS_MM1, 5)
+                                rc = BleEncode8(Buf$, TS_HH, 4)
+                                rc = BleEncode8(Buf$, TS_DD, 3)
+                                rc = BleEncode8(Buf$, TS_MM2, 2)
+                                rc = BleEncode16(Buf$, TS_YYYY, 0)
+                                rc = BleGATTCWrite(nCtxG, TimeUUID, Buf$)
+                            ELSE
+                                DoFunc = WRITE_TIME
+                                rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(TimeHID), 0)
+                            ENDIF
+                        ELSE
+                            //Invalid timestamp
+                            PRINT "Error: Provided timestamp is not valid\n"
+                        ENDIF
+                    ELSE
+                        //Invalid length
+                        PRINT "Error: Provided timestamp is not valid\n"
+                    ENDIF
+                ELSEIF strcmp(tkn$, "alarm")==0 THEN
+                    tlen = ExtractStrToken(urtcmd$,tkn$) //Get next token
+                    IF strcmp(tkn$, "time")==0 THEN
+                        //Update alarm on server
+                        tkn$ = mid$(urtcmd$, 1, strlen(urtcmd$)-2)
+                        IF STRLEN(tkn$) == 19 THEN
+                            rc = SplitTimestamp(tkn$)
+                            IF ValidateTimestamp() == 1 THEN
+                                IF (AlarmTimeUUID > 0) THEN
+                                    //Valid timestamp
+                                    rc = BleEncode8(Buf$, TS_SS, 0)
+                                    rc = BleEncode8(Buf$, TS_MM1, 1)
+                                    rc = BleEncode8(Buf$, TS_HH, 2)
+                                    rc = BleEncode8(Buf$, TS_DD, 3)
+                                    rc = BleEncode8(Buf$, TS_MM2, 4)
+                                    rc = BleGATTCWrite(nCtxG, AlarmTimeUUID, Buf$)
+                                    PRINT "Setting alarm time to ";TS_HH;":";TS_MM1;":";TS_SS;" ";TS_DD;"/";TS_MM2;"...\n"
+                                ELSE
+                                    DoFunc = WRITE_ALARMTIME
+                                    rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(AlarmTimeHID), 0)
+                                ENDIF
+                            ELSE
+                                //Invalid timestamp
+                                PRINT "Error: Provided timestamp is not valid\n"
+                            ENDIF
+                        ELSE
+                            //Invalid length
+                            PRINT "Error: Provided timestamp is not valid\n"
+                        ENDIF
+                    ELSEIF strcmp(tkn$, "mode")==0 THEN
+                        //Set alarm mode and if enabled
+                        tlen = ExtractStrToken(urtcmd$,tkn$) //Get next token
+                        IF strcmp(tkn$, "on")==0 THEN
+                            //Enable
+                            tlen = ExtractStrToken(urtcmd$,tkn$) //Get next token
+                            rc = BleEncode8(Buf$, 1, 0)
+                            DoFunc = WRITE_ALARMMODE
+                            IF strcmp(tkn$, "seconds")==0 THEN
+                                //Seconds
+                                rc = BleEncode8(Buf$, 0, 1)
+                                TmpStr$ = Buf$
+                                IF (AlarmModeUUID > 0) THEN
+                                    rc = BleGATTCWrite(nCtxG, AlarmModeUUID, Buf$)
+                                ELSE
+                                    rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(AlarmModeHID), 0)
+                                ENDIF
+                                PRINT "Enabled alarm to match on seconds\n"
+                            ELSEIF strcmp(tkn$, "minutes")==0 THEN
+                                //Minutes
+                                rc = BleEncode8(Buf$, 1, 1)
+                                TmpStr$ = Buf$
+                                IF (AlarmModeUUID > 0) THEN
+                                    rc = BleGATTCWrite(nCtxG, AlarmModeUUID, Buf$)
+                                ELSE
+                                    rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(AlarmModeHID), 0)
+                                ENDIF
+                                PRINT "Enabled alarm to match on minutes\n"
+                            ELSEIF strcmp(tkn$, "hours")==0 THEN
+                                //Hours
+                                rc = BleEncode8(Buf$, 2, 1)
+                                TmpStr$ = Buf$
+                                IF (AlarmModeUUID > 0) THEN
+                                    rc = BleGATTCWrite(nCtxG, AlarmModeUUID, Buf$)
+                                ELSE
+                                    rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(AlarmModeHID), 0)
+                                ENDIF
+                                PRINT "Enabled alarm to match on hours\n"
+                            ELSEIF strcmp(tkn$, "date")==0 THEN
+                                //Date
+                                rc = BleEncode8(Buf$, 4, 1)
+                                TmpStr$ = Buf$
+                                IF (AlarmModeUUID > 0) THEN
+                                    rc = BleGATTCWrite(nCtxG, AlarmModeUUID, Buf$)
+                                ELSE
+                                    rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(AlarmModeHID), 0)
+                                ENDIF
+                                PRINT "Enabled alarm to match on date\n"
+                            ELSE
+                                //Invalid
+                                PRINT "Error: Invalid mode.\n"
+                            ENDIF
+                        ELSEIF strcmp(tkn$, "off")==0 THEN
+                            //Disable
+                            rc = BleEncode8(Buf$, 0, 0)
+                            rc = BleEncode8(Buf$, 0, 1)
+                            TmpStr$ = Buf$
+                            IF (AlarmModeUUID > 0) THEN
+                                rc = BleGATTCWrite(nCtxG, AlarmModeUUID, Buf$)
+                            ELSE
+                                DoFunc = WRITE_ALARMMODE
+                                rc = BleGattCFindChar(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(AlarmModeHID), 0)
+                            ENDIF
+                            PRINT "Disabled alarm\n"
+                        ELSE
+                            //Invalid
+                            PRINT "Error: Invalid mode.\n"
+                        ENDIF
+                    ENDIF
+                ELSEIF strcmp(tkn$, "notifications")==0 THEN
+                    //Enable or disable notifications
+                    tlen = ExtractStrToken(urtcmd$,tkn$) //Get next token
+                    IF strcmp(tkn$, "on")==0 THEN
+                        //Enable notifications
+                        DoFunc = ENABLE_NOTIFICATIONS
+                        IF (NotificationUUID > 0) THEN
+                            Buf$ = "\01\00"
+                            rc = BleGATTCWrite(nCtxG, NotificationUUID, Buf$)
+                        ELSE
+                            rc = BLEGATTCFINDDESC(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(TimeHID), 0, BleHandleUuid16(0x2902), 0)
+                        ENDIF
+                    ELSEIF strcmp(tkn$, "off")==0 THEN
+                        //Disable notifications
+                        DoFunc = DISABLE_NOTIFICATIONS
+                        IF (NotificationUUID > 0) THEN
+                            Buf$ = "\00\00"
+                            rc = BleGATTCWrite(nCtxG, NotificationUUID, Buf$)
+                        ELSE
+                            rc = BLEGATTCFINDDESC(nCtxG, BleHandleUuid16(0x1805), 0, BleHandleUuid16(TimeHID), 0, BleHandleUuid16(0x2902), 0)
+                        ENDIF
+                    ELSE
+                        //Invalid
+                        PRINT "Error: Invalid notification setting.\n"
+                    ENDIF
+            ENDIF
+        ENDIF
+        ELSEIF strcmp(tkn$, "scan")==0 THEN
+            rc = EnableScan()
+        ELSEIF strcmp(tkn$, "connect")==0 THEN
+            rc = DoConnect()
+        ELSEIF strcmp(tkn$, "disconnect")==0 THEN
+            rc = DoDisconnect()
+        ELSEIF StrCmp(tkn$, "help")==0 THEN
+            PRINT "Please see the top of the rtcc.lient.sb file for a list of commands.\n"
+        ELSEIF StrCmp(tkn$, "timestamp")==0 THEN
+            PRINT "Timestamp format is: HH:MM:SS DD/MM/YYYY\n"
+        ELSEIF strcmp(tkn$, "version")==0 THEN
+            PRINT "Version ";APP_VERSION$;"\n"
+        ELSEIF strcmp(tkn$, "quit")==0 || strcmp(tkn$, "exit")==0 THEN
+            IF ConnectionStatus == 1 THEN
+                rc = DoDisconnect()
+            ENDIF
+            EXITFUNC 0
+        ELSE
+            PRINT "Error: '";tkn$;LEFT$(urtcmd$, STRLEN(urtcmd$)-1);"' is not a valid command\n"
+        ENDIF
+    ENDIF
+    //Clear UART RX buffer
+    urtcmd$ = ""
+ENDFUNC 1
+
+FUNCTION HndlrUartRx()
+    IF Status == 1 THEN
+        //End scanning
+        rc = BleScanStop()
+        Status = 0
+        PRINT "Ended scanning.\n"
+    ELSE
+        //Check if CR has been received
+        nMatch=UartReadMatch(stRsp$,13)
+        if nMatch!=0 then
+            //CR exists in the input buffer
+            urtcmd$ = strsplitleft$(stRsp$,nMatch)
+            EXITFUNC OnUartCmd()
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+FUNCTION HndlrGCData(nCtx, nHndl, nStat)
+    //Runs when data has been read from remote GATT server
+    dim offset, attrData$, Tmp
+    IF nStat == 0 THEN
+        rc = BleGATTCReadData(nCtx, nHndl, offset, attrData$)
+        IF nHndl == TimeUUID THEN
+            //We have the time & date data
+            PRINT "Date & Time: "
+            rc=BleDecodeU8(attrData$,Tmp,4)
+            PRINT Tmp;":"
+            rc=BleDecodeU8(attrData$,Tmp,5)
+            PRINT Tmp;":"
+            rc=BleDecodeU8(attrData$,Tmp,6)
+            PRINT Tmp;" on "
+            rc=BleDecodeU8(attrData$,Tmp,3)
+            PRINT Tmp;"/"
+            rc=BleDecodeU8(attrData$,Tmp,2)
+            PRINT Tmp;"/"
+            rc=BleDecodeU16(attrData$,Tmp,0)
+            PRINT Tmp;"\n"
+        ELSEIF nHndl == AlarmTimeUUID THEN
+            //We have the alarm data
+            PRINT "Alarm: "
+            rc=BleDecodeU8(attrData$,Tmp,2)
+            PRINT Tmp;":"
+            rc=BleDecodeU8(attrData$,Tmp,1)
+            PRINT Tmp;":"
+            rc=BleDecodeU8(attrData$,Tmp,0)
+            PRINT Tmp;" on "
+            rc=BleDecodeU8(attrData$,Tmp,3)
+            PRINT Tmp;"/"
+            rc=BleDecodeU8(attrData$,Tmp,4)
+            PRINT Tmp;"\n"
+        ELSEIF nHndl == VersionUUID THEN
+            //Version reply
+            PRINT "Remote RTC Server Version: ";attrData$;"\n"
+        ELSEIF nHndl == AlarmModeUUID THEN
+            //Alarm mode reply
+            dim TmpStr$
+            PRINT "Alarm is "
+            TmpStr$ = LEFT$(attrData$, 1)
+            IF strcmp(TmpStr$, "\01") == 0 THEN
+                //Alarm enabled
+                PRINT "ENABLED"
+            ELSE
+                //Alarm disabled
+                PRINT "DISABLED"
+            ENDIF
+            PRINT ". Matching on "
+            TmpStr$ = RIGHT$(attrData$, 1)
+            IF strcmp(TmpStr$, "\00") == 0 THEN
+                //000 = Seconds match
+                PRINT "Seconds"
+            ELSEIF strcmp(TmpStr$, "\01") == 0 THEN
+                //001 = Minutes match
+                PRINT "Minutes"
+            ELSEIF strcmp(TmpStr$, "\02") == 0 THEN
+                //010 = Hours match
+                PRINT "Hours"
+            ELSEIF strcmp(TmpStr$, "\04") == 0 THEN
+                //100 = Date match
+                PRINT "Date"
+            ELSE
+                //Invalid
+                PRINT "<invalid>"
+            ENDIF
+            PRINT "\n"
+        ENDIF
+    ELSE
+        PRINT "Error: Data reading from remote GATT server failed (Code: ";nStat;")\n"
+        PRINT "(Please note that the BL652 alarm pin is not connected and so the alarm service has been removed)\n"
+    ENDIF
+ENDFUNC 1
+
+FUNCTION HndlrFindCh(nCtx, cP, hCv, sH)
+    //Runs when a characteristic has been discovered
+    dim Buf$ : Buf$ = ""
+    IF (DoFunc == READ_TIME) THEN
+        TimeUUID = hCv
+        rc = BleGattcRead(nCtxG, hCv, 0)
+    ELSEIF (DoFunc == READ_VERSION) THEN
+        VersionUUID = hCv
+        rc = BleGattcRead(nCtxG, hCv, 0)
+    ELSEIF (DoFunc == READ_ALARMTIME) THEN
+        AlarmTimeUUID = hCv
+        rc = BleGattcRead(nCtxG, hCv, 0)
+    ELSEIF (DoFunc == READ_ALARMMODE) THEN
+        AlarmModeUUID = hCv
+        rc = BleGattcRead(nCtxG, hCv, 0)
+    ELSEIF (DoFunc == WRITE_ALARMTIME) THEN
+        AlarmTimeUUID = hCv
+        rc = BleEncode8(Buf$, TS_SS, 0)
+        rc = BleEncode8(Buf$, TS_MM1, 1)
+        rc = BleEncode8(Buf$, TS_HH, 2)
+        rc = BleEncode8(Buf$, TS_DD, 3)
+        rc = BleEncode8(Buf$, TS_MM2, 4)
+        rc = BleGATTCWrite(nCtxG, AlarmTimeUUID, Buf$)
+    ELSEIF (DoFunc == WRITE_ALARMMODE) THEN
+        AlarmModeUUID = hCv
+        rc = BleGATTCWrite(nCtxG, AlarmModeUUID, TmpStr$)
+    ELSEIF (DoFunc == WRITE_TIME) THEN
+        TimeUUID = hCv
+        rc = BleEncode8(Buf$, TS_SS, 0)
+        rc = BleEncode8(Buf$, TS_MM1, 1)
+        rc = BleEncode8(Buf$, TS_HH, 2)
+        rc = BleEncode8(Buf$, TS_DD, 3)
+        rc = BleEncode8(Buf$, TS_MM2, 4)
+        rc = BleEncode16(Buf$, TS_YYYY, 5)
+        rc = BleGATTCWrite(nCtxG, hCv, Buf$)
+    ENDIF
+ENDFUNC 1
+
+FUNCTION HndlrWrtnCh(nCtx, hCv, nStat)
+    //Runs when a charteristic was written
+    IF (hCv == AlarmTimeUUID) THEN
+        PRINT "Alarm Time"
+    ELSEIF (hCv == AlarmModeUUID) THEN
+        PRINT "Alarm Mode"
+    ELSEIF (hCv == TimeUUID) THEN
+        PRINT "Time"
+    ELSEIF (hCv == NotificationUUID) THEN
+        PRINT "Notifications "
+        IF (DoFunc == ENABLE_NOTIFICATIONS) THEN
+            PRINT "(enabled)"
+        ELSEIF (DoFunc == DISABLE_NOTIFICATIONS) THEN
+            PRINT "(disabled)"
+        ENDIF
+    ENDIF
+
+    IF (nStat == 0) THEN
+        //Written successfully
+        PRINT " Updated successfully!"
+    ELSE
+        //Error
+        PRINT " was not updated, error code: ";INTEGER.H'nStat
+    ENDIF
+    PRINT "\n"
+ENDFUNC 1
+
+FUNCTION HndlrFindDe(nCtx, hDv)
+    //Runs on descriptor found
+    IF (hDv == 0) THEN
+        //Invalid descriptor
+        PRINT "Error: Notification CCCD was not found.\n"
+    ELSE
+        //Found descriptor
+        dim Buf$
+        NotificationUUID = hDv
+        IF (DoFunc == ENABLE_NOTIFICATIONS) THEN
+            Buf$ = "\01\00"
+        ELSEIF (DoFunc == DISABLE_NOTIFICATIONS) THEN
+            Buf$ = "\00\00"
+        ENDIF
+        rc = BleGATTCWrite(nCtxG, hDv, Buf$)
+    ENDIF
+ENDFUNC 1
+
+FUNCTION HndlrNtfyDo()
+    //Runs on notification received
+    dim nCtX, Hndl, Dat$, discard, Tmp
+    rc = BLEGATTCNOTIFYREAD(nCtX, Hndl, Dat$, discard)
+
+//    IF (Hndl == TimeUUID && strlen(Dat$) == 10) THEN - Might not have TimeUUID handle at this point
+    IF (strlen(Dat$) == 10) THEN
+        IF (strlen(Dat$) == 10) THEN
+            //We have the time & date data from the notifications
+            PRINT "(Notification) Date & Time: "
+            rc=BleDecodeU8(Dat$,Tmp,4)
+            PRINT Tmp;":"
+            rc=BleDecodeU8(Dat$,Tmp,5)
+            PRINT Tmp;":"
+            rc=BleDecodeU8(Dat$,Tmp,6)
+            PRINT Tmp;" on "
+            rc=BleDecodeU8(Dat$,Tmp,3)
+            PRINT Tmp;"/"
+            rc=BleDecodeU8(Dat$,Tmp,2)
+            PRINT Tmp;"/"
+            rc=BleDecodeU16(Dat$,Tmp,0)
+            PRINT Tmp;"\n"
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//Open GATT Client
+rc = BleGattcOpen(0,0)
+PRINT "RTC Client ready!\n"
+
+//Change human-readable BT address to hex BT address
+TargetBT$ = STRDEHEXIZE$(TargetBT$)
+
+//Events
+ONEVENT EVUARTRX             CALL HndlrUartRx //Runs when UART gets data
+ONEVENT EVBLE_SCAN_TIMEOUT   CALL HndlrScanTO //Runs when BLE scan times out
+ONEVENT EVBLE_ADV_REPORT     CALL HndlrAdvRpt //Runs when a BLE scan report is ready
+ONEVENT EVBLE_CONN_TIMEOUT   CALL HndlrCnTOut //Runs on connection timeout
+ONEVENT EVBLEMSG             CALL HndlrBleMsg //Runs on BLE message
+ONEVENT EVATTRREAD           CALL HndlrGCData //Runs on GATT Client data ready for reading
+ONEVENT EVFINDCHAR           CALL HndlrFindCh //Runs on characteristic found
+ONEVENT EVATTRWRITE          CALL HndlrWrtnCh //Runs on characteristic written
+ONEVENT EVFINDDESC           CALL HndlrFindDe //Runs on descriptor found
+ONEVENT EVATTRNOTIFY         CALL HndlrNtfyDo //Runs on notification received
+
+WAITEVENT

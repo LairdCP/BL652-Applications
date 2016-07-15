@@ -1,0 +1,12 @@
+//Example :: BleGattcOpen.sb
+DIM rc
+//open the gatt client with default notify/indicate ring buffer size
+rc = BleGattcOpen(0,0)
+IF rc == 0 THEN
+    PRINT "\nGatt Client is now open"
+ENDIF
+//open the client with default notify/indicate ring buffer size - again
+rc = BleGattcOpen(128,1)
+IF rc == 0 THEN
+    PRINT "\nGatt Client is still open, because already open"
+ENDIF

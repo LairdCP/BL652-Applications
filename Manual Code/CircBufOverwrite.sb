@@ -1,0 +1,24 @@
+// Example :: CircBufOverwrite.sb
+DIM rc,circHandle,i
+
+rc = CircBufCreate(4,circHandle)
+IF rc != 0 THEN 
+    PRINT "\nThe circular buffer was not created\n"
+ELSE
+    PRINT "\nThe circular buffer was created successfully\n"
+ENDIF
+
+FOR i = 1 TO 5 
+	rc = CircBufOverwrite(circHandle,i)
+	IF rc == 0x5103 THEN
+		PRINT "\nOldest value was discarded to write ";i
+	ELSEIF rc !=0 THEN
+		PRINT "\nFailed TO write inTO the circular buffer"
+	ELSE 
+		PRINT "\n";i
+	ENDIF
+NEXT
+
+
+
+	

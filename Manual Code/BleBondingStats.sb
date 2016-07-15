@@ -1,0 +1,6 @@
+//Example :: BleBondingStats.sb
+dim rc, nRoll, nPers
+print "\n:Bonding Manager Database Statistics:"
+print "\nCapacity:  ","", BleBondingStats(nRoll, nPers)
+print "\nRolling: ","",nRoll
+print "\nPersistent: ",nPers

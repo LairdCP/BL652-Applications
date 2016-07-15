@@ -1,0 +1,19 @@
+//Example :: EVTMRn.sb
+FUNCTION HandlerTimer0()
+  PRINT "\nTimer 0 has expired"
+ENDFUNC 1 							//remain blocked in WAITEVENT
+
+FUNCTION HandlerTimer1()
+  PRINT "\nTimer 1 has expired"
+ENDFUNC 0 							//exit from WAITEVENT
+
+ONEVENT EVTMR0 CALL HandlerTimer0
+ONEVENT EVTMR1 CALL HandlerTimer1
+
+TimerStart(0,500,1)  				//start a 500 millisecond recurring timer
+PRINT "\nWaiting for Timer 0"
+TimerStart(1,1000,0) 				//start a 1000 millisecond timer
+PRINT "\nWaiting for Timer 1"
+
+WAITEVENT
+PRINT "\nGot here because TIMER 1 expired and handler returned 0"

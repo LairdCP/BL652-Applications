@@ -1,0 +1,13 @@
+//Example :: GetTickSince.sb
+DIM startTick, elapseMs, x
+x=1
+
+startTick = GetTickCount()
+DO
+	PRINT x;" x 2 = "
+	x=x*2
+	PRINT x;"\n"
+UNTIL x==32768
+
+elapseMs = GetTickSince(startTick)
+PRINT "\nThe Do Until loop took ";elapseMS; " msec to process"

@@ -1,0 +1,34 @@
+//Example :: BleAdvGetADbyIndex.sb
+DIM rc,  ad1$, ad2$, fullAD$, nADTag, ADval$
+
+'//AD with length = 6 bytes, tag = 0xDD
+ad1$="\06\DD\11\22\33\44\55"
+
+ //AD with length = 7 bytes, tag = 0xDA
+ad2$="\07\EE\AA\BB\CC\DD\EE\FF"
+
+fullAD$ = ad1$ + ad2$
+PRINT "\n\n"; Strhexize$(fullAD$);"\n"
+
+rc=BleGetADbyIndex(0, fullAD$ , nADTag, ADval$ )
+IF rc==0 THEN
+    PRINT "\nFirst AD element with tag 0x"; INTEGER.H'nADTag ;" is  ";StrHexize$(ADval$)
+ELSE
+    PRINT "\nError reading AD: " ;INTEGER.H'rc
+ENDIF
+
+rc=BleGetADbyIndex(1, fullAD$ , nADTag, ADval$)
+IF rc==0 THEN
+    PRINT "\nSecond AD element with tag 0x"; INTEGER.H'nADTag ;" is  ";StrHexize$(ADval$)
+ELSE
+    PRINT "\nError reading AD: "; INTEGER.H'rc
+ENDIF
+
+'//Will fail because there are only 2 AD elements
+rc=BleGetADbyIndex(2, fullAD$ , nADTag, ADval$)
+IF rc==0 THEN
+    PRINT "\nThird AD element with tag 0x"; INTEGER.H'nADTag ;" is ";StrHexize$(ADval$)
+ELSE
+    PRINT "\nError reading AD: "; INTEGER.H'rc
+ENDIF
+

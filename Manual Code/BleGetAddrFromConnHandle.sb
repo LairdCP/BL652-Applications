@@ -1,0 +1,59 @@
+//Example :: BleGetAddrFromConnHandle.sb
+DIM rc, periphAddr$
+
+'//Scan indefinitely
+rc=BleScanStart(0, 0)
+
+IF rc==0 THEN
+    PRINT "\nScanning"
+ELSE
+    PRINT "\nError: "; INTEGER.H'rc
+ENDIF
+
+
+'//This handler will be called when an advert is received
+FUNCTION HndlrAdvRpt()
+    DIM advData$, nDiscarded, nRssi
+    
+    '//Read an advert report and connect to the sender
+    rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
+    rc=BleScanStop()
+    
+    '//Connect to device with MAC address obtained above with 5s connection timeout,
+    '//20ms min connection interval, 75 max, 5 second supervision timeout.
+    rc=BleConnect(periphAddr$, 5000, 20000, 75000, 5000000)
+    IF rc==0 THEN
+        PRINT "\n--- Connecting"
+    ELSE
+        PRINT "\nError: "; INTEGER.H'rc
+    ENDIF
+ENDFUNC 1
+
+'//This handler will be called in the event of a connection timeout
+FUNCTION HndlrConnTO()
+    PRINT "\n--- Connection timeout"
+    rc=BleScanStart(0, 0)
+ENDFUNC 1
+
+'//This handler will be called when there is a BLE message
+FUNCTION HndlrBleMsg(nMsgId, nCtx)
+    IF nMsgId == 0 THEN
+        dim addr$
+        rc=BleGetAddrFromConnHandle(nCtx,addr$)
+        PRINT "\n--- Connected to device with MAC address "; StrHexize$(addr$)
+        PRINT "\n--- Disconnecting now"
+        rc=BleDisconnect(nCtx)       
+    ENDIF
+ENDFUNC 1
+
+'//This handler will be called when a disconnection happens
+FUNCTION HndlrDiscon(nCtx, nRsn)
+ENDFUNC 0
+
+       
+ONEVENT EVBLEMSG          CALL HndlrBleMsg
+ONEVENT EVDISCON          CALL HndlrDiscon
+ONEVENT EVBLE_ADV_REPORT   CALL HndlrAdvRpt
+ONEVENT EVBLE_CONN_TIMEOUT CALL HndlrConnTO
+
+WAITEVENT

@@ -1,0 +1,7 @@
+//UartFlushTest.sb
+
+PRINT UartInfo(3); " bytes in the rx buffer"
+UartFlush(0)
+PRINT UartInfo(3); " bytes in the rx buffer"
+
+

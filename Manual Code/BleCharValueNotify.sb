@@ -1,0 +1,88 @@
+//Example :: BleCharValueNotify.sb
+DIM hMyChar,rc,at$,conHndl
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, hSvc, at$, attr$, adRpt$, addr$, scRpt$  
+    attr$="Hi"
+    DIM mdCccd : mdCccd = BleAttrMetadata(1,1,2,0,rc)   //CCCD metadata for char
+    
+    //Commit svc with handle 'hSvcUuid'
+	rc=BleServiceNew(1, BleHandleUuid16(0x18EE), hSvc)
+    //initialise char, write/read enabled, accept signed writes, notifiable
+    rc=BleCharNew(0x12,BleHandleUuid16(1),BleAttrMetaData(1,0,20,0,rc),mdCccd,0)     
+    //commit char initialised above, with initial value "hi" to service 'hMyChar'
+    rc=BleCharCommit(hSvc,attr$,hMyChar)
+	//commit changes to service
+	rc=BleServiceCommit(hSvc)
+    rc=BleScanRptInit(scRpt$) 
+    //Add 1 service handle to scan report
+    rc=BleAdvRptAddUuid16(scRpt$,0x18EE,-1,-1,-1,-1,-1)
+    //commit reports to GATT table - adRpt$ is empty
+    rc=BleAdvRptsCommit(adRpt$,scRpt$)
+    rc=BleAdvertStart(0,addr$,50,0,0)
+ENDFUNC rc
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+ENDSUB
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n--- Disconnected from client"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n--- Connected to client"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// CCCD descriptor written handler
+//==============================================================================
+FUNCTION HndlrCharCccd(BYVAL charHandle, BYVAL nVal) AS INTEGER
+    DIM value$
+    IF charHandle==hMyChar THEN
+        PRINT "\nCCCD Val: ";nVal
+        IF nVal THEN
+            PRINT " : Notifications have been enabled by client"
+            value$="hello"
+            IF BleCharValueNotify(hMyChar,value$)!=0 THEN
+                PRINT "\nFailed to notify new value :";INTEGER.H'rc
+            ELSE
+                PRINT "\nSuccessful notification of new value"              
+                EXITFUNC 0
+            ENDIF
+        ELSE
+            PRINT " : Notifications have been disabled by client"
+        ENDIF
+    ELSE
+        PRINT "\nThis is for some other characteristic"
+    ENDIF
+ENDFUNC 1
+
+ONEVENT  EVBLEMSG    CALL HndlrBleMsg
+ONEVENT  EVCHARCCCD  CALL HndlrCharCccd
+
+IF OnStartup()==0 THEN
+    rc = BleCharValueRead(hMyChar,at$)
+    PRINT "\nCharacteristic Value: ";at$
+    PRINT "\nYou can connect and write to the CCCD characteristic."
+    PRINT "\nThe BL652 will then notify your device of a new characteristic value\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+WAITEVENT
+
+CloseConnections()
+PRINT "\nExiting..."

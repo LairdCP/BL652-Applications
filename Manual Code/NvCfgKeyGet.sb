@@ -1,0 +1,4 @@
+//Example :: NvCfgKeyGet.sb
+DIM v : v = 0               	//initial the value just in case the key does not exist
+PRINT NvCfgKeyGet(100,v)		
+PRINT "\n";v					

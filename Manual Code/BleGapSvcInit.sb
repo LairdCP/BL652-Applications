@@ -1,0 +1,19 @@
+//Example :: BleGapSvcInit.sb
+
+DIM rc,dvcNme$,nmeWrtble,apprnce,MinConnInt,MaxConnInt,ConnSupTO,sL,s$
+
+dvcNme$= "Laird_TS"
+nmeWrtble = 0             //Device name will not be writable by peer
+apprnce = 768             //The device will appear as a Generic Thermometer
+MinConnInt = 500000        //Minimum acceptable connection interval is 0.5 seconds
+MaxConnInt = 1000000       //Maximum acceptable connection interval is 1 second
+ConnSupTO = 4000000        //Connection supervisory timeout is 4 seconds
+sL = 0                   //Slave latency--number of conn events that can be missed
+
+rc=BleGapSvcInit(dvcNme$,nmeWrtble,apprnce,MinConnInt,MaxConnInt,ConnSupTO,sL)
+
+IF !rc THEN
+    PRINT "\nSuccess"
+ELSE 
+    PRINT "\nFailed 0x"; INTEGER.H'rc      //Print result code as 4 hex digits
+ENDIF

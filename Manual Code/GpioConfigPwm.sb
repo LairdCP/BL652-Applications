@@ -1,0 +1,41 @@
+//Example :: GpioConfigPwm.sb
+dim retval
+dim i
+dim nFreq
+dim nResolution
+dim res[5] as integer
+
+FUNCTION HandlerTimer1()
+  dim TmpVal
+  i=i+1
+  if i==5 then
+    i=0
+  endif
+  TmpVal = (res[i]*100/nFreq)
+  PRINT "\nTimer event! PWM changed to "; TmpVal; "% duty cycle."
+  GpioWrite(13,res[i])
+ENDFUNC 1 
+
+i=0
+nFreq=2048
+nResolution=2048
+res[0]=nResolution/2
+res[1]=nResolution/4
+res[2]=nResolution/8
+res[3]=0
+res[4]=nResolution
+
+ONEVENT EVTMR1 CALL HandlerTimer1
+
+//Configure PWM
+retval = GpioConfigPWM(nFreq,nResolution)
+retval = GpioSetFunc(13,2,2)
+
+//Write the first value to the PWM out
+GpioWrite(13,res[i])
+PRINT "\nTimer started. PWM on 50% duty cycle."
+
+//start a 5000 millisecond (5 second) recurring timer
+TimerStart(1,5000,1)    
+
+WAITEVENT

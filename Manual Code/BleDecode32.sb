@@ -1,0 +1,25 @@
+ //Example :: BleDecode32.sb
+
+ DIM chrHandle,v1,svcHandle,rc
+ DIM mdVal : mdVal = BleAttrMetadata(1,1,50,0,rc)
+ DIM attr$ : attr$="\00\01\02\03\04\85\86\87\88\89"
+ DIM uuid : uuid = 0x1853
+
+ rc=BleServiceNew(1, BleHandleUuid16(uuid), svcHandle)
+
+ rc=BleCharNew(0x07,BleHandleUuid16(0x2A1C),mdVal,0,0)
+ rc=BleCharCommit(svcHandle,attr$,chrHandle)
+
+ rc=BleServiceCommit(svcHandle)
+
+ rc=BleCharValueRead(chrHandle,attr$)
+
+ //read 4 signed bytes from index 2
+ rc=BleDecode32(attr$,v1,2)
+ PRINT "\ndata in Hex = 0x"; INTEGER.H'v1
+ PRINT "\ndata in Decimal = "; v1;"\n"
+
+ //read 4 signed bytes from index 6
+ rc=BleDecode32(attr$,v1,6)
+ PRINT "\ndata in Hex = 0x"; INTEGER.H'v1
+ PRINT "\ndata in Decimal = "; v1;"\n"

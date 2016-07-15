@@ -1,0 +1,147 @@
+﻿// Copyright (c) 2014, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// BLE Advert scanner : Displays data from BLE packets, ignores repeated adverts
+// if the advert data is in the cache.
+//
+// 03/11/2014
+//
+//******************************************************************************
+
+//Variables
+DIM rc                             //Result code
+dim looprc                         //
+dim PrevAds$[8]                    //Previous adverts (size of 8 adverts)
+dim PrevAdCount : PrevAdCount = 0  //Number of previous adverts
+
+//This function removes leading 0s from the front of a string
+FUNCTION RemoveZeros(Data$) AS STRING
+    dim i, Done, TmpStr$ : i = 0 : Done = 0
+    WHILE (i < strlen(Data$))
+        TmpStr$ = MID$(Data$, i, 1)
+        IF (STRCMP(TmpStr$, "0") != 0) THEN
+            //Other number found - cut string to this length and mark as finished
+            TmpStr$ = RIGHT$(Data$, strlen(Data$)-i)
+            i = strlen(Data$)
+            Done = 1
+        ENDIF
+        i = i+1
+    ENDWHILE
+
+    IF (Done == 0) THEN
+        //Other number not found in provided string
+        TmpStr$ = "0"
+    ENDIF
+ENDFUNC TmpStr$
+
+//This handler will be called when an advert report is received
+FUNCTION HndlrAdvRpt()
+    DIM periphAddr$, advData$, nRssi, ADval$, TmpStr$, TmpStr2$, TmpVal
+
+    //Read all cached advert reports
+    looprc=BleScanGetAdvReport(periphAddr$, advData$, TmpVal, nRssi)
+    WHILE (looprc == 0)
+        //Check if this advert was received recently
+        TmpStr$ = periphAddr$ + advData$
+        TmpVal = 0
+        while (TmpVal < PrevAdCount)
+            if (strcmp(TmpStr$, PrevAds$[TmpVal]) == 0) then
+                //Already seen this advert, ignore it
+                TmpVal = 254
+            endif
+            TmpVal = TmpVal+1
+        endwhile
+
+        if (TmpVal != 255) then
+            //Advert not seen before - get device name
+            rc = BLEGETADBYTAG(advData$, 8, TmpStr$)
+            if (rc == 0) then
+                //Name found at index 0x08
+                PRINT TmpStr$;"\n"
+            else
+                //Name not found at index 0x08, check 0x09
+                rc = BLEGETADBYTAG(advData$, 9, TmpStr$)
+                if (rc == 0) then
+                    //Name found at index 0x09
+                    PRINT TmpStr$;"\n"
+                else
+                    //Name not found
+                    PRINT "[Device Name Not Found]\n"
+                endif
+            endif
+
+            //Output BT addr and RSSI
+            PRINT strhexize$(periphAddr$);", RSSI: ";nRssi;"\n"
+
+            //Go through all tags and print them out
+            PRINT "Advertising data [hex]:\n"
+            TmpVal = 0
+            while (TmpVal <= 0xff)
+                if (TmpVal == 8) then
+                    //Skip name tags
+                    TmpVal = 10
+                endif
+                rc = BLEGETADBYTAG(advData$, TmpVal, TmpStr$)
+                if (rc == 0) then
+                    //Output tag
+                    TmpStr2$ = ""
+                    SPRINT #TmpStr2$,INTEGER.H'TmpVal
+                    TmpStr2$ = RemoveZeros(TmpStr2$)
+                    PRINT "  Length: ";strlen(TmpStr$);", Type: 0x";TmpStr2$;", Value: ";STRHEXIZE$(TmpStr$);"\n"
+                endif
+                TmpVal = TmpVal+1
+            endwhile
+
+            //Newline
+            PRINT "\n"
+
+            //Check if the array is too large
+            if (PrevAdCount > 6) then
+                //Array too big - clear it
+                TmpVal = 0
+                while (TmpVal < 8)
+                    PrevAds$[TmpVal] = ""
+                    TmpVal = TmpVal+1
+                endwhile
+                PrevAdCount = 0
+            endif
+
+            //Add this adverts to the recent list
+            TmpStr$ = periphAddr$ + advData$
+            PrevAds$[PrevAdCount] = TmpStr$
+            PrevAdCount = PrevAdCount+1
+        endif
+        looprc=BleScanGetAdvReport(periphAddr$, advData$, TmpVal, nRssi)
+    ENDWHILE
+ENDFUNC 1
+
+//Start scanning
+rc = BLESCANCONFIG(3, 4) //Change cache size to 4 reports
+rc = BLESCANCONFIG(2, 1) //Active scanning
+rc = BleScanStart(0, 0)  //Scan with no timeout
+
+//Register events
+ONEVENT EVBLE_ADV_REPORT  CALL HndlrAdvRpt //Called when an advert report is received
+
+//Wait for events
+WAITEVENT

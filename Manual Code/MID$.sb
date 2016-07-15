@@ -1,0 +1,31 @@
+//Example :: MID.sb
+DIM newstring$ 
+DIM s$
+
+s$="Arsenic"
+newstring$ = MID$(s$,0,4)  
+PRINT newstring$; "\n"
+
+DIM longstring$
+DIM len
+DIM pos             				 
+
+longstring$ = "abcdefghijkl"
+pos=0 : len = 6
+newstring$ = MID$(longstring$,pos,len)
+PRINT newstring$; "\n"
+
+pos = 2 : len = 5	
+newstring$ = MID$(longstring$,pos,len)
+PRINT newstring$; "\n"
+
+
+pos = -5 : len = 3
+newstring$ = MID$(longstring$,pos,len)
+PRINT newstring$; "\n"
+
+
+
+
+
+

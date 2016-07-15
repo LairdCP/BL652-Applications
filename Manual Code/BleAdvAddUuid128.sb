@@ -1,0 +1,17 @@
+//Example :: BleAdvAddUuid128.sb
+DIM uuid$ , hUuidCustom 
+DIM tx$,scRpt$,adRpt$,addr$, hndl
+ scRpt$=""
+ PRINT BleScanRptInit(scRpt$)
+
+//create a custom uuid for my ble widget
+ uuid$ = "ced9d91366924a1287d56f2764762b2a"
+ uuid$ = StrDehexize$(uuid$)
+ hUuidCustom = BleHandleUuid128(uuid$)
+
+ //Advertise the 128 bit uuid in a scan report
+ PRINT BleAdvRptAddUuid128(scRpt$, hUuidCustom)
+ adRpt$=""
+ PRINT BleAdvRptsCommit(adRpt$,scRpt$)
+ addr$=""  //because we are not doing a DIRECT advert
+ PRINT BleAdvertStart(0,addr$,20,30000,0)

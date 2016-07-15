@@ -1,0 +1,17 @@
+//Example :: BleEncode16.sb
+
+DIM rc
+DIM attr$
+
+attr$="Laird"
+
+PRINT "\nattr$=";attr$
+
+//write 'CD' to index 2 
+rc=BleEncode16(attr$,0x4443,2)
+//write 'AB' to index 0 - '2222' will be ignored
+rc=BleEncode16(attr$,0x22224241,0)
+//write 'EF' to index 3 
+rc=BleEncode16(attr$,0x4645,4)
+
+PRINT "\nattr$ now = ";attr$  

@@ -1,0 +1,8 @@
+//Example :: StrHexize$.sb
+DIM s$,t$
+s$="Laird"
+PRINT s$;"\n"
+t$=StrHexize$(s$)
+PRINT StrLen(s$);"\n"           
+PRINT t$;"\n"
+PRINT StrLen(t$);"\n"   

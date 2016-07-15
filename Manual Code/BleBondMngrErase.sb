@@ -1,0 +1,5 @@
+//Example :: BleBondMngrErase.sb
+
+DIM rc
+
+BleBondMngrErase(0)

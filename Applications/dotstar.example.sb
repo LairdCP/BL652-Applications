@@ -1,0 +1,277 @@
+// Copyright (c) 2015, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// dotstar.example.sb
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// Example calls on DotStar API for smartBasic and performs a simple rainbow
+//    snake on the strip.
+//
+// NOTE - The refresh rate of the DotStars may be limited by the processor's
+//    speed to access pixel information. Less pixels, greater potential refresh
+//    rate Will also very from smartBasic module to module.
+//
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+//Note that a maximum of 256 pixels are supported
+#DEFINE NUM_PIXELS             150    //5 Meters of 30LEDs/m.
+#DEFINE LEN_OF_SNAKE           15
+#DEFINE ENABLE_DEBUG_PRINTS    0      //Set this to 1 to enable debug output
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim resultCode
+dim pixelColor
+dim numLEDs : numLEDs = 0
+dim pixel[256]
+dim brightness : brightness = 256 //256 steps of brightness (0-255)
+dim startFrame$ : startFrame$ = "\00\00\00\00"
+dim endFrame$ : endFrame$ = "\FF\FF\FF\FF"
+dim brightness$ : brightness$ = "FF"
+dim hSPI
+dim spiTX$
+dim rc
+dim head, tail, r, g, b, color
+head = LEN_OF_SNAKE
+tail = 0
+r = 255
+g = 0
+b = 0
+
+//------------------------------------------------------------------------------
+// For debugging
+// --- rc = result code
+// --- ln = line number
+//------------------------------------------------------------------------------
+Sub AssertRC(rc,ln)
+    if (ENABLE_DEBUG_PRINTS!=0 && rc!=0) then
+        print "\nFail :";integer.h' rc;" at tag ";ln
+    endif
+EndSub
+
+//------------------------------------------------------------------------------
+// Register Error Handler as early as possible
+//------------------------------------------------------------------------------
+sub HandlerOnErr()
+  if (ENABLE_DEBUG_PRINTS!=0) then
+    print "\n OnErr - ";GetLastError();"\n"
+  endif
+endsub
+
+onerror next HandlerOnErr
+
+//------------------------------------------------------------------------------
+// Prime SPI for output
+//------------------------------------------------------------------------------
+FUNCTION DotStarBegin(n as INTEGER)
+    numLEDs = n
+    resultCode = SPIOPEN(0, 8000000, 0, hSPI)  //Set SPI mode to 0, 1MHz, MSB First, w/ Handle attached to hSPI
+        AssertRC(resultCode, 93)
+ENDFUNC resultCode
+
+//------------------------------------------------------------------------------
+//LED#, R, G, B (0-255)
+//------------------------------------------------------------------------------
+FUNCTION setDotStarPixelColor(n as INTEGER, r as INTEGER, g as INTEGER, b as INTEGER)
+    if (n < 0 || n > 255) then
+    else
+        dim color : color = (r << 16 | g << 8 | b)
+        pixel[n] = color
+        EXITFUNC pixel[n]
+    endif
+ENDFUNC -1
+
+//------------------------------------------------------------------------------
+//Retrieve specific n'th pixel color.
+//------------------------------------------------------------------------------
+FUNCTION getDotStarPixelColor(n as INTEGER, byref r as INTEGER, byref g as INTEGER, byref b as INTEGER)
+    if (n < 0 || n > 255) then
+        EXITFUNC -1
+    else
+        r = ((pixel[n] & 0xFF0000) >> 16)  //Find bits 0x00xx0000
+        g = ((pixel[n] & 0xFF00) >> 8)     //Find bits 0x0000xx00
+        b = (pixel[n] & 0xFF)              //Find bits 0x000000xx
+        EXITFUNC pixel[n]
+    endif
+ENDFUNC 0
+
+//------------------------------------------------------------------------------
+//Print all pixel data
+//------------------------------------------------------------------------------
+SUB getDotStarPixels()
+    dim n : n = 0
+    dim r, g, b
+    while (n < numLEDs)
+        n = n + 1
+        pixelColor = (getDotStarPixelColor(n, r, g, b))
+        r = r >> 8
+        g = g >> 8
+        b = b >> 8
+        pixelColor = (r << 16 | g << 8 | b)
+        print "\n"; n; ":"; INTEGER.h'pixelColor
+    endwhile
+ENDSUB
+
+//------------------------------------------------------------------------------
+//Issue/Refresh color data to strip.
+//------------------------------------------------------------------------------
+SUB DotStarUpdate()
+    dim n : n = numLEDs
+    dim r, g, b, i
+    dim r$, g$, b$, pixel$
+
+    resultCode = SPIOPEN(0, 8000000, 0, hSPI)    //Set SPI mode to 0, 1MHz, MSB First, w/ Handle attached to hSPI
+    for i = 1 to 4
+        resultCode = SPIWRITE(startFrame$)
+    next
+
+    while (n > 0)
+        n = n - 1
+        pixelColor = getDotStarPixelColor(n, r, g, b)
+        SPRINT #r$, INTEGER.H'r
+        SPRINT #g$, INTEGER.H'g
+        SPRINT #b$, INTEGER.H'b
+
+        SPRINT #spiTX$, RIGHT$(brightness$,2); RIGHT$(b$, 2); RIGHT$(g$, 2); RIGHT$(r$, 2) //Sent out in reverse order for the DotStar to frame pixels properly. 
+        //See LED datasheet at http://www.adafruit.com/datasheets/APA102.pdf
+        pixel$ = StrDehexize$(spiTX$)
+        resultCode = SpiWrite(pixel$)
+    endwhile
+    
+    //for i = 1 to 4
+        //resultCode = SPIWRITE(endFrame$)
+    //next
+    SpiClose(hSPI)
+ENDSUB
+
+//------------------------------------------------------------------------------
+//Set all pixel data to zero
+//------------------------------------------------------------------------------
+SUB DotStarClear()
+    dim n : n = numLEDs
+    while (n > 0)
+        n = n - 1
+        pixelColor = setDotStarPixelColor(n, 0, 0, 0)
+    endwhile
+    DotStarUpdate()
+ENDSUB
+
+//------------------------------------------------------------------------------
+//Number of Pixels in strip
+//------------------------------------------------------------------------------
+FUNCTION numPixels()
+ENDFUNC numLEDs
+
+//------------------------------------------------------------------------------
+//Current Brightness
+//------------------------------------------------------------------------------
+FUNCTION getDotStarBrightness()
+ENDFUNC brightness
+
+//------------------------------------------------------------------------------
+//Set Brightness
+//------------------------------------------------------------------------------
+SUB setDotStarBrightness(br as INTEGER)
+    if (br < 0 || br > 31) then
+        brightness = 31 + 224
+    else
+        brightness = br + 224
+    endif
+
+    SPRINT #brightness$, INTEGER.h'brightness
+ENDSUB
+
+//------------------------------------------------------------------------------
+//Change length
+//------------------------------------------------------------------------------
+SUB DotStarNewLength(n as INTEGER)
+    if (n < 0) then
+        numLEDs = 0
+    elseif (n > 255) then
+        numLEDs = 255
+    else
+        numLEDs = n
+    endif
+ENDSUB
+
+//------------------------------------------------------------------------------
+// Main loop
+//------------------------------------------------------------------------------
+FUNCTION HandleLoop()
+    if (r == 255) && (g < 255)  && (b == 0) then
+        g = g + 1
+    elseif (g == 255) && (r > 0)  && (b == 0) then
+        r = r - 1
+    elseif (g == 255) && (b < 255)  && (r == 0) then
+        b = b + 1
+    elseif (b == 255) && (g > 0) && (r == 0) then
+        g = g - 1
+    elseif (b == 255) && (r < 255) && (g == 0) then
+        r = r + 1
+    elseif (r == 255) && (b > 0) && (g == 0) then
+        b = b - 1
+    endif
+
+    color = setDotStarPixelColor(head, r, g, b)    //Update head with new colors
+    color = setDotStarPixelColor(tail, 0, 0, 0)    //Have tail turn off.
+
+    setDotStarBrightness(head % 32)
+    'print "\nr="; r; " g="; g; " b= "; b; " h="; head; " t="; tail
+
+    DotStarUpdate()
+
+    head = head + 1
+    tail = tail + 1
+
+    if(head > NUM_PIXELS) then
+        head = 0
+    endif
+    if(tail > NUM_PIXELS) then
+        tail = 0
+    endif
+
+ENDFUNC 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+rc = DotStarBegin(NUM_PIXELS)    //Initialize sB device to open SPI, and set chipSelect pin for DotStar.
+
+if rc == 0 then
+    DotStarClear()               //Immediately turn off all LEDs
+    TimerStart(1, 20, 1)         //50HZ update rate
+
+    ONEVENT EVTMR1     CALL HandleLoop
+
+    //------------------------------------------------------------------------------
+    // Wait for a synchronous event.
+    // An application can have multiple <WaitEvent> statements
+    //------------------------------------------------------------------------------
+    waitevent
+else
+    print "\nDotStarBegin() failed\n"
+endif

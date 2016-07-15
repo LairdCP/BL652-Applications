@@ -1,0 +1,2 @@
+//Example :: RAND.sb
+PRINT "\nRandom number is ";RAND()

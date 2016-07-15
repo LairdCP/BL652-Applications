@@ -1,0 +1,16 @@
+//Example :: SelectCase.sb
+DIM a,b,c
+
+a=3 : b=4				//Use ":" to write multiple commands
+							//on one line
+SELECT a*b
+CASE 10
+  c=10
+CASE 12              //this block will get processed
+  c=12
+CASE 14,156,789,1022
+  c=-1
+CASE ELSE
+  c=0
+ENDSELECT
+PRINT c

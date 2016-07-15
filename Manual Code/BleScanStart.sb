@@ -1,0 +1,20 @@
+//Example :: BleScanStart.sb
+DIM rc
+
+'//Scan for 20 seconds with no filtering
+rc = BleScanStart(20000, 0)
+
+IF rc==0 THEN
+    PRINT "\nScanning"
+ELSE
+    PRINT "\nError: "; INTEGER.H'rc
+ENDIF
+
+'//This handler will be called when scanning times out
+FUNCTION HndlrScanTO()
+    PRINT "\nScan timeout"
+ENDFUNC 0
+
+ONEVENT EVBLE_SCAN_TIMEOUT CALL HndlrScanTO
+
+WAITEVENT

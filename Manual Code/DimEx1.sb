@@ -1,0 +1,17 @@
+//Example :: DimEx1.sb
+
+DIM temp1 AS INTEGER
+DIM temp2 						//Will be an INTEGER by default
+DIM temp3$ AS STRING
+DIM temp4$ 						//Will be a STRING by default
+DIM temp5$ AS INTEGER 		//Allowed but not recommended practice as there 
+//is a $ at end of name
+DIM temp6 AS STRING 			//Allowed but not recommended practice as no $ 
+//at end of name
+DIM a1,a2,a3$,a4 				//3 INTEGER variables and 1 STRING variable
+ 
+print "We will now print each varaible on screen \n"
+print temp1, temp2, temp3$, temp4$, temp5$, temp6, a1, a2, a3$, a4
+
+//Since the variables have not been instantiated, they hold default values
+//The comma inserts a TAB

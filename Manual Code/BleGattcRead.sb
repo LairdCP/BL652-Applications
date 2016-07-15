@@ -1,0 +1,97 @@
+//Example :: BleGattcRead.sb
+//
+//Remote server has 3 prim services with 16 bit uuid. First service has one
+//characteristic whose value attribute is at handle 3 and has read/write props
+//
+// Server created using BleGattcTblRead.sub invoked in _OpenMcp.scr
+// using Nordic Usb Dongle PC10000
+
+DIM rc,at$,conHndl,uHndl,nOff,atHndl
+
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, adRpt$, addr$, scRpt$  
+	rc=BleAdvRptInit(adRpt$, 2, 0, 10)
+	IF rc==0 THEN : rc=BleScanRptInit(scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvRptsCommit(adRpt$,scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvertStart(0,addr$,50,0,0) : ENDIF
+	//open the gatt client with default notify/indicate ring buffer size
+	IF rc==0 THEN : rc = BleGattcOpen(0,0) : ENDIF
+ENDFUNC rc
+
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+ENDSUB
+
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
+    DIM uHndA
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n- Disconnected"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n- Connected, so read attibute handle 3"
+		atHndl = 3
+		nOff = 0
+		rc=BleGattcRead(conHndl,atHndl,nOff)
+		IF rc==0 THEN
+		    WAITEVENT
+		ENDIF
+        PRINT "\nread attibute handle 300 which does not exist"
+		atHndl = 300
+		nOff = 0
+		rc=BleGattcRead(conHndl,atHndl,nOff)
+		IF rc==0 THEN
+		    WAITEVENT
+		ENDIF
+		CloseConnections()
+    ENDIF
+ENDFUNC 1
+
+'//==============================================================================
+'//==============================================================================
+function HandlerAttrRead(cHndl,aHndl,nSts) as integer
+    dim nOfst,nAhndl,at$
+    print "\nEVATTRREAD "
+    print " cHndl=";cHndl
+    print " attrHndl=";aHndl
+    print " status=";integer.h' nSts
+	if nSts == 0 then
+	    print "\nAttribute read OK"
+		rc = BleGattcReadData(cHndl,nAhndl,nOfst,at$)
+	    print "\nData   = ";StrHexize$(at$)
+		print " Offset= ";nOfst
+		print " Len=";strlen(at$)
+		print "\nhandle = ";nAhndl
+	else
+	    print "\nFailed to read attribute"
+	endif
+endfunc 0
+
+
+//==============================================================================
+// Main() equivalent
+//==============================================================================
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+OnEvent  EVATTRREAD         call HandlerAttrRead
+
+IF OnStartup()==0 THEN
+    PRINT "\nAdvertising, and Gatt Client is open\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+WAITEVENT
+PRINT "\nExiting..."

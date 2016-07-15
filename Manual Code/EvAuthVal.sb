@@ -1,0 +1,77 @@
+//Example :: EvAuthVal.sb
+
+DIM hMyChar,rc,at$,conHndl
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, hSvc, attr$, adRpt$, addr$, scRpt$ : attr$="Hi"
+    
+    //Commit service
+    rc=BleServiceNew(1,BleHandleUuid16(0x18EE),hSvc)            
+    //Initialise char, write/read enabled, accept signed writes
+    rc=BleCharNew(0x0A,BleHandleUuid16(1),BleAttrMetaDataex(1,1,20,8,rc),0,0)     
+    //Commit char initialised above, with initial value "hi" to service 'hSvc'
+    rc=BleCharCommit(hSvc,attr$,hMyChar)
+    //Commit changes to the service
+    rc=BleServiceCommit(hSvc)
+    rc=BleScanRptInit(scRpt$) 
+    //Add 1 service handle to scan report
+    //rc=BleAdvRptAddUuid16(scRpt$,hSvc,-1,-1,-1,-1,-1)
+    //Commit reports to GATT table - adRpt$ is empty
+    rc=BleAdvRptsCommit(adRpt$,scRpt$)
+    rc=BleAdvertStart(0,addr$,20,300000,0)
+ENDFUNC rc
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+ENDSUB
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n--- Disconnected from client"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n--- Connected to client"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// New char value handler
+//==============================================================================
+FUNCTION HndlrAuthVal(BYVAL connHandle, BYVAL charHandle, BYVAL readWrite) 
+    DIM s$
+    IF charHandle == hMyChar THEN
+        IF readWrite!=0 THEN
+            rc=BleAuthorizeChar(connHandle, charHandle, 3)  //Grant access
+            rc=BleCharValueRead(hMyChar,s$)
+            PRINT "\nNew Char Value: ";s$
+        ENDIF
+    ENDIF
+    CloseConnections()
+ENDFUNC 1
+
+ONEVENT  EVAUTHVAL CALL HndlrAuthVal
+ONEVENT  EVBLEMSG  CALL HndlrBleMsg
+
+IF OnStartup()==0 THEN
+    rc = BleCharValueRead(hMyChar,at$)
+    PRINT "\nThe characteristic's value is ";at$
+    PRINT "\nWrite a new value to the characteristic\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+
+WAITEVENT
+
+PRINT "\nExiting..."

@@ -1,0 +1,11 @@
+//Example :: CircBufDestroy.sb
+DIM circHandle, circHandle2, rc
+
+rc = CircBufCreate(16,circHandle)
+PRINT "\n";rc
+IF rc!=0 THEN
+	PRINT "\nThe circular buffer ";circHandle; " was not created"
+ENDIF
+
+CircBufDestroy(circHandle)
+PRINT "\nThe handle value is now ";circHandle; " so it has been destroyed"

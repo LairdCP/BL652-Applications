@@ -1,0 +1,29 @@
+//Example :: UartWrite.sb
+DIM rc,str$,i,done,d
+
+//str$ contains a lot of space so that we can satisfy the condition in the IF statement
+str$="                                                                                                                                                                                                                                                                       Hello World"
+
+FUNCTION HndlrUartTxEty()
+  PRINT "\nTx buffer is now empty"
+ENDFUNC 0 //exit from WAITEVENT
+
+rc=UartWrite(str$)
+
+//Shift 'str$' if there isn't enough space in the buffer until 'str$' can be written
+WHILE done == 0
+	IF rc < StrLen(str$) THEN 
+		PRINT rc;" bytes written"
+		PRINT "\nStill have ";StrLen(str$)-rc;" bytes to write\n"
+		PRINT "\nShifting 'str$' by ";rc
+		StrShiftLeft(str$,rc)
+		done = 0
+	ELSE
+		PRINT "\nString 'str$' written successfully"
+		done=1
+	ENDIF
+ENDWHILE
+
+ONEVENT EVUARTTXEMPTY CALL HndlrUartTxEty
+
+WAITEVENT

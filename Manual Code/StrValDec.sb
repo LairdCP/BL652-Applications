@@ -1,0 +1,12 @@
+//Example :: StrValDec.sb
+DIM s$
+s$="  1234"
+PRINT "\n";StrValDec(s$)        
+s$=" -1234"
+PRINT "\n";StrValDec(s$)        
+s$=" +1234"
+PRINT "\n";StrValDec(s$)        
+s$="  2345hello"
+PRINT "\n";StrValDec(s$)        
+s$="  hello"
+PRINT "\n";StrValDec(s$)

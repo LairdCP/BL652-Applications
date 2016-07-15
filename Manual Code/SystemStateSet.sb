@@ -1,0 +1,4 @@
+//Example :: SystemStateSet.sb
+
+//Put the module into deep sleep
+PRINT "\n"; SystemStateSet(0)   

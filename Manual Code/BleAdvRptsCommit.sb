@@ -1,0 +1,12 @@
+//Example :: BleAdvRptsCommit.sb
+DIM advRpt$ : advRpt$=""
+DIM scRpt$ : scRpt$=""
+DIM discovMode : discovMode = 0
+DIM advApprnce : advApprnce = 1
+DIM maxDevName : maxDevName = 10
+
+PRINT BleAdvRptInit(advRpt$, discovMode, advApprnce, maxDevName)
+PRINT BleAdvRptAddUuid16(advRpt$, 0x180F,0x180A, -1, -1, -1, -1)
+PRINT BleAdvRptsCommit(advRpt$, scRpt$)
+
+// Only the advert report will be updated.

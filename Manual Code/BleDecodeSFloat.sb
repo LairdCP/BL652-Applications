@@ -1,0 +1,23 @@
+ //Example :: BleDecodeSFloat.sb
+
+ DIM chrHandle,v1,svcHandle,rc, mantissa, exp
+ DIM mdVal : mdVal = BleAttrMetadata(1,1,50,0,rc)
+ DIM attr$ : attr$="\00\01\02\03\04\85\86\87\88\89"
+ DIM uuid : uuid = 0x1853
+
+ rc=BleServiceNew(1, BleHandleUuid16(uuid), svcHandle)
+
+ rc=BleCharNew(0x07,BleHandleUuid16(0x2A1C),mdVal,0,0)
+ rc=BleCharCommit(svcHandle,attr$,chrHandle)
+
+ rc=BleServiceCommit(svcHandle)
+
+ rc=BleCharValueRead(chrHandle,attr$)
+
+ //read 2 bytes FLOAT from index 2 in the string
+ rc=BleDecodeSFloat(attr$,mantissa,exp,2)
+ PRINT "\nThe number read is ";mantissa;" x 10^";exp
+
+ //read 2 bytes FLOAT from index 6 in the string
+ rc=BleDecodeSFloat(attr$,mantissa,exp,6)
+ PRINT "\nThe number read is ";mantissa;"x 10^";exp

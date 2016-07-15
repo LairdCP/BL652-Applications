@@ -1,0 +1,5 @@
+//Example :: StrSplitLeft$.sb
+DIM origStr$
+origStr$ = "12345678"
+PRINT StrSplitLeft$ (origStr$, 3);"\n"                      
+PRINT origStr$

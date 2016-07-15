@@ -1,0 +1,136 @@
+//Example :: ServicesAndCharacteristics.sb
+
+//==============================================================================
+//Register two Services in the GATT Table. Service 1 with 2 Characteristics and
+//Service 2 with 1 characteristic. This implies a total of 3 characteristics to 
+//manage.
+//The characteristic 2 in Service 1 will not be readable or writable but only 
+//indicatable
+//The characteristic 1 in Service 2 will not be readable or writable but only 
+//notifyable
+//==============================================================================
+
+#define BLE_SERVICE_SECONDARY                           0
+#define BLE_SERVICE_PRIMARY                             1
+
+#define BLE_CHAR_METADATA_ATTR_NOT_PRESENT              0
+
+#define BLE_ATTR_ACCESS_NONE                            0
+#define BLE_ATTR_ACCESS_OPEN                            1
+#define BLE_ATTR_ACCESS_ENC_NO_MITM                     2
+#define BLE_ATTR_ACCESS_ENC_WITH_MITM                   3
+#define BLE_ATTR_ACCESS_SIGNED_NO_MITM                  4
+#define BLE_ATTR_ACCESS_SIGNED_WITH_MITM                5
+
+#define BLE_CHAR_PROPERTIES_BROADCAST                   0x01
+#define BLE_CHAR_PROPERTIES_READ                        0x02
+#define BLE_CHAR_PROPERTIES_WRITE_WO_RESPONSE           0x04
+#define BLE_CHAR_PROPERTIES_WRITE                       0x08
+#define BLE_CHAR_PROPERTIES_NOTIFY                      0x10
+#define BLE_CHAR_PROPERTIES_INDICATE                    0x20
+#define BLE_CHAR_PROPERTIES_AUTH_SIGNED_WR              0x40
+#define BLE_CHAR_PROPERTIES_RELIABLE_WRITE              0x80
+
+DIM rc      //result code
+DIM hSvc    //service handle
+DIM mdAttr 
+DIM mdCccd
+DIM mdSccd
+DIM chProp
+DIM attr$
+
+DIM hChar11  // handles for characteristic 1 of Service 1
+DIM hChar21  // handles for characteristic 2 of Service 1
+DIM hChar12  // handles for characteristic 1 of Service 2
+
+DIM hUuidS1   // handles for uuid of Service 1
+DIM hUuidS2   // handles for uuid of Service 2
+DIM hUuidC11  // handles for uuid of characteristic 1 in Service 1
+DIM hUuidC12  // handles for uuid of characteristic 2 in Service 1
+DIM hUuidC21  // handles for uuid of characteristic 1 in Service 2
+
+//---Register Service 1
+hUuidS1 = BleHandleUuid16(0x180D)
+rc = BleServiceNew(BLE_SERVICE_PRIMARY, hUuidS1, hSvc)
+
+//---Register Characteristic 1 in Service 1
+mdAttr = BleAttrMetadata(BLE_ATTR_ACCESS_OPEN,BLE_ATTR_ACCESS_OPEN,10,0,rc)
+mdCccd = BLE_CHAR_METADATA_ATTR_NOT_PRESENT
+mdSccd = BLE_CHAR_METADATA_ATTR_NOT_PRESENT
+chProp = BLE_CHAR_PROPERTIES_READ + BLE_CHAR_PROPERTIES_WRITE
+hUuidC11 = BleHandleUuid16(0x2A37)
+rc = BleCharNew(chProp, hUuidC11,mdAttr,mdCccd,mdSccd)
+attr$="\00\00"
+rc = BleCharCommit(hSvc,attr$,hChar11)
+
+//---Register Characteristic 2 in Service 1
+mdAttr = BleAttrMetadata(BLE_ATTR_ACCESS_OPEN,BLE_ATTR_ACCESS_OPEN,10,0,rc)
+mdCccd = BleAttrMetadata(BLE_ATTR_ACCESS_OPEN,BLE_ATTR_ACCESS_OPEN,2,0,rc)
+mdSccd = BLE_CHAR_METADATA_ATTR_NOT_PRESENT
+chProp = BLE_CHAR_PROPERTIES_INDICATE
+hUuidC12 = BleHandleUuid16(0x2A39)
+rc = BleCharNew(chProp, hUuidC12,mdAttr,mdCccd,mdSccd)
+attr$="\00\00"
+rc = BleCharCommit(hSvc,attr$,hChar21)
+rc = BleServiceCommit(hSvc)
+
+//---Register Service 2  (can now reuse the service handle)
+hUuidS2 = BleHandleUuid16(0x1856)
+rc = BleServiceNew(BLE_SERVICE_PRIMARY, hUuidS2, hSvc)
+
+//---Register Characteristic 1 in Service 2
+mdAttr = BleAttrMetadata(BLE_ATTR_ACCESS_NONE,BLE_ATTR_ACCESS_NONE,10,0,rc)
+mdCccd = BleAttrMetadata(BLE_ATTR_ACCESS_OPEN,BLE_ATTR_ACCESS_OPEN,2,0,rc)
+mdSccd = BLE_CHAR_METADATA_ATTR_NOT_PRESENT
+chProp = BLE_CHAR_PROPERTIES_NOTIFY
+hUuidC21 = BleHandleUuid16(0x2A54)
+rc = BleCharNew(chProp, hUuidC21,mdAttr,mdCccd,mdSccd)
+attr$="\00\00\00\00"
+rc = BleCharCommit(hSvc,attr$,hChar12)
+rc = BleServiceCommit(hSvc)
+
+//===The 2 services are now visible in the gatt table
+
+//------------------------------------------------------------------------------
+// To deal with writes from a gatt client into characteristic 1 of Service 1
+// which has the handle hChar11
+//------------------------------------------------------------------------------
+
+// This handler is called when there is a EVCHARVAL message
+FUNCTION HandlerCharVal(BYVAL hChar AS INTEGER, BYVAL offset, BYVAL len) AS INTEGER
+  DIM attr$
+  IF hChar == hChar11 THEN
+    rc = BleCharValueRead(hChar11,attr$)
+    print "Svc1/Char1 has been writen with = ";attr$
+  ENDIF
+ENDFUNC 1
+
+//enable characteristic value write handler
+OnEvent  EVCHARVAL          call HandlerCharVal
+
+//wait for events
+WAITEVENT
+
+//------------------------------------------------------------------------------
+// Notify a value for characteristic 1 in service 2
+//------------------------------------------------------------------------------
+
+attr$="somevalue"
+rc = BleCharValueNotify(hChar12,attr$)
+
+//------------------------------------------------------------------------------
+// indicate  a value for characteristic 2 in service 1
+//------------------------------------------------------------------------------
+
+// This handler is called when there is a EVCHARHVC message
+FUNCTION HandlerCharHvc(BYVAL hChar AS INTEGER) AS INTEGER
+  IF hChar == hChar12 THEN
+    PRINT "Svc1/Char2 indicate has been confirmed"
+  ENDIF
+ENDFUNC 1
+
+//enable characteristic value indication confirm  handler
+OnEvent  EVCHARHVC          CALL HandlerCharHvc
+
+attr$="somevalue"
+rc = BleCharValueIndicate(hChar12,attr$)

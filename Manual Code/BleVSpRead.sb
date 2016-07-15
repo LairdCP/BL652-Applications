@@ -1,0 +1,71 @@
+//Example :: BleVSpRead.sb
+
+DIM conHndl      
+//Only 1 global variable because its value is used in more than 1 routine
+//All other variables declared locally, inside routine that they are used in.
+//More efficient because these local variables only exist in memory
+//when they are being used inside their respective routines
+                
+
+//==============================================================================
+// Open VSp and start advertising
+//==============================================================================
+SUB OnStartup()
+    DIM rc, hndl, tx$, scRpt$, addr$, adRpt$ : adRpt$="" : addr$=""
+    rc=BleVSpOpen(128,128,0,hndl)
+    rc=BleScanRptInit(scRpt$) 
+    rc=BleAdvRptAddUuid128(scRpt$,hndl)
+    rc=BleAdvRptsCommit(adRpt$,scRpt$)
+    rc=BleAdvertStart(0,addr$,20,300000,0)
+    PRINT "\nDevice name is "; BleGetDeviceName$()
+    
+    tx$="\nSend me some text \nTo exit the app, just tell me\n"
+    rc = BleVSpWrite(tx$)
+ENDSUB
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    DIM rc
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+    BleVspClose()
+ENDSUB
+
+//==============================================================================
+//  VSP Rx buffer event handler
+//==============================================================================
+FUNCTION HandlerVSpRx() AS INTEGER
+    DIM rc, rx$, e$ : e$="exit"
+    rc=BleVSpRead(rx$,20)
+    PRINT "\nMessage from client: ";rx$ 
+
+    //If user has typed exit
+    IF StrPos(rx$,e$,0) > -1 THEN
+       EXITFUNC 0
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// BLE event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\nDisconnected from client"
+        EXITFUNC 0
+    ENDIF
+ENDFUNC 1
+    
+    
+ONEVENT  EVVSPRX  CALL HandlerVSpRx
+ONEVENT  EVBLEMSG CALL HndlrBleMsg
+
+
+OnStartup()          //Calls first subroutine declared above
+
+WAITEVENT
+
+CloseConnections()  //Calls second subroutine declared above
+PRINT "\nExiting..."

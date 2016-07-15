@@ -1,0 +1,5 @@
+//Example :: NvCfgKeyGet.sb
+DIM rc, r, w : w=0x8107
+PRINT "\n";NvCfgKeySet(100,w)
+PRINT "\n";NvCfgKeyGet(100,r)		
+PRINT "\nValue for 100 is ";r				

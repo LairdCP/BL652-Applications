@@ -1,0 +1,8 @@
+//Example :: BleEncodeTimestamp.sb
+
+DIM rc, ts$
+DIM attr$ : attr$=""
+
+//write the timestamp <5 May 2013 10:31:24>
+ts$="\14\0D\05\05\0A\1F\18"
+PRINT BleEncodeTimestamp(attr$,ts$,0)

@@ -1,0 +1,14 @@
+//Example :: Continue.sb
+DIM n
+n=0
+
+WHILE n<10
+  n=n+1
+  IF n==5 THEN
+    CONTINUE         
+  ENDIF
+  PRINT "Hello " ;n
+ENDWHILE
+
+PRINT "\nFinished\n"
+

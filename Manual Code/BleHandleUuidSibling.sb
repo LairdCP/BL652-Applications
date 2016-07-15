@@ -1,0 +1,28 @@
+//Example :: BleHandleUuid128.sb
+DIM uuid$
+DIM hUuid1
+DIM hUuid2    //will have the same base uuid as hUuid1
+
+//create a custom uuid for my ble widget
+uuid$ = "ced9d91366924a1287d56f2764762b2a"
+uuid$ = StrDehexize$(uuid$)
+hUuid1 = BleHandleUuid128(uuid$)
+IF hUuid1 == 0 THEN
+    PRINT "\nFailed to create a handle"
+ELSE
+    PRINT "Handle for custom Uuid is ";integer.h' hUuid1;"(";hUuid1;")"
+ENDIF
+// hUuidCustom now references an object which points to
+// a base uuid = ced9d91366924a1287d56f2764762b2a  (note 0's in byte position 2/3)
+// and an offset = 0xd913
+
+
+hUuid2 = BleHandleUuidSibling(hUuid1,0x1234)
+IF hUuid2 == 0 THEN
+    PRINT "\nFailed to create a handle"
+ELSE
+    PRINT "\nHandle for custom sibling Uuid is ";integer.h' hUuid2;"(";hUuid2;")"
+ENDIF
+// hUuidCustom2 now references an object which also points to
+// the base uuid = ced9d91366924a1287d56f2764762b2a  (note 0's in byte position 2/3)
+// and has the offset = 0x1234

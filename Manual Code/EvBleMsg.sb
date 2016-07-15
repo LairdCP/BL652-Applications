@@ -1,0 +1,51 @@
+//Example :: EvBleMsg.sb
+DIM addr$ : addr$=""
+DIM rc
+
+//==============================================================================
+// This handler is called when there is a BLE message
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) 
+    SELECT nMsgId
+        CASE 0
+            PRINT "\nBLE Connection ";nCtx
+            rc = BleAuthenticate(nCtx)
+        CASE 1
+            PRINT "\nDisconnected ";nCtx;"\n"
+        CASE 18
+            PRINT "\nConnection ";nCtx;" is now encrypted"
+        CASE 16
+            PRINT "\nConnected to a bonded master"
+        CASE 17
+            PRINT "\nA new pairing has replaced the old key";   
+        CASE ELSE
+            PRINT "\nUnknown Ble Msg"
+    ENDSELECT
+ENDFUNC 1
+
+FUNCTION HndlrBlrAdvTimOut() 
+   PRINT "\nAdvert stopped via timeout"
+   PRINT "\nExiting..."
+ENDFUNC 0
+
+FUNCTION Btn0Press()
+    PRINT "\nExiting..."
+ENDFUNC 0
+
+rc = GpioSetFunc(16,1,2)
+rc = GpioBindEvent(0,16,1)
+
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+ONEVENT  EVBLE_ADV_TIMEOUT  CALL HndlrBlrAdvTimOut
+ONEVENT  EVGPIOCHAN0        CALL Btn0Press
+
+// start adverts
+IF BleAdvertStart(0,addr$,100,10000,0)==0 THEN
+    PRINT "\nAdverts Started"
+    PRINT "\nPress button 0 to exit\n"
+ELSE
+    PRINT "\n\nAdvertisement not successful"
+ENDIF
+
+WAITEVENT
+

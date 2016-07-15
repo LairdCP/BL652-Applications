@@ -1,0 +1,19 @@
+//Example :: UartRead.sb
+DIM rc,strLength,str$
+str$="Your name is "
+
+FUNCTION HndlrUartRx()
+	TimerStart(0,100,0)		//Allow enough time for data to reach rx buffer
+ENDFUNC 1
+
+FUNCTION HndlrTmr0()
+	strLength=UartRead(str$)
+	PRINT "\n";str$
+ENDFUNC 0
+	
+ONEVENT EVTMR0 		CALL HndlrTmr0
+ONEVENT EVUARTRX 	CALL HndlrUartRx
+
+PRINT "\nWhat is your name?\n"
+
+WAITEVENT

@@ -1,0 +1,56 @@
+ //Example :: BleSetCurConnParms.sb
+ DIM rc
+ DIM addr$ : addr$=""
+
+ FUNCTION HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) AS INTEGER
+     DIM intrvl,sprvTo,sLat
+
+     SELECT nMsgId
+         CASE 0 //BLE_EVBLEMSGID_CONNECT
+             PRINT "\n --- New Connection : ","",nCtx
+             rc=BleGetCurconnParms(nCtx,intrvl,sprvto,slat)
+             IF rc==0 THEN
+                 PRINT "\nConn Interval","","",intrvl
+                 PRINT "\nConn Supervision Timeout",sprvto
+                 PRINT "\nConn Slave Latency","",slat
+                 PRINT "\n\nRequest new parameters"
+                
+                 //request connection interval in range 50ms to 75ms and link 
+                 //supervision timeout of 4seconds with a slave latency of 19
+                 rc =  BleSetCurconnParms(nCtx, 50000,75000,4000000,19)                              
+             ENDIF                                                       
+                                                                                                                                            
+         CASE 1 //BLE_EVBLEMSGID_DISCONNECT
+             PRINT "\n --- Disconnected : ",nCtx
+             EXITFUNC 0
+            
+         CASE 14 //BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+             rc=BleGetCurconnParms(nCtx,intrvl,sprvto,slat)
+             IF rc==0 THEN
+                 PRINT "\n\nConn Interval",intrvl
+                 PRINT "\nConn Supervision Timeout",sprvto
+                 PRINT "\nConn Slave Latency",slat
+             ENDIF
+
+         CASE 15 //BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
+             PRINT "\n ??? Conn Parm Negotiation FAILED"
+              
+         CASE ELSE
+             PRINT "\nBle Msg",nMsgId
+     ENDSELECT
+ ENDFUNC 1
+
+
+ ONEVENT  EVBLEMSG    CALL HandlerBleMsg
+
+
+ IF BleAdvertStart(0,addr$,25,60000,0)==0 THEN     
+     PRINT "\nAdverts Started\n"                 
+     PRINT "\nMake a connection to the BL652"
+ ELSE                                            
+     PRINT "\n\nAdvertisement not successful"
+ ENDIF
+
+
+ WAITEVENT
+

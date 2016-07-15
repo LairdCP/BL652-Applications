@@ -1,0 +1,14 @@
+//Example :: BleEncode24.sb
+
+DIM rc
+DIM attr$ : attr$="Laird"
+
+//write 'BCD' to index 1 
+rc=BleEncode24(attr$,0x444342,1)
+//write 'A' to index 0 
+rc=BleEncode8(attr$,0x41,0)
+//write 'EF'to index 4 
+rc=BleEncode16(attr$,0x4645,4)
+
+PRINT "attr$=";attr$   
+ 

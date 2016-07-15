@@ -1,0 +1,24 @@
+//Example :: GpioRead.sb
+//This example reads from the trim pot, for it to work, TrimPot on CON14 needs to be in the ON position
+#define GPIO_TRIM_POT           20
+
+dim rc, adc
+
+//Start timer to read trim pot
+TimerStart(0,1000,1)
+
+//Remove resistor
+rc = GpioSetFunc(GPIO_TRIM_POT, 1, 2)
+
+//Analogue in
+rc = GpioSetFunc(GPIO_TRIM_POT, 3, 0)
+
+FUNCTION HandlerTimer0()
+    //Read the ADC
+    adc = GpioRead(GPIO_TRIM_POT)
+    PRINT "\nTrim Pot Reading: ";adc
+ENDFUNC 1
+
+OnEvent EVTMR0 call HandlerTimer0
+
+WAITEVENT

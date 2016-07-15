@@ -1,0 +1,96 @@
+//Example :: BleGattcWriteCmd.sb
+//
+//Remote server has 3 prim services with 16 bit uuid. First service has one
+//characteristic whose value attribute is at handle 3 and has read/write props
+//
+// Server created using BleGattcTblWriteCmd.sub invoked in _OpenMcp.scr
+// using Nordic Usb Dongle PC10000
+
+DIM rc,at$,conHndl,uHndl,atHndl
+
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, adRpt$, addr$, scRpt$  
+  rc=BleAdvRptInit(adRpt$, 2, 0, 10)
+  IF rc==0 THEN : rc=BleScanRptInit(scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvRptsCommit(adRpt$,scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvertStart(0,addr$,50,0,0) : ENDIF
+  //open the gatt client with default notify/indicate ring buffer size
+  IF rc==0 THEN : rc = BleGattcOpen(0,0) : ENDIF
+ENDFUNC rc
+
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+ENDSUB
+
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
+    DIM uHndA
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n- Disconnected"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n- Connected, so write to attribute handle 3"
+    atHndl = 3
+    at$="\01\02\03\04"
+    rc=BleGattcWriteCmd(conHndl,atHndl,at$)
+    IF rc==0 THEN
+        WAITEVENT
+    ENDIF
+        PRINT "\n- write again to attribute handle 3"
+    atHndl = 3
+    at$="\05\06\07\08"
+    rc=BleGattcWriteCmd(conHndl,atHndl,at$)
+    IF rc==0 THEN
+        WAITEVENT
+    ENDIF
+        PRINT "\n- write again to attribute handle 3"
+    atHndl = 3
+    at$="\09\0A\0B\0C"
+    rc=BleGattcWriteCmd(conHndl,atHndl,at$)
+    IF rc==0 THEN
+        WAITEVENT
+    ENDIF
+        PRINT "\nwrite to attribute handle 300 which does not exist"
+    atHndl = 300
+    rc=BleGattcWriteCmd(conHndl,atHndl,at$)
+    IF rc==0 THEN
+        PRINT "\nEven when the attribute does not exist an event will occur"
+        WAITEVENT
+    ENDIF
+    CloseConnections()
+    ENDIF
+ENDFUNC 1
+
+'//==============================================================================
+'//==============================================================================
+function HandlerNotifyBuf() as integer
+  print "\nEVNOTIFYBUF Event"
+endfunc 0  '//need to progress the WAITEVENT 
+
+//==============================================================================
+// Main() equivalent
+//==============================================================================
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+OnEvent  EVNOTIFYBUF        call HandlerNotifyBuf
+
+IF OnStartup()==0 THEN
+    PRINT "\nAdvertising, and Gatt Client is open\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+WAITEVENT
+PRINT "\nExiting..."

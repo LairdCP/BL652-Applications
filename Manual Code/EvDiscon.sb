@@ -1,0 +1,28 @@
+//Example :: EvDiscon.sb
+DIM addr$ : addr$=""
+
+FUNCTION HndlrBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) 
+	IF nMsgID==0 THEN
+		PRINT "\nNew Connection ";nCtx
+	ENDIF
+ENDFUNC 1
+
+FUNCTION Btn0Press()
+	PRINT "\nExiting..."
+ENDFUNC 0
+
+FUNCTION HndlrDiscon(BYVAL hConn AS INTEGER, BYVAL nRsn AS INTEGER) AS INTEGER
+	PRINT "\nConnection ";hConn;" Closed: 0x";nRsn	
+ENDFUNC 0
+
+ONEVENT EVBLEMSG 	CALL HndlrBleMsg
+ONEVENT EVDISCON	CALL HndlrDiscon
+
+// start adverts
+IF BleAdvertStart(0,addr$,100,10000,0)==0 THEN
+    PRINT "\nAdverts Started\n"
+ELSE
+    PRINT "\n\nAdvertisement not successful"
+ENDIF
+
+WAITEVENT

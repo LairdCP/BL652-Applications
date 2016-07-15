@@ -1,0 +1,1518 @@
+// Copyright (c) 2014, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+//
+//    smartZ
+//
+//
+//    This app provides for a command line interface to the BT900 devkit over the UART.
+//    The commands are designed to mimic the behaviour of BlueZ commands used in Linux.
+//
+//    When you run the app you will get a -------> command prompt to allow you to submit
+//    commands as follows:-
+//
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//        hcitool dev                    Display local devices
+//        hcitool con                    Display active connections
+//        hcitool leadv                  Start LE advertisement
+//        hcitool noleadv                Stop LE advertisement
+//        hcitool lescan                 Start LE scan
+//        hcitool lecc                   Create a LE Connection
+//        hcitool ledc                   Disconnect a LE Connection
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//        gatttool --primary             Primary Service Discovery
+//        gatttool --characteristics     Characteristics Discovery
+//        gatttool --char-read           Characteristics Value/Descriptor Read
+//        gatttool --char-write          Characteristics Value Write Without Response
+//        gatttool --char-desc           Characteristics Descriptor Discovery
+//        gatttool --listen              Listen for notifications and indications
+//
+//        Options:
+//        -b, --device=MAC               Specify remote Bluetooth address
+//        -l, --sec-level                Set security level. Default: low
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//        hciconfig letpl    [level]     Get/Set LE transmit power level
+//        hciconfig version              Display version information
+//        hciconfig leadv                Enable LE advertising
+//        hciconfig noleadv              Disable LE advertising
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+//Number of connections
+#define NUM_OF_CONNS                             8
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                   0 //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                1 //msgCtx = connection handle
+
+//SMARTZ COMMAND IDs:
+#define SMARTZ_COMMAND_NONE                      0
+//SMARTZ COMMAND IDs: HCITOOL
+#define SMARTZ_COMMAND_HCITOOL_DEV               1
+#define SMARTZ_COMMAND_HCITOOL_INQ               2
+#define SMARTZ_COMMAND_HCITOOL_SCAN              3
+#define SMARTZ_COMMAND_HCITOOL_NAME              4
+#define SMARTZ_COMMAND_HCITOOL_CON               5
+#define SMARTZ_COMMAND_HCITOOL_PAIR              6
+#define SMARTZ_COMMAND_HCITOOL_UNPAIR            7
+#define SMARTZ_COMMAND_HCITOOL_LESCAN            8
+#define SMARTZ_COMMAND_HCITOOL_LEADV             9
+#define SMARTZ_COMMAND_HCITOOL_LENOADV           10
+#define SMARTZ_COMMAND_HCITOOL_LECC              11
+#define SMARTZ_COMMAND_HCITOOL_LEDC              12
+
+//SMARTZ COMMAND IDs: GATTTOOL
+#define SMARTZ_COMMAND_GATTTOOL_PRIMARY          21
+#define SMARTZ_COMMAND_GATTTOOL_CHARACTERISTICS  22
+#define SMARTZ_COMMAND_GATTTOOL_CHAR_READ        23
+#define SMARTZ_COMMAND_GATTTOOL_CHAR_WRITE       24
+#define SMARTZ_COMMAND_GATTTOOL_CHAR_DESC        25
+#define SMARTZ_COMMAND_GATTTOOL_LISTEN           26
+
+//APP RUN MODES
+#define NORMAL_MODE                              0
+#define GATTTOOL_LISTEN                          2
+#define AUTH_MODE                                3
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+
+//Global variables
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+dim rc                          //Response code
+dim stRsp$                      //Uart rx data is stored here
+dim pr$                         //Command prompt
+dim urtcmd$                     //CMD line from uart
+dim tkn$,tlen                   //Used by command parser
+dim hc[NUM_OF_CONNS+1]          //Contains connection handles
+dim conns                       //Number of connections
+dim name$                       //Local device name
+dim addr$                       //Address of device being connected to
+dim command : command = 0       //Currently active smartZ command
+
+//Global variables used for hcitool command
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+dim AuthType
+
+//Global variables used for rfcomm command
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//dim hcSpp                       //Handle of connection to use for VSP service
+//dim carCnt                      //Count variable for number of times '^' entered
+
+//Global variables used for the hciconfig command
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+dim nDiscv : nDiscv = 1         //The device is discoverable by default
+dim nConn : nConn = 1           //The device is connectable by default
+dim nPair : nPair = 1           //The device is pairable by default
+dim inqtype    : inqtype = 0    //Inquiry Type: 0 General, 1 Limited
+dim inqmode    : inqmode = 2    //Inquiry Mode: 0 for Standard, 1 for with RSSI, 2 for Extended)
+dim inqtpl : inqtpl=4           //Inquiry transmit power level
+dim letpl : letpl = 4           //LE Tx Power level in dBm
+dim mjVersion : mjVersion=2     //Major version number
+dim mnVersion : mnVersion=2     //Minor version number
+
+
+//Globale variables used for gatttool command
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+dim gattLsn : gattLsn = 0       //If Lsn = 1, notifications will be shown
+dim chrHdl                      //Global characteristic handle of the current characteristic being serviced
+dim valHdl                      //Global characteristic value handle of the current characteristic value handle being serviced
+dim secPair                     //If 1, it means sec-level is medium or high and therefore should pair
+
+
+//******************************************************************************
+// Initialise Global Variable
+//******************************************************************************
+
+pr$    = "------->"
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//==============================================================================
+// Display the error message
+//==============================================================================
+sub AssertRC(resCode, line)
+    if rc !=0 then
+        print "error: ";integer.h'rc;" on line ";line;"\n"
+    endif
+endsub
+
+//==============================================================================
+// Add a delay of t seconds
+//==============================================================================
+sub delay(t as integer)
+
+        t = t*1000
+        DIM tm
+        tm = gettickcount()
+        while (gettickcount()-tm) < t
+            //Wait for t*1000 milliseconds
+        endwhile
+
+endsub
+
+//==============================================================================
+// Initialise all connection handles
+//==============================================================================
+sub InitConnHandles()
+
+    dim z
+    for z=0 to (NUM_OF_CONNS)
+        hc[z]=-1
+    next
+
+endsub
+
+//==============================================================================
+// Add the connection handle to the list of connection handles
+//==============================================================================
+function AcqConnHandle(hConn)
+
+    dim z
+    for z=1 to (NUM_OF_CONNS)
+        if hc[z] == -1 then
+            hc[z]=hConn
+            exitfunc z
+        endif
+    next
+
+endfunc 0
+
+//==============================================================================
+// Release the connection handle from the array of conn handles
+//==============================================================================
+function RelConnHandle(hConn)
+
+    dim x, z
+    for z=1 to (NUM_OF_CONNS)
+        if hc[z] == hConn then
+            for x = z to (NUM_OF_CONNS-1)
+                hc[x] = hc[x+1]
+            next
+            exitfunc z
+        endif
+    next
+
+endfunc 0
+
+//==============================================================================
+// Display the hcitool help menu
+//==============================================================================
+sub _hciHelp()
+
+    print "Usage:\n"
+    print "    hcitool <command> [command parameters]\n\n"
+    print "Commands:\n"
+    print "    dev         Display local devices\n"
+    print "    con         Display active connection handles\n"
+    print "    leadv       Start LE advertisement\n"
+    print "    noleadv     Stop LE advertisement\n"
+    print "    lescan      Start LE scan\n"
+    print "    lecc        Create a LE Connection\n"
+    print "    ledc        Disconnect a LE Connection\n"
+    print "\n"
+    print "For more information on the usage of each command use:\n"
+    print "    hcitool <command> --help\n\n"
+
+endsub
+
+//==============================================================================
+//    hcitool dev
+//==============================================================================
+function _hciDev()
+
+    dim addr$
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the hcitool dev help menu
+            print "Usage:\n"
+            print "        hcitool dev\n"
+            exitfunc 1
+        endif
+    endwhile
+//--------------------------------------//
+
+    //Get Bluetooth address of local device
+    addr$ = SYSINFO$(4)
+    addr$ = right$(addr$, 6)
+    //Display the local device name + Bluetooth address
+    print "Device: \n    ";name$;"    ";StrHexize$(addr$);"\n"
+
+endfunc 1
+
+//==============================================================================
+//    hcitool con
+//==============================================================================
+function _hciCon()
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the hcitool con help menu
+            print "Usage:\n"
+            print "        hcitool con\n"
+            exitfunc 1
+        endif
+    endwhile
+//--------------------------------------//
+
+    dim conAddr$, z
+
+    //Loop through the acquired connection handles and display connected devices
+    print "Connections:\n"
+    for z=1 to conns
+        rc = BleGetAddrFromConnHandle(hc[z],conAddr$)
+        if rc!=0 then
+//            rc = BtcGetBDAddrFromHandle(hc[z],conAddr$)
+        endif
+        print "    > ";strhexize$(conAddr$);" handle ";hc[z];"\n"
+    next
+
+endfunc 1
+
+//==============================================================================
+//    hcitool leadv    [--timeout]
+//==============================================================================
+function _hciLeAdv()
+
+    //Set default time-out of LE adverts to be infinite
+    dim timOut    : timOut = 0
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+        //Display the hcitool leadv help menu
+            print "Usage:\n"
+            print "        hcitool leadv [--timeout=t] advert time-out in seconds\n"
+            print ""
+            exitfunc 1
+
+        elseif strcmp(tkn$,"timeout")==0 then
+        //Modify the timeout variable
+            strshiftleft(urtcmd$, 1)                //Discard the = sign
+            rc = extractStrToken(urtcmd$, tkn$)     //Take the next string from the command
+            rc = extractInttoken(tkn$,timOut)       //Extract the integer value of the string
+
+        endif
+    endwhile
+//--------------------------------------//
+
+    dim a$
+    //Change timeout value from seconds to milliseconds
+    timOut = timOut * 1000
+    rc = BleAdvertStart(0,a$,25,timOut,0)
+    AssertRC(rc, 344)
+
+endfunc 1
+
+//==============================================================================
+//    hcitool noleadv
+//==============================================================================
+function _hciNoLeAdv()
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+        //Display the hcitool noleadv help menu
+            print "Usage:\n"
+            print "        hcitool noleadv\n"
+            print ""
+            exitfunc 1
+
+        endif
+    endwhile
+//--------------------------------------//
+
+    rc = BleAdvertStop()
+    AssertRC(rc, 368)
+
+endfunc 1
+
+//==============================================================================
+//    hcitool lescan [--length]
+//==============================================================================
+function _hciLeScan()
+
+    //Set default scan time to 5 seconds
+    dim scnLen : scnLen = 5000
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+        //Display the hcitool lescan help menu
+            print "Usage:\n"
+            print "        hcitool lescan [--length=N] maximum scan duration in seconds\n"
+            print ""
+            exitfunc 1
+
+        elseif strcmp(tkn$,"length")==0 then
+            strshiftleft(urtcmd$, 1)                //Discard the = sign
+            rc = extractStrToken(urtcmd$, tkn$)     //Take the next string from the command
+            rc = extractInttoken(tkn$,scnLen)       //Extract the integer value of the string
+            scnLen = scnLen*1000
+
+        endif
+    endwhile
+//--------------------------------------//
+
+    rc = BleScanStart(scnLen, 0)
+    AssertRC(rc, 401)
+    if rc == 0 then
+        print "LE Scan ...\n"
+    endif
+
+endfunc 1
+
+//==============================================================================
+//    hcitool lecc <bdaddr>
+//==============================================================================
+function _hciLeCc() as integer
+
+    addr$=""
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the hcitool lecc help menu
+            print "Usage:\n"
+            print "        hcitool lecc <bdaddr>\n"
+            exitfunc 1
+
+        else
+            addr$ = strdehexize$(tkn$)
+
+        endif
+    endwhile
+//--------------------------------------//
+
+    rc = BleConnect(addr$, 5000, 20000, 75000, 5000000)   //ConnectionTimeoutms, minConIntervalus, maxConIntervalus, nSupervisionTimeoutus
+    AssertRC(rc, 432)
+    if rc == 0 then
+        print "Connecting ... \n"
+    endif
+
+endfunc 1
+
+//==============================================================================
+//    hcitool ledc <handle>
+//==============================================================================
+function _hciLeDc() as integer
+
+    dim conHdl
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the hcitool ledc help menu
+            print "Usage:\n"
+            print "        hcitool ledc <handle>\n"
+
+            exitfunc 1
+
+        else
+            conHdl = StrValDec(tkn$)
+
+        endif
+    endwhile
+//--------------------------------------//
+
+    //Disconnect from LE device
+    rc = bledisconnect(conHdl)
+    AssertRC(rc, 465)
+    if rc == 0 then
+        print "Disconnecting ...\n"
+    endif
+
+endfunc 1
+
+//==============================================================================
+//    Extract the hcitool command
+//==============================================================================
+sub _hci()
+
+    //Extract and process hcitool subcommand
+
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the hcitool command help menu
+            _hciHelp()
+            break
+
+        elseif strcmp(tkn$,"dev")==0 then
+            //Display the address of the local device
+            rc = _hciDev()
+
+        elseif strcmp(tkn$,"con")==0 then
+            //Display active connection handles
+            command = SMARTZ_COMMAND_HCITOOL_CON
+            rc = _hciCon()
+
+        elseif strcmp(tkn$, "leadv")== 0 then
+            //LE advertise
+            rc = _hciLeAdv()
+
+        elseif strcmp(tkn$, "noleadv")== 0 then
+            //Stop LE adverts
+            rc = _hciNoLeAdv()
+
+        elseif strcmp(tkn$, "lescan")==0 then
+            //Start LE scan
+            rc = _hciLeScan()
+
+        elseif strcmp(tkn$, "lecc")==0 then
+            //Create a LE connection
+            rc = _hciLeCc()
+
+        elseif strcmp(tkn$, "ledc")==0 then
+            //Disconnect a LE Connection
+            rc = _hciLeDc()
+
+        endif
+    endwhile
+
+endsub
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// This handler is called when there is an advert report waiting to be read
+//==============================================================================
+function HandlerAdvRpt() as integer
+
+    dim ad$,dta$,ndisc,rsi,tag, nm$
+    rc = BleScanGetAdvReport(ad$,dta$,ndisc,rsi)
+    while rc==0
+        ad$ = right$(ad$,8)
+        print "\n        ";strhexize$(ad$)
+        tag = 0x09
+        rc = BLEGETADBYTAG(dta$, tag, nm$)
+        if rc == 0x6060 then
+            tag = 0x08
+            rc = BLEGETADBYTAG(dta$, tag, nm$)
+        endif
+
+        if rc == 0 then
+            print "  ";nm$
+        endif
+        rc = BleScanGetAdvReport(ad$,dta$,ndisc,rsi)
+    endwhile
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a BLE connection timeout
+//==============================================================================
+function HandlerBleConnTimOut() as integer
+
+    print "\nCould not create connection: Connection timed out\n";pr$
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a BLE scan timeout
+//==============================================================================
+function HandlerBlrScanTimOut() as integer
+
+    rc = BleScanStop()
+    AssertRC(rc, 563)
+    print "\n";pr$
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a BLE message (connection or disconnection)
+//==============================================================================
+function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as integer
+
+    dim hz
+
+    select nMsgId
+
+    case BLE_EVBLEMSGID_CONNECT
+        hz = nCtx
+        //Add connection handle to list of connection handles
+        rc = AcqConnHandle(hz)
+        conns = conns + 1
+        print "\nConnection handle ";hz;"\n";pr$
+
+    case BLE_EVBLEMSGID_DISCONNECT
+        //Release connection handle from list of connection handles
+        hz = nCtx
+        rc = RelConnHandle(hz)
+        conns = conns - 1
+        print "\nDisconnected\n";pr$
+
+    case else
+        //Unknown Ble Msg
+
+  endselect
+
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+
+//hcitool related events (BLE)
+OnEvent EVBLE_ADV_REPORT       call HandlerAdvRpt
+OnEvent EVBLE_SCAN_TIMEOUT     call HandlerBlrScanTimOut
+OnEvent EVBLE_CONN_TIMEOUT     call HandlerBleConnTimOut
+OnEvent EVBLEMSG               call HandlerBleMsg
+
+//==============================================================================
+// Print the gatt help menu
+//==============================================================================
+sub _gattHelp()
+
+    print "Usage:\n"
+    print "    gatttool [OPTION...] <command>\n\n"
+    print "GATT commands\n"
+    print "    --primary                               Primary Service Discovery\n"
+    print "    --characteristics                       Characteristics Discovery\n"
+    print "    --char-read                             Characteristics Value/Descriptor Read\n"
+    print "    --char-write                            Characteristics Value Write Without Response\n"
+    print "    --char-desc                             Characteristics Descriptor Discovery\n"
+    print "    --listen                                Listen for notifications and indications\n"
+    print "\n"
+    print "Options:\n"
+    print "    -b, --device=MAC                        Specify remote Bluetooth address\n"
+    print "    -l, --sec-level=[low | medium | high]   Set security level. Default: low\n"
+    print "\nFor more information on the usage of each command use:\n"
+    print "    gatttool <command> --help\n\n"
+
+endsub
+
+//=========================================================================
+//    Set security level flag depending on sec-level value
+//=========================================================================
+function _gattSecLvl() as integer
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    strshiftleft(urtcmd$, 1)
+    rc = ExtractStrToken(urtcmd$, tkn$)
+    if strcmp(tkn$, "level")==0 then
+        strshiftleft(urtcmd$,1)
+        rc = ExtractStrToken(urtcmd$, tkn$)
+
+        if strcmp(tkn$,"low")==0 then
+            //Set pair flag to be 0
+            secPair = 0
+
+        elseif strcmp(tkn$,"medium")==0 || strcmp(tkn$,"high")==0 then
+            //Set pair flag to be 1
+            secPair = 1
+
+        endif
+    endif
+//--------------------------------------//
+
+endfunc 1
+
+//==============================================================================
+// gatttool -b <bdaddr> --primary
+//==============================================================================
+function _gattPrimary() as integer
+
+    dim conHdl
+    secPair = 0
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the gatttool primary help menu
+            print "Usage:\n"
+            print "        gatttool -b <bdaddr> --primary\n"
+            exitfunc 1
+
+        elseif strcmp(tkn$,"b")==0 then
+            //Extract bdaddr from command
+            rc = ExtractStrToken(urtcmd$,addr$)
+            addr$ = strdehexize$(addr$)
+
+        elseif strcmp(tkn$,"device")==0 then
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, addr$)
+
+        elseif strcmp(tkn$, "sec")==0 then
+            //Call the sec-level function to pair or unpair with LE device
+            rc = _gattSecLvl()
+
+        endif
+    endwhile
+//--------------------------------------//
+
+    //Get connection handle from provided address
+    rc = BleGetConnHandleFromAddr(addr$, conHdl)
+    AssertRC(rc, 694)
+
+    //If pair flag is set, pair with LE device
+    if secPair == 1 then
+        rc = BlePair(conHdl, 0)
+        AssertRC(rc, 699)
+    endif
+
+    rc = BleGattcOpen(0,0)
+    AssertRC(rc, 703)
+    rc = BleDiscServiceFirst(conHdl,0,0)
+    AssertRC(rc, 705)
+
+endfunc 1
+
+//==============================================================================
+// gatttool -b <bdaddr> --characteristics
+//==============================================================================
+function _gattChar() as integer
+
+    dim conHdl
+    secPair = 0
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+        while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the gatttool characteristics help menu
+            print "Usage:\n"
+            print "        gatttool -b <bdaddr> --characteristics\n"
+            exitfunc 1
+
+        elseif strcmp(tkn$,"b")==0 then
+            //Extract bdaddr from command
+            rc = ExtractStrToken(urtcmd$,addr$)
+            addr$ = strdehexize$(addr$)
+
+        elseif strcmp(tkn$,"device")==0 then
+            //Extract bdaddr from command
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, addr$)
+
+        elseif strcmp(tkn$, "sec")==0 then
+            //Call the sec-level function to piar or unpair with LE device
+            rc = _gattSecLvl()
+
+        endif
+    endwhile
+//--------------------------------------//
+
+    //Get connection handle from provided address
+    rc = BleGetConnHandleFromAddr(addr$, conHdl)
+    AssertRC(rc, 746)
+
+    //If pair flag is set, pair with LE device
+    if secPair == 1 then
+        rc = BlePair(conHdl, 0)
+        AssertRC(rc, 751)
+    endif
+
+    rc = BleGattcOpen(0,0)
+    AssertRC(rc, 755)
+    rc = BleDiscServiceFirst(conHdl,0,0)
+    AssertRC(rc, 757)
+
+endfunc 1
+
+//==============================================================================
+// gatttool -b <bdaddr> --char-read --handle=0x0000
+//==============================================================================
+function _gattCharRead() as integer
+
+    dim conHdl
+    secPair = 0
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the gatttool char-read help menu
+            print "Usage:\n"
+            print "        gatttool -b <bdaddr> --char-read --handle=0x0000 \n"
+            exitfunc 1
+
+        elseif strcmp(tkn$,"b")==0 then
+            //Extract bdaddr from command
+            rc = ExtractStrToken(urtcmd$,addr$)
+            addr$ = strdehexize$(addr$)
+
+        elseif strcmp(tkn$,"device")==0 then
+            //Extract bdaddr from command
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, addr$)
+
+        elseif strcmp(tkn$,"handle")==0 then
+            //Extract characteristic handle from command
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, tkn$)
+            rc = ExtractIntToken(tkn$, valHdl)
+
+        elseif strcmp(tkn$, "sec")==0 then
+            //Call the sec-level function to pair or unpair with LE device
+            rc = _gattSecLvl()
+
+        elseif strcmp(tkn$, "l")==0 then
+            //Call the sec-level function to pair or unpair with LE device
+            rc = _gattSecLvl()
+
+        endif 
+    endwhile
+//--------------------------------------//
+
+    //Get connection handle from provided address
+    rc = BleGetConnHandleFromAddr(addr$, conHdl)
+    AssertRC(rc, 808)
+
+    //If pair flag is set, pair with LE device
+    if secPair == 1 then
+        rc = BlePair(conHdl, 0)
+        AssertRC(rc, 813)
+    endif
+
+    rc = BleGattcOpen(0,0)
+    AssertRC(rc, 817)
+    rc = BleGattcRead(conHdl,valHdl,0)
+    AssertRC(rc, 819)
+
+endfunc 1
+
+//==============================================================================
+// gatttool -b <bdaddr> --char-write --handle=0x0000  --value=0000
+//==============================================================================
+function _gattCharWrite() as integer
+
+    dim conHdl
+    dim val$          //Value (string format)
+    dim val           //Value (integer format)
+    secPair = 0
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0 
+        if strcmp(tkn$,"help")==0 then
+            //Display the gatttool char-write help menu
+            print "Usage:\n"
+            print "        gatttool -b <bdaddr> --char-write --handle=0x0000 --value=0000 \n"
+            exitfunc 1
+
+        elseif strcmp(tkn$,"b")==0 then
+            //Extract bdaddr from command
+            rc = ExtractStrToken(urtcmd$,addr$)
+            addr$ = strdehexize$(addr$)
+
+        elseif strcmp(tkn$,"device")==0 then
+            //Extract bdaddr from command
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, addr$)
+
+        elseif strcmp(tkn$,"handle")==0 then
+            //Extract characteristic handle from command
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, tkn$)
+            rc = ExtractIntToken(tkn$, valHdl)
+
+        elseif strcmp(tkn$,"value")==0 then
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, val$)
+            val$ = StrDehexize$(val$)
+
+        elseif strcmp(tkn$, "sec")==0 then
+            //Call the sec-level function to piar or unpair with LE device
+            rc = _gattSecLvl()
+
+        elseif strcmp(tkn$, "listen")==0 then
+            gattLsn = 1
+
+        endif 
+    endwhile
+//--------------------------------------//
+
+    //Get connection handle from provided address
+    rc = BleGetConnHandleFromAddr(addr$, conHdl)
+    AssertRC(rc, 876)
+
+    //If pair flag is set, pair with LE device
+    if secPair == 1 then
+        rc = BlePair(conHdl, 0)
+        AssertRC(rc, 881)
+        delay(5)
+    endif
+
+    rc = BleGattcOpen(0,0)
+    AssertRC(rc, 886)
+    rc = BleGattcWrite(conHdl,valHdl,val$)
+    AssertRC(rc, 888)
+
+    //If --listen is passed, switch mode to receive and display notifications
+    if gattLsn == 1 then
+        rc = SendMsgApp(0, GATTTOOL_LISTEN)
+        AssertRC(rc, 893)
+    endif
+
+endfunc 1
+
+//==============================================================================
+// gatttool -b <bdaddr> --char-desc  --handle=0x0000
+//==============================================================================
+function _gattCharDesc()
+
+    dim conHdl
+    chrHdl = 0
+    secPair = 0
+
+//--- Extract all strings in command ---//
+//--------------------------------------//
+    while ExtractStrToken(urtcmd$, tkn$)!=0
+        if strcmp(tkn$,"help")==0 then
+            //Display the gatttool char-desc help menu
+            print "Usage:\n"
+            print "        gatttool -b <bdaddr> --char-desc --handle=0x0000\n"
+            exitfunc 1
+
+        elseif strcmp(tkn$,"b")==0 then
+            //Extract bdaddr from command
+            rc = ExtractStrToken(urtcmd$,addr$)
+            addr$ = strdehexize$(addr$)
+
+        elseif strcmp(tkn$,"device")==0 then
+            //Extract bdaddr from command
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, addr$)
+
+        elseif strcmp(tkn$,"handle")==0 then
+            //Extract characteristic handle from command
+            strshiftleft(urtcmd$, 1)
+            rc = ExtractStrToken(urtcmd$, tkn$)
+            rc = ExtractIntToken(tkn$, chrHdl)
+
+        elseif strcmp(tkn$, "sec")==0 then
+            //Call the sec-level function to piar or unpair with LE device
+            rc = _gattSecLvl()
+
+        endif
+    endwhile
+//--------------------------------------//
+
+    //Get connection handle from provided address
+    rc = BleGetConnHandleFromAddr(addr$, conHdl)
+    AssertRC(rc, 942)
+
+    //If pair flag is set, pair with LE device
+    if secPair == 1 then
+        rc = BlePair(conHdl, 0)
+        AssertRC(rc, 947)
+    endif
+
+    rc = BleGattcOpen(0,0)
+    AssertRC(rc, 951)
+    rc = BleDiscDescFirst(conHdl, 0, chrHdl)
+    AssertRC(rc, 953)
+
+endfunc 1
+
+//==============================================================================
+// Extract the gatttool command
+//==============================================================================
+sub _gatt()
+
+    //Extract and process gatttool subcommand
+
+    dim s$
+    s$ = urtcmd$
+
+    while ExtractStrToken(s$, tkn$)!= 0
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if strcmp(tkn$,"help")==0 then
+            //Display the gatt command help menu
+            _gattHelp()
+            break
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        elseif strcmp(tkn$,"primary")==0 then
+            //Discover primary services 
+            command = SMARTZ_COMMAND_GATTTOOL_PRIMARY
+            rc = _gattPrimary()
+            break
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        elseif strcmp(tkn$,"characteristics")==0 then
+            //Discover characteristics
+            command = SMARTZ_COMMAND_GATTTOOL_CHARACTERISTICS
+            rc = _gattChar()
+            break
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        elseif strcmp(tkn$, "char")==0 then 
+            strshiftleft(s$, 1)
+            rc = ExtractStrToken(s$, tkn$)
+            if strcmp(tkn$, "read")==0 then
+                //Read characteristic value
+                command = SMARTZ_COMMAND_GATTTOOL_CHAR_READ
+                rc = _gattCharRead()
+                break
+            elseif strcmp(tkn$, "write")==0 then
+                //Write characteristic value
+                command = SMARTZ_COMMAND_GATTTOOL_CHAR_WRITE
+                rc = _gattCharWrite()
+                break
+            elseif strcmp(tkn$, "desc")==0 then
+                //Discover characteristic descriptors
+                command = SMARTZ_COMMAND_GATTTOOL_CHAR_DESC
+                rc = _gattCharDesc()
+                break
+            endif
+
+        endif
+    endwhile
+
+endsub
+
+//==============================================================================
+// gatt status error codes
+//==============================================================================
+sub _gattStatus(status as integer)
+
+    //Depending on the supplied status, print equivalent error message
+
+    print "\nATT Error: "
+    select status
+
+        case H'0101
+            print "Invalid attribute handle\n"
+
+        case H'0102
+            print "Read not permitted\n"
+
+        case H'0103
+            print "Write not permitted\n"
+
+        case H'0104
+            print "Used in ATT as invalid PDU\n"
+
+        case H'0105
+            print "Authenticated link required\n"
+
+        case H'0106
+            print "Used in ATT as request not supported\n"
+
+        case H'0107
+            print "Offset specified was past the end of the attribute\n"
+
+        case H'0108
+            print "Used in ATT as insufficient authorisation\n"
+
+        case H'0109
+            print "Used in ATT as prepare queue full\n"
+
+        case H'010A
+            print "Used in ATT as attribute not found\n"
+
+        case H'010B
+            print "Attribute cannot be read or written using read/write requests\n"
+
+        case H'010C
+            print "Encryption key size used is insufficient\n"
+
+        case H'010D
+            print "Invalid value size\n"
+
+        case H'010E
+            print "Very unlikely error\n"
+
+        case H'010F
+            print "Encrypted link required\n"
+
+        case H'0110
+            print "Attribute type is not a supported grouping attribute\n"
+
+        case H'0111
+            print "Encrypted link required\n"
+
+        case H'0180
+            print "Application range begin\n"
+
+        case H'019F
+            print "Application range end\n"
+
+        case H'01FE
+            print "Profile and service error: Procedure already in progress\n"
+
+        case H'01FF
+            print "Profile and service error: Out of range\n"
+
+        case else
+            print "Unknown status\n"
+
+        endselect
+    print pr$
+
+endsub
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// This handler is called when a BLE primary service is discovered
+//==============================================================================
+function HandlerPrimSvc(hConn,hUuid,hStart,hEnd) as integer
+
+    if hUuid != 0 then
+        if command == SMARTZ_COMMAND_GATTTOOL_PRIMARY then
+            print "\n" 
+            print "attr handle = 0x";integer.h' hStart
+            print ", end grp handle = 0x";integer.h' hEnd
+            print ", uuid = ";integer.h' hUuid
+            rc = BleDiscServiceNext(hConn)
+            if rc!=0 then
+                BleGattcClose()
+                print "\n";pr$
+                exitfunc 1
+            endif
+
+        elseif command == SMARTZ_COMMAND_GATTTOOL_CHARACTERISTICS then
+            rc = BleDiscCharFirst(hConn,0,hStart,hEnd)
+
+        endif
+
+    else
+        BleGattcClose()
+        print "\n";pr$
+        exitfunc 1
+
+    endif
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when a BLE characteristic is discovered
+//==============================================================================
+function HandlerCharDisc(hConn,hUuid,cProp,hVal,hiUuid) as integer
+
+    if hUuid != 0 then
+        print "\n"
+        print "handle = 0x";integer.h' hVal-1
+        print ", char properties = 0x";integer.h' cProp
+        print ", char value handle = 0x";integer.h' hVal
+        print ", uuid = ";integer.h' hUuid
+    endif
+
+    rc = BleDiscCharNext(hConn)
+    if rc != 0 then
+        rc = BleDiscServiceNext(hConn)
+        if rc !=0 then
+            print "\n";pr$
+            BleGattcClose()
+        endif
+    endif
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when a BLE descriptor is discovered
+//==============================================================================
+function HandlerDescDisc(hChar, hUuid, hDisc) as integer
+
+    if hUuid !=0 then
+        print "\n"
+        print "handle : 0x";integer.h' hDisc;" uuid : ";integer.h' hUuid
+    endif
+
+    rc = BleDiscDescNext(hChar)
+    if rc !=0 then
+        print "\n";pr$
+        BleGattcClose()
+    endif
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when a BLE characteristic attribute has been read
+//==============================================================================
+function HandlerAttrRead(hConn,hAttr,nSts) as integer
+
+    dim a$,ofst  
+    if nSts == 0 then
+        rc = BleGattcReadData(hConn,valHdl,ofst,a$)
+        if rc==0 then
+            print "\nCharacteristic value/descriptor: "
+            print "";StrHexize$(a$)
+            print " (";StrEscape$(a$);") \n";pr$
+        else
+            AssertRC(rc, 1186)
+        endif
+ 
+    else
+        //If status !=0, display equivalent error message
+        _gattStatus(nSts)
+
+    endif
+
+    BleGattcClose()
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when a BLE characteristic attribute has been written to 
+//==============================================================================
+function HandlerAttrWrite(hConn,aHndl,nSts) as integer
+
+    if nSts == 0 then
+        print "\nCharacteristic value was written successfully\n";pr$
+    else 
+        //If status !=0, display equivalent error message
+        _gattStatus(nSts)
+    endif
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is data notified or indicated
+//==============================================================================
+function HandlerAttrNtfyCmd() as integer
+
+    dim hConn,hAttr,att$,dscd
+
+    if gattLsn == 1 then
+        //If in gatttool listen mode, continuously print not/inds as they come
+        do
+            rc=BleGattcNotifyRead(hConn,hAttr,att$,dscd)
+            if rc==0 then
+                print "\nNotification/Indication handle = 0x";integer.h' hAttr;" value: ";StrHexize$(att$)
+            endif
+        dowhile rc==0
+    endif
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port in gatttool listen mode
+//==============================================================================
+function HandlerUartRxLsn() as integer
+
+    //Wait for "stop" command, otherwise discard
+
+    dim nMatch
+
+    nMatch=UartReadMatch(stRsp$,13)
+    if nMatch!=0 then
+        //CR exists in the input buffer
+        urtcmd$ = strsplitleft$(stRsp$, nMatch)
+        tlen = ExtractStrToken(urtcmd$,tkn$)
+        if strcmp(tkn$,"stop")==0 then 
+            gattLsn = 0
+            print pr$
+            //"Stop" received, switch back to normal mode
+            rc = SendMsgApp(0, NORMAL_MODE)
+            AssertRC(rc, 1251)
+        endif
+    endif
+
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+
+//gatttool related events
+OnEvent EVDISCPRIMSVC call HandlerPrimSvc
+OnEvent EVDISCCHAR    call HandlerCharDisc
+OnEvent EVDISCDESC    call HandlerDescDisc
+OnEvent EVATTRREAD    call HandlerAttrRead
+OnEvent EVATTRWRITE   call HandlerAttrWrite
+OnEvent EVATTRNOTIFY  call HandlerAttrNtfyCmd
+
+//==============================================================================
+// Print the hciconfig help menu
+//==============================================================================
+sub _hciCfgHelp()
+
+    print "Usage:\n"
+    print "    hciconfig <command> [command parameters]\n\n"
+    print "Commands:\n"
+    print "    version              Display version information\n"
+    print "    leadv                Enable LE advertising\n"
+    print "    noleadv              Disable LE advertising\n"
+    print "    letpl     [level]    Get/Set LE transmit power level\n"
+    print "\n"
+
+endsub
+//==============================================================================
+// Extract the hciconfig command
+//==============================================================================
+sub _hciCfg()
+
+    //Extract and process hciconfig subcommand
+
+    dim s$, val
+    s$ = urtcmd$
+    while ExtractStrToken(s$, tkn$)!= 0
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if strcmp(tkn$,"help")==0 then
+            //Display hciconfig command help menu
+            _hciCfgHelp()
+            break
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        elseif strcmp(tkn$, "leadv")==0 then
+            //Enable LE adverts
+            dim a$
+            rc = BleAdvertStart(0,a$,25,0,0)
+            AssertRC(rc, 1305)
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        elseif strcmp(tkn$, "noleadv")==0 then
+            //Disable LE adverts
+            rc = BleAdvertStop()
+            AssertRC(rc, 1311)
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        elseif strcmp(tkn$, "letpl")==0 then
+            //Get/set the LE transmit power level
+            if ExtractStrToken(s$, tkn$) == 0  then
+                //Display the LE transmit power level
+                print "LE transmit power level : ";letpl;"\n"
+            else 
+                //Set the LE transmit power level
+                if strcmp(tkn$,"-")==0 then
+                    rc = ExtractStrToken(s$, tkn$)
+                    val = StrValDec(tkn$)
+                    if (val > 20) then
+                        print "Invalid power value. Valid range is from -20 to 8 dBm\n"
+                    else
+                        letpl = val*-1
+                    endif
+                else
+                    val = StrValDec(tkn$)
+                    if (val > 8) then
+                        print "Invalid power value. Valid range is from -20 to 8 dBm\n"
+                    else
+                        letpl =  val
+                    endif
+                endif
+                rc = BleTxPowerSet(letpl)
+                AssertRC(rc, 1338)
+            endif
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        elseif strcmp(tkn$, "version")==0 then
+            //Display version information
+            dim fw, X, Y, Z
+            fw = SYSINFO(3)
+            X = (fw >> 24) & 0xFF
+            Y = (fw >>  8) & 0xFFFF
+            Z = (fw      ) & 0xFF
+            print "\nApp Version: smartZ Version ";mjVersion;".";mnVersion;"\n"
+            print "Device Name: ";BleGetDeviceName$();"\n"
+            print "Firmware: 28.";X;".";Y;".";Z;"\n"
+            print "Manufacturer: Laird Technologies\n"
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        endif
+    endwhile
+
+endsub
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// Initialise the Bluetooth device
+// Set the device to be discoverable, connectible, pairable,
+// Set the inquiry type to be general, inquiry mode to be extended
+//==============================================================================
+sub InitBtDevice()
+
+    dim nHandle
+
+    //Set device name
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //Get the device's bdaddr and display it in hex format
+    name$ = SYSINFO$(4)
+    name$ = right$(name$, 6)
+    name$ = StrHexize$(name$)
+    //Set the name of the local Bluetooth device to be smartZ+<bdaddr>
+    name$ = "smartZ-" + name$
+
+endsub
+//==============================================================================
+// This is the first subroutine called when the program starts
+//==============================================================================
+sub Initialise()
+
+    //Set device to be discoverable, connectible, and pairable
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    InitBtDevice()
+    //Initialise connection handles
+    InitConnHandles()
+
+    //Display the following lines as soon as the program starts
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    print "\n-----------------------\n"
+    print " smartZ v";mjVersion;".";mnVersion;"\n"
+    print "-----------------------\n"
+    print "\nType \22help\22 or \22<command> help\22\n"
+    print pr$
+
+endsub
+//==============================================================================
+// Display the Help menu
+//==============================================================================
+sub _help()
+
+    print "Available Commands: \n\n"
+    print "    help\n"
+    print "    hcitool\n"
+    print "    gatttool\n"
+    print "    hciconfig\n"
+    print "    quit/exit\n"
+    print "\n"
+    print "For more information on the usage of each command use:\n"
+    print "<command> --help\n\n"
+
+endsub
+//==============================================================================
+// Extract the received UART command
+//==============================================================================
+function OnUartCmd() as integer
+
+    //Get first token
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+
+    if strcmp(tkn$,"hcitool")==0 then
+        _hci()
+
+    elseif strcmp(tkn$,"gatttool")==0 then
+        _gatt()
+
+    elseif strcmp(tkn$,"hciconfig")==0 then
+        _hciCfg()
+
+    elseif strcmp(tkn$, "help")==0 then
+        _help()
+
+    elseif strcmp(tkn$,"exit")==0 || strcmp(tkn$,"quit")==0  then
+        //Exit this application
+        reset(0)
+
+    elseif strcmp(tkn$,"")==0 then
+        //Received carriage return. Do nothing
+
+    else
+        print tkn$;": command not found\n"
+    endif
+
+    print pr$
+
+endfunc 1
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// This handler is called when data has arrived through the UART
+//==============================================================================
+function HandlerUartRxCmd() as integer
+
+    dim nMatch
+
+    //Read UART data until CR
+    nMatch=UartReadMatch(stRsp$,13)
+    if nMatch!=0 then
+        //CR exists in the input buffer
+        urtcmd$ = strsplitleft$(stRsp$, nMatch)
+        //Process the received string
+        exitfunc OnUartCmd()
+    endif
+
+endfunc 1
+//==============================================================================
+// Called after SendMsgApp is called. Used to switch between command and
+// gatttool listen modes
+//==============================================================================
+function SetMode(msgID, cmd) as integer
+
+    if cmd == NORMAL_MODE then
+        //If normal mode, UART data will be processed normally
+        OnEvent     EVUARTRX                    call HandlerUartRxCmd
+
+    elseif cmd == GATTTOOL_LISTEN then
+        //If gatttool mode, UART data will be discarded as terminal
+        //is used for displaying notifications/indications
+        print "\nListening for notifications/indications. For hangup, type \22stop\22\n"
+        OnEvent    EVUARTRX                    call HandlerUartRxLsn
+
+    endif
+
+endfunc 1
+//******************************************************************************
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+//Data received over the UART. Process the data accordingly
+OnEvent  EVUARTRX                call HandlerUartRxCmd
+
+//Event recieved to switch between normal and gatttool mode
+OnEvent  EVMSGAPP                call SetMode
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+//Initialise the device
+Initialise()
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+//------------------------------------------------------------------------------
+WaitEvent

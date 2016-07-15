@@ -1,0 +1,15 @@
+//Example :: UartCloseEx.sb
+DIM rc1
+DIM rc2
+
+UartClose()
+rc1 = UartOpen(9600,0,0,"CN81H") 		//open as DTE at 300 baudrate, odd parity
+										//8 databits, 1 stopbits, cts/rts flow control
+PRINT "Laird"
+
+IF UartCloseEx(1)!=0 THEN
+	PRINT "\nData in at least one buffer. Uart Port not closed"	
+ELSE
+	rc1 = UartOpen(9600,0,0,"CN81H")	//open as DTE at 300 baudrate, odd parity
+	PRINT "\nUart Port was closed"
+ENDIF

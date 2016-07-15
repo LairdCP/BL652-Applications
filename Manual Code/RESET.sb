@@ -1,0 +1,2 @@
+//Example :: RESET.sb
+RESET(0)	//force a reset of the module

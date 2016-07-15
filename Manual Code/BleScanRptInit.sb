@@ -1,0 +1,6 @@
+//Example :: BleScanRptInit.sb
+DIM scnRpt$ : scnRpt$=""
+
+IF BleScanRptInit(scnRpt$)==0 THEN
+	PRINT "\nScan report initialised"
+ENDIF

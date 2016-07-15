@@ -1,0 +1,31 @@
+//Example :: AesSetKeyIv.sb
+DIM key$, initVector$
+DIM rc
+//Create context for EBC mode, 128 bit
+key$="\00\01\02\03\04\05\06\07\08\09\0A\0B\0C\0D\0E\0F"
+initVector$=""   //EBC does not require initialisation vector
+rc=AesSetKeyIv(0x100,16,key$,initVector$)
+IF rc==0 THEN
+  PRINT "\nEBC context created successfully"
+ELSE
+  PRINT "\nFailed to create EBC context"
+ENDIF
+//Create context for EBC mode with XOR, 128 bit
+key$="\00\01\02\03\04\05\06\07\08\09\0A\0B\0C\0D\0E\0F"
+initVector$="\FF\01\FF\03\FF\05\FF\07\FF\09\FF\0B\FF\0D\FF\0F"   
+rc=AesSetKeyIv(0x101,16,key$,initVector$)
+IF rc==0 THEN
+  PRINT "\nEBC-XOR context created successfully"
+ELSE
+  PRINT "\nFailed to create EBC-XOR context"
+ENDIF
+//Create context for CBC mode, 128 bit
+key$="\00\01\02\03\04\05\06\07\08\09\0A\0B\0C\0D\0E\0F"
+initVector$="\FF\01\FF\03\FF\05\FF\07\FF\09\FF\0B\FF\0D\FF\0F"   
+rc=AesSetKeyIv(0x200,16,key$,initVector$)
+IF rc==0 THEN
+  PRINT "\nCBC context created successfully"
+ELSE
+  PRINT "\nFailed to create CBC context"
+ENDIF
+

@@ -1,0 +1,10 @@
+//Example :: BleEncodeString.sb
+
+DIM rc, ts$
+DIM attr$ : attr$=""
+
+//write "Wor" from "Hello World" to the attribute at index 2
+ts$="Hello World"
+rc=BleEncodeString(attr$,2,ts$,6,3)
+
+PRINT attr$

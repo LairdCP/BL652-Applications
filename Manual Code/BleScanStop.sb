@@ -1,0 +1,25 @@
+//Example :: BleScanStop.sb
+DIM rc, startTick
+
+'//Scan for 20 seconds with no filtering
+rc = BleScanStart(20000, 0)
+
+IF rc==0 THEN
+    PRINT "\nScanning"
+ELSE
+    PRINT "\nError: "; INTEGER.H'rc
+ENDIF
+
+'//Wait 2 seconds before aborting scan
+startTick = GetTickCount()
+WHILE GetTickSince(startTick) < 2000
+ENDWHILE
+
+'//If scan in progress, abort
+IF SysInfo(2016) == 0x08 THEN
+    PRINT "\nStop scanning. Freeing up allocated memory"
+    rc = BleScanStop()   
+    IF SysInfo(2016) == 0 THEN
+        PRINT "\nScan stopped"
+    ENDIF
+ENDIF

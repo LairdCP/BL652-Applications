@@ -1,0 +1,43 @@
+//Example :: BleSecMngrOobKey.sb
+DIM rc, connHandle
+DIM addr$ : addr$=""
+DIM oob$ : oob$ = "\11\22\33\44\55\66\77\88\99\11\aa\cc\bb\dd\ee\ff"
+
+#define OOB_KEY     2
+
+FUNCTION HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) AS INTEGER
+	SELECT nMsgId
+		CASE 0
+			connHandle = nCtx
+			PRINT "\nBle Connection ",nCtx
+		
+		CASE 1
+			PRINT "\nDisconnected ";nCtx;"\n"
+			EXITFUNC 0
+		CASE 11
+			PRINT "\n +++ Auth Key Request, type=",nCtx
+            if nCtx == OOB_KEY then
+                rc=BleSecMngrOobKey(connHandle,oob$)
+                print "\nOOB Key ";StrHexize$(oob$);" was used"
+            endif
+
+		CASE ELSE
+			PRINT "\nUnknown Ble Msg" 
+	ENDSELECT
+ENDFUNC 1
+
+
+ONEVENT  EVBLEMSG  CALL HandlerBleMsg
+
+
+IF BleAdvertStart(0,addr$,25,60000,0)==0 THEN	  
+    PRINT "\nAdverts Started\n"					
+	PRINT "\nMake a connection to the BL600"
+ELSE											
+    PRINT "\n\nAdvertisement not successful"
+ENDIF
+
+
+WAITEVENT
+
+

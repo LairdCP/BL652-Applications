@@ -1,0 +1,13 @@
+//Example :: SPrint.sb
+DIM a, s$
+a=100
+
+//Note: SPRINT replaces the content of s$ with exprlist each time it is used
+SPRINT #s$,a				//s$ now contains 100
+PRINT "\n";s$;"\n"
+SPRINT #s$,INTEGER.H'a		//s$ now contains 64
+PRINT s$;"\n"
+SPRINT #s$,INTEGER.O'a		//s$ now contains 144
+PRINT s$;"\n"
+SPRINT #s$,INTEGER.B'a		//s$ now contains 1100100
+PRINT s$;"\n"

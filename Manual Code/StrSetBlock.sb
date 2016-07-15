@@ -1,0 +1,8 @@
+//Example :: StrSetBlock.sb
+DIM s$
+s$="HelloWorld"
+PRINT s$;"\n"
+PRINT StrSetBlock(s$,64,4,2)    
+PRINT "\n";s$;"\n"          
+PRINT StrSetBlock(s$,300,4,200)
+PRINT "\n";s$ 

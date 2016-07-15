@@ -1,0 +1,43 @@
+//Example :: VSpEvents.sb
+
+DIM tx$,rc,x,scRpt$,adRpt$,addr$,hndl
+
+//handler for data arrival
+FUNCTION HandlerBleVSpRx() AS INTEGER
+    //print the data that arrived
+    DIM n,rx$
+    n = BleVSpRead(rx$,20)
+    PRINT "\nrx=";rx$
+ENDFUNC 1
+
+//handler when VSP tx buffer is empty
+FUNCTION HandlerVSpTxEmpty() AS INTEGER
+    IF x==0 THEN
+        rc = BleVSpWrite(tx$)
+        x=1
+    ENDIF
+ENDFUNC 1
+
+PRINT "\nDevice name is "; BleGetDeviceName$()
+
+//Open the VSP
+rc = BleVSpOpen(128,128,0,hndl)
+//Initialise a scan report
+rc = BleScanRptInit(scRpt$)
+//Advertise the VSP service in the scan report so 
+//that it can be seen by the client
+rc = BleAdvRptAddUuid128(scRpt$,hndl)
+adRpt$=""
+rc = BleAdvRptsCommit(adRpt$,scRpt$)
+addr$=""  //because we are not doing a DIRECT advert
+rc = BleAdvertStart(0,addr$,20,300000,0)
+//Now advertising so can be connectable
+
+ONEVENT  EVVSPRX      CALL HandlerBleVSpRx
+ONEVENT  EVVSPTXEMPTY  CALL HandlerVSpTxEmpty
+
+tx$="tx buffer empty"
+PRINT "\nUse the iOS 'BL652 Serial' app to test this"
+
+//wait for events and messages
+WAITEVENT

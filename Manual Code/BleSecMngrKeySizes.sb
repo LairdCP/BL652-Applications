@@ -1,0 +1,3 @@
+//Example :: BleSecMngrKeySizes.sb
+PRINT BleSecMngrKeySizes(8,15)
+

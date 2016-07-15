@@ -1,0 +1,11 @@
+//Example :: BleGattcClose.sb
+DIM rc
+//open the gatt client with default notify/indicate ring buffer size
+rc = BleGattcOpen(0,0)
+IF rc == 0 THEN
+    PRINT "\nGatt Client is now open"
+ENDIF
+BleGattcClose()
+PRINT "\nGatt Client is now closed"
+BleGattcClose()
+PRINT "\nGatt Client is closed - was safe to call when already closed"

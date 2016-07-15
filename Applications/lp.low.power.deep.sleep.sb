@@ -1,0 +1,77 @@
+// Copyright (c) 2013, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+//
+// This small program configures the development board for minimal
+// power consumption by setting various SIO as digital outs and
+// closing the UART
+//
+// After running this application you should see <4uA at the current measurement
+// header pins (CONN1). Remove the jumper and place an ammeter in series.
+//
+// gpiosetfunc(SIO,function,sub function)
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+//******************************************************************************
+// Library Import
+//******************************************************************************
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+dim rc          //Declare rc as a variable (result code)
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+rc=gpiosetfunc(15,2,0)  //Sets Buzzer to digital out low
+rc=gpiosetfunc(18,2,0)  //Sets LED 0 to digital out low
+rc=gpiosetfunc(19,2,0)  //Sets LED 1 to digital out low
+rc=gpiosetfunc(4,2,0)   //Disables the temperature sensor
+uartclose()             //Closes the UART
+rc=gpiosetfunc(21,2,1)  //TX - set high on default
+rc=gpiosetfunc(23,2,0)  //RTS
+
+//Put module into deep sleep
+rc = SystemStateSet(0)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+waitevent       //Waits for an event to happen

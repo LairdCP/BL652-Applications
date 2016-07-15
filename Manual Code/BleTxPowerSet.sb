@@ -1,0 +1,18 @@
+//Example :: BleTxPowerSet.sb
+DIM rc,dp
+
+dp=1000 : rc = BleTxPowerSet(dp)
+PRINT "\nrc = ";rc
+PRINT "\nTx power : desired= ";dp," actual= "; SysInfo(2008)
+dp=8 : rc = BleTxPowerSet(dp)
+PRINT "\nTx power : desired= ";dp," "," actual= "; SysInfo(2008)
+dp=2 : rc = BleTxPowerSet(dp)
+PRINT "\nTx power : desired= ";dp," "," actual= "; SysInfo(2008)
+dp=-10 : rc = BleTxPowerSet(dp)
+PRINT "\nTx power : desired= ";dp," "," actual= "; SysInfo(2008)
+dp=-25 : rc = BleTxPowerSet(dp)
+PRINT "\nTx power : desired= ";dp," "," actual= "; SysInfo(2008)
+dp=-45 : rc = BleTxPowerSet(dp)
+PRINT "\nTx power : desired= ";dp," "," actual= "; SysInfo(2008)
+dp=-1000 : rc = BleTxPowerSet(dp)
+PRINT "\nTx power : desired= ";dp," actual= "; SysInfo(2008)

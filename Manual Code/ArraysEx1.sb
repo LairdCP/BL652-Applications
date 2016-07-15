@@ -1,0 +1,21 @@
+//Example :: ArraysEx1.sb 
+
+DIM nCmds AS INTEGER
+DIM stCmds[20] AS STRING 	//declare an array as a string with 20 elements
+//Not recommended because we are only using 7 elements as you will see below
+
+//Setting the values for 7 of the elements
+stCmds[0]="\rATS0=1\r"
+stCmds[1]="ATS512=4\r" 
+stCmds[2]="ATS501=1\r"
+stCmds[3]="ATS502=1\r"
+stCmds[4]="ATS503=1\r"
+stCmds[5]="ATS504=1\r"
+stCmds[6]="AT&W\r"
+nCmds=6			
+
+//Print the 7 elements above in order			
+DIM i AS INTEGER
+for i=0 to nCmds step 1
+	print stCmds[i]			
+next			

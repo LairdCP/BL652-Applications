@@ -1,0 +1,7 @@
+//Example :: StrFill.sb
+DIM s$
+s$="hello"
+PRINT s$;"\n"
+PRINT StrFill(s$,64,7);"\n" 
+PRINT s$;"\n"               
+PRINT StrFill(s$,-23,7) 

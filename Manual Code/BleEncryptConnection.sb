@@ -1,0 +1,68 @@
+//Example :: BleEncryptConnection.sb
+dim rc, pr$, hC, hDesc
+#define GATT_SERVER_ADDRESS         "\01\F6\36\27\A6\0B\EA"
+
+//This example app was tested with a BL600 running the health thermometer sensor sample app 
+//which the module had previously bonded with.
+
+
+'//------------------------------------------------------------------------------
+'// For debugging
+'// --- rc = result code
+'// --- ln = line number         
+'//------------------------------------------------------------------------------
+Sub AssertRC(rc,ln)   
+    if rc!=0 then
+        print "\nFail :";integer.h' rc;" at tag ";ln
+    endif
+EndSub
+
+
+'//------------------------------------------------------------------------------
+'// This handler is called when there is a significant BLE event
+'//------------------------------------------------------------------------------
+function HndlrBleMsg(byval nMsgId as integer, byval nCtx as integer) 
+    select nMsgId
+        case 0
+            hC = nCtx
+            print "\nConnected"
+            rc=BleEncryptConnection(hC, 16, 0)
+            if rc==0 then
+                print "\nEncrypting connection"
+            else
+                AssertRC(rc,28)
+            endif
+        case 1
+            print "\n\n --- Disconnected"
+             exitfunc 0
+        case 10
+            print "\nNew bond created"           
+            
+        case 11
+            print "\nPair request: Accepting"
+            rc=BleAcceptPairing(hC,1)
+            AssertRC(rc,52)
+            print "\nPairing in progress"
+        case 17   
+            print "\nNew pairing/bond has replaced old key"
+        case 18
+            print "\nConnection now encrypted"
+            rc=BleDisconnect(hC)
+        case else
+    endselect
+endfunc 1
+
+
+rc=BleSecMngrIoCap(0)           //set io capability to just works
+rc=BleSecMngrJustWorksConf(0)   //module will  not wait for confirmation (EVBLEMSG 11) before just works pairing
+
+pr$ = GATT_SERVER_ADDRESS
+rc=BleConnect(pr$, 10000, 25, 100, 30000000)
+AssertRC(rc,91)
+
+onevent evblemsg   call HndlrBleMsg
+
+
+waitevent
+
+print "\nExiting..."

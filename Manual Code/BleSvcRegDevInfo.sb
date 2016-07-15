@@ -1,0 +1,19 @@
+//Example :: BleSvcRegDevInfo.sb
+DIM rc,manfNme$,mdlNum$,srlNum$,hwRev$,swRev$,sysId$,regDtaLst$,pnpId$
+
+manfNme$ = "Laird Technologies"
+mdlNum$ = "BL652"             
+srlNum$ = ""                   //empty to omit submission          
+hwRev$ = "1.0"       
+swRev$ = "1.0"               
+sysId$ = ""                    //empty to omit submission
+regDtaLst$ = ""                //empty to omit submission
+pnpId$ = ""                   //empty to omit submission
+
+rc=BleSvcRegDevInfo(manfNme$,mdlNum$,srlNum$,hwRev$,swRev$,sysId$,regDtaLst$,pnpId$)
+
+IF !rc THEN
+    PRINT "\nSuccess"
+ELSE 
+    PRINT "\nFailed 0x"; INTEGER.H'rc      
+ENDIF

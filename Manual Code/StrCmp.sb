@@ -1,0 +1,7 @@
+//Example :: StrCmp.sb
+DIM s1$,s2$
+s1$="hello"
+s2$="world"
+PRINT StrCmp(s1$,s2$);"\n"  
+PRINT StrCmp(s2$,s1$);"\n"  
+PRINT StrCmp(s1$,s1$);"\n"  

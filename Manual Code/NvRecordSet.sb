@@ -1,0 +1,5 @@
+//Example :: NvRecordSet.sb
+DIM w$, r$, rc : w$ = "HelloWorld"
+PRINT NvRecordSet(500,w$);" bytes written\n"
+PRINT NvRecordGetEx(500,r$,"default");" bytes read"		
+PRINT "\n";r$				

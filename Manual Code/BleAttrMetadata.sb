@@ -1,0 +1,25 @@
+//Example :: BleAttrMetadata.sb
+
+DIM mdVal    //metadata for value attribute of Characteristic
+DIM mdCccd   //metadata for CCCD attribute of Characteristic
+DIM mdSccd   //metadata for SCCD attribute of Characteristic
+DIM rc
+
+//++++
+// Create the metadata for the value attribute in the characteristic
+// and Heart Rate attribute has variable length
+//++++
+
+//There is always a Value attribute in a characteristic
+mdVal=BleAttrMetadata(17,0,20,0,rc)
+//There is a CCCD and SCCD in this characteristic
+mdCccd=BleAttrMetadata(1,2,2,0,rc)
+mdSccd=BleAttrMetadata(0,0,2,0,rc)
+
+//Create the Characteristic object
+IF BleCharNew(3,BleHandleUuid16(0x2A1C),mdVal,mdCccd,mdSccd)==0 THEN
+    PRINT "\nSuccess"
+ELSE
+    PRINT "\nFailed"
+ENDIF
+

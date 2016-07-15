@@ -1,0 +1,28 @@
+ //Example :: BleDecodeString.sb
+
+ DIM chrHandle,v1,svcHandle,rc, ts$,decStr$
+ DIM mdVal : mdVal = BleAttrMetadata(1,1,50,0,rc)
+ //"ABCDEFGHIJ"
+ DIM attr$ : attr$="41\42\43\44\45\46\47\48\49\4A"
+ DIM uuid : uuid = 0x1853
+
+ rc=BleServiceNew(1, BleHandleUuid16(uuid), svcHandle)
+
+ rc=BleCharNew(0x07,BleHandleUuid16(0x2A1C),mdVal,0,0)
+ rc=BleCharCommit(svcHandle,attr$,chrHandle)
+
+ rc=BleServiceCommit(svcHandle)
+
+ rc=BleCharValueRead(chrHandle,attr$)
+
+ //read max 4 bytes from index 3 in the string
+ rc=BleDecodeSTRING(attr$,3,decStr$,4)
+ PRINT "\nd$=";decStr$
+
+ //read max 20 bytes from index 3 in the string - will be truncated
+ rc=BleDecodeSTRING(attr$,3,decStr$,20)
+ PRINT "\nd$=";decStr$
+
+ //read max 4 bytes from index 14 in the string - nothing at index 14
+ rc=BleDecodeSTRING(attr$,14,decStr$,4)
+ PRINT "\nd$=";decStr$

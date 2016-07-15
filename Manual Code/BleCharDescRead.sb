@@ -1,0 +1,75 @@
+//Example :: BleCharDescRead.sb
+
+DIM rc,conHndl,hMyChar
+
+//----------------------------------------------------------------------------
+//Create some PRIMARY service attribure which has a uuid of 0x18FF
+//----------------------------------------------------------------------------
+SUB OnStartup()
+    DIM hSvc,attr$,scRpt$,adRpt$,addr$    
+    rc = BleSvcCommit(1,BleHandleUuid16(0x18FF),hSvc)
+    // Add one or more characteristics 
+    rc = BleCharNew(0x08,BleHandleUuid16(0x2AFF),BleAttrMetadata(1,1,20,1,rc),0,0)
+    attr$="\00"  //no initial alert
+    rc = BleCharCommit(hSvc,attr$,hMyChar)
+    
+    //Add a user description
+    DIM s$ : s$="You can change this"
+    rc=BleCharDescUserDesc(s$,BleAttrMetadata(1,1,20,1,rc))
+    
+    rc=BleScanRptInit(scRpt$) 
+    //Add 1 char handle to scan report
+    rc=BleAdvRptAddUuid16(scRpt$,hMyChar,-1,-1,-1,-1,-1)
+    //commit reports to GATT table - adRpt$ is empty
+    rc=BleAdvRptsCommit(adRpt$,scRpt$)
+    rc=BleAdvertStart(0,addr$,200,0,0)
+ENDSUB 
+
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+  
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+ENDSUB
+
+//==============================================================================
+// Ble event handler - Just to get the connection handle
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+ENDFUNC 1
+
+//==============================================================================
+// Handler to service writes to descriptors by a gatt client 
+//==============================================================================
+FUNCTION HandlerCharDesc(BYVAL hChar AS INTEGER, BYVAL hDesc AS INTEGER) 
+    dim duid,a$,rc
+    IF hChar == hMyChar THEN
+        rc = BleCharDescRead(hChar,hDesc,0,512,duid,a$)
+        IF rc==0 THEN 
+            PRINT "\nNew value for descriptor is ";StrHexize$(a$)
+            EXITFUNC 0
+        ELSE
+            PRINT "\nCould not access the uuid"
+        ENDIF
+    ELSE
+        PRINT "\nThis is for some other characteristic"
+    ENDIF
+ENDFUNC 1
+
+
+
+//install a handler for writes to characteristic values
+ONEVENT  EVCHARDESC   CALL HandlerCharDesc
+ONEVENT  EVBLEMSG  CALL HndlrBleMsg
+
+OnStartup()
+
+//wait for events and messages
+WAITEVENT
+
+CloseConnections()
+PRINT "\nExiting..."

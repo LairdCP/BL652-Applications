@@ -1,0 +1,14 @@
+// Example :: EVUARTTXEMPTY.sb
+FUNCTION HndlrUartTxEty()
+  PRINT "\nTx buffer is empty"
+ENDFUNC 0 									
+
+ONEVENT EVUARTTXEMPTY CALL HndlrUartTxEty
+
+PRINT "\nSend this via uart"
+
+WAITEVENT     								
+
+
+
+

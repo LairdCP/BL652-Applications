@@ -1,0 +1,20 @@
+//Example :: UartRead.sb
+//***Use UartReadBetter.sb***
+DIM rc,strLength,str$
+
+FUNCTION HndlrUartRx()
+	WHILE UartInfo(3)!=0
+		strLength=UartRead(str$)
+	ENDWHILE
+
+	PRINT "\n";str$
+
+ENDFUNC 0
+	
+str$="Your name is "
+
+ONEVENT EVUARTRX CALL HndlrUartRx
+
+PRINT "\nWhat is your name?\n"
+
+WAITEVENT

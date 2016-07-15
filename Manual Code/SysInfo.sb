@@ -1,0 +1,4 @@
+//Example :: SysInfo.sb
+PRINT "\nSysInfo 601   = ";SYSINFO(601)    // Flash File System: Total Space (Data Segment)
+PRINT "\nSysInfo 2300   = ";SYSINFO(2300)    // Current system clock speed
+PRINT "\nSysInfo 1002 = ";SYSINFO(1002)  // Minimum UART baud rate

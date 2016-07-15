@@ -1,0 +1,32 @@
+//Example :: BleCharDescPrstnFrmt.sb
+
+DIM rc, metaSuccess,usrDesc$ : usrDesc$="A description" 
+DIM charUuid : charUuid = BleHandleUuid16(1)
+DIM charMet : charMet = BleAttrMetaData(1,1,20,0,metaSuccess)
+DIM mdUsrDsc : mdUsrDsc = BleAttrMetaData(1,1,20,0,metaSuccess)
+DIM mdSccd : mdSccd = BleAttrMetadata(1,1,2,0,rc)   //CCCD metadata for char
+           
+//initialise char, write/read enabled, accept signed writes, indicatable
+rc=BleCharNew(0x4B,charUuid,charMet,0,mdSccd)     
+rc=BleCharDescUserDesc(usrDesc$,mdUsrDsc)
+
+IF rc==0 THEN
+    PRINT "\nChar created and User Description '";usrDesc$;"' added"
+ELSE
+    PRINT "\nFailed"
+ENDIF
+
+// ~ ~ ~
+// other optional descriptors
+// ~ ~ ~
+
+// 16 bit signed integer = 0x0E
+// exponent = 2
+// unit = 0x271A ( amount concentration (mole per cubic metre) )
+// namespace = 0x01 == Bluetooth SIG
+// description = 0x0000 == unknown
+IF BleCharDescPrstnFrmt(0x0E,2,0x271A,0x01,0x0000)==0 THEN
+    PRINT "\nPresentation Format Descriptor added"
+ELSE
+    PRINT "\nPresentation Format Descriptor not added"
+ENDIF

@@ -1,0 +1,32 @@
+//Example :: BleVSpWrite.sb (See in BL652CodeSnippets.zip)
+
+DIM tx$,rc,scRpt$,adRpt$,addr$,hndl,cnt
+
+//handler when VSP tx buffer is empty
+FUNCTION HandlerVSpTxEmpty() AS INTEGER
+    cnt=cnt+1
+    IF cnt<= 2 THEN
+        tx$="then this is sent"
+        rc = BleVSpWrite(tx$)  
+    ENDIF
+
+ENDFUNC 0
+
+rc = BleVSpOpen(128,128,0,hndl)
+rc = BleScanRptInit(scRpt$)
+rc = BleAdvRptAddUuid128(scRpt$,hndl)
+adRpt$=""
+rc = BleAdvRptsCommit(adRpt$,scRpt$)
+addr$=""  
+rc = BleAdvertStart(0,addr$,20,300000,0)
+PRINT "\nDevice name is "; BleGetDeviceName$()
+
+cnt=1
+tx$="send this data and "
+rc = BleVSpWrite(tx$)
+
+ONEVENT  EVVSPTXEMPTY  CALL HandlerVSpTxEmpty
+
+WAITEVENT
+
+PRINT "\nExiting..."

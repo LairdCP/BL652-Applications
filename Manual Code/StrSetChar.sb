@@ -1,0 +1,12 @@
+//Example :: StrSetChar.sb
+DIM s$
+s$="Hello"
+PRINT StrSetChr(s$,64,0)        //64 is the ASCII decimal code for the char '@' 
+PRINT StrSetChr(s$,64,5)        //5 is greater than the length of s$ by 1
+                                //So s$ is extended and '@' is appended up to
+                                //index 5
+                               
+PRINT StrSetChr(s$,64,8)        //Again, 8 is greater than the length of s$         
+                                //So s$ is extended and '@' is appended up to
+                                //index 8
+PRINT "\n";s$   

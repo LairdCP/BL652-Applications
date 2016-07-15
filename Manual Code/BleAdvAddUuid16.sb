@@ -1,0 +1,16 @@
+//Example :: BleAdvAddUuid16.sb
+DIM advRpt$, rc
+DIM discovMode : discovMode=0 
+DIM advAppearance : advAppearance = 1
+DIM maxDevName : maxDevName = 10
+
+rc = BleAdvRptInit(advRpt$, discovMode, advAppearance, maxDevName)
+
+//BatteryService =  0x180F
+//DeviceInfoService = 0x180A
+
+IF BleAdvRptAddUuid16(advRpt$,0x180F,0x180A, -1, -1, -1, -1)==0 THEN
+    PRINT "\nUUID Service List AD added"
+ENDIF
+
+//Only the battery and device information services are included in the advert report

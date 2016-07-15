@@ -1,0 +1,26 @@
+//Example :: BleConnectConfig.sb
+DIM rc, startTick
+
+SUB GetParms()
+    //get default scan interval for connecting
+    PRINT "\nConnecting Scan Interval: "; SysInfo(2100);"ms"
+    //get default scan window for connecting
+    PRINT "\nConnecting Scan Window: "; SysInfo(2101);"ms"
+    //get default slave latency for connecting
+    PRINT "\nConnecting Slave Latency: "; SysInfo(2102)
+    //get current multi-link connection interval periodicity
+    PRINT "\nMulti-Link connection Interval Periodicity: "; SysInfo(2105);"ms"
+ENDSUB
+
+PRINT "\n\n--- Current Parameters:"
+GetParms()
+
+PRINT "\n\nSetting new parameters..."
+rc = BleConnectConfig(0, 60)               //set scan interval to 60
+rc = BleConnectConfig(1, 13)               //set scan window to 13 (will round to 12)
+rc = BleConnectConfig(2, 3)                //set slave latency to 3
+rc = BleConnectConfig(5, 30)               //set ML connection interval periodicity to 30
+PRINT "\n"; integer.h'rc
+
+PRINT "\n\n--- New Parameters:"
+GetParms()

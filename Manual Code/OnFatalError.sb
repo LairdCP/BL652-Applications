@@ -1,0 +1,14 @@
+//Example :: OnFatalError.sb
+SUB MySub()
+	MySub()
+ENDSUB
+
+MySub()
+
+SUB HndlOnFtlErr()
+    PRINT "\nFatal error occured"
+ENDSUB 
+
+
+
+ONFATALERROR NEXT HndlOnFtlErr

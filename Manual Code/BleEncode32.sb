@@ -1,0 +1,11 @@
+//Example :: BleEncode32.sb
+
+DIM rc
+DIM attr$ : attr$="Laird"
+
+//write 'BCDE' to index 1 
+rc=BleEncode32(attr$,0x45444342,1)
+//write 'A' to index 0
+rc=BleEncode8(attr$,0x41,0)
+
+PRINT "attr$=";attr$   

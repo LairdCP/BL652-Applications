@@ -1,0 +1,15 @@
+//Example :: BleVspOpen.sb
+
+DIM scRpt$,adRpt$,addr$,vspSvcHndl
+
+//Close VSP if already open
+IF BleVSpInfo(0)!=0 THEN
+    BleVSpClose()    
+ENDIF
+
+//Open VSP
+IF BleVSpOpen(128,128,0,vspSvcHndl)==0 THEN
+    PRINT "\nVSP service opened"
+ELSE
+    PRINT "\nFailed"
+ENDIF

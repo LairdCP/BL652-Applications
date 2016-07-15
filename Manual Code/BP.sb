@@ -1,0 +1,9 @@
+//Example :: BP.sb
+PRINT "hello"
+BP 1234
+PRINT "world"
+PRINT "Laird"
+PRINT "Rocks"
+BP 5678
+PRINT "the"
+PRINT "world"

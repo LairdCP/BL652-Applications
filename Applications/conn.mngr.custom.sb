@@ -1,0 +1,128 @@
+// Copyright (c) 2013, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++            In this case $autorun$ will be the filename               ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+//
+// LT Connection Manager Service example
+//      This demonstrates a workaround for the disconnect delay associated
+//      with iOS. Now instead of locally calling a disconnect function, the iOS
+//      app can write the special magic value D15C (0x5CD1) to a custom value.
+//
+// "conn.mngr.custom.sb"
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// When UwTerminal downloads the app it will store it as conn
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+        //Laird Technologies 128 bit Base UUID
+#define LT_BASE_UUID                         "\56\9a\00\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c\"
+        //Connection Manager Service 16 bit UUID
+#define CONNMNGR_SVC_UUID                     0x1901
+        //Disconnect Proxy Characteristic 16 bit UUID
+#define DISCON_CHAR_UUID                      0x2020
+
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim rc          //Result code
+dim hConn       //Connection handle
+dim hChar       //Characteristic handle
+dim addr$       //Peer address
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+Sub OnStartup()
+    dim bseUuid$ : bseUuid$ = LT_BASE_UUID                  //LT Base Uuid
+    dim hBseUuid : hBseUuid = BleHandleUuid128(bseUuid$)    //LT Base uuid handle
+    dim hSvc                                                //Service handle
+    dim hUuidSvc                                            //Service uuid handle
+    dim hUuidChar                                           //Characteristic uuid handle
+    dim attr$                                               //Empty char value variable
+
+    //Initialise Service
+    hUuidSvc=BleHandleUuidSibling(hBseUuid, CONNMNGR_SVC_UUID)
+    rc=BleServiceNew(1,hUuidSvc, hSvc)
+
+    //Commit char to GATT table
+    hUuidChar=BleHandleUuidSibling(hBseUuid, DISCON_CHAR_UUID)
+    rc=BleCharNew(0x08,hUuidChar,BleAttrMetaData(0,1,2,0,rc),0,0)
+    attr$="\00\00"
+    rc=BleCharCommit(hSvc,attr$,hChar)
+
+    //Commit service to GATT table
+    rc=BleServiceCommit(hSvc)
+EndSub
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+Function HndlrBleMsg(msgID, hCon)
+    hConn = hCon
+    select msgID
+        case 0
+            print "\n --- New connection"
+            print "\n Write 'D15C' to the Disconnect Proxy characteristic"
+        case 1
+            print "\n --- Disconnected"
+            ExitFunc 0
+        case else
+    endselect
+EndFunc 1
+
+Function HndlrCharVal(char, offset, len)
+    dim val$
+    if char==hCHar then
+        rc=BleCharValueRead(hChar, val$)
+        print "\nChar Val: "; StrHexize$(val$)
+        if StrCmp(val$,"\D1\5C")==0 then
+            rc=BleDisconnect(hConn)
+        endif
+    endif
+EndFunc 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+OnStartup()
+
+OnEvent EvBleMsg   call HndlrBleMsg
+OnEvent EvCharVal  call HndlrCharVal
+
+//Start advertising
+rc=BleAdvertStart(0,addr$,100,0,0)
+print "\nMake a connection to the BL652"
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+waitevent

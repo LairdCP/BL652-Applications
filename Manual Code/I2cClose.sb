@@ -1,0 +1,12 @@
+//Example :: I2cClose.sb
+DIM handle
+DIM rc : rc=I2cOpen(100000,0,handle)
+
+IF rc!= 0 THEN
+	PRINT "\nFailed to open I2C interface with error code ";INTEGER.h' rc
+ELSE
+	PRINT "\nI2C open success \nHandle is ";handle
+ENDIF
+
+I2cClose(handle)  //close the port
+I2cClose(handle)  //no harm done doing it again

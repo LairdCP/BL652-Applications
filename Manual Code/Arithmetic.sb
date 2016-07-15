@@ -1,0 +1,15 @@
+//Example :: Arithmetic.sb
+
+DIM sum1,bit1,bit2
+bit1 = 2
+bit2 = 3
+
+DIM volume,height,area
+height = 5
+area = 20
+
+sum1 = bit1 + bit2
+volume = height * area
+
+print "\nSum1 = ";sum1
+print "\nVolume = ";volume;"\n"

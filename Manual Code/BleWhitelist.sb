@@ -1,0 +1,96 @@
+//Example :: BleWhitelist.sb
+
+DIM rc,conHndl,hWlist, val
+DIM addr$ : addr$=""    
+
+//==============================================================================
+//==============================================================================
+sub AssertRC(byval tag as integer)
+  if rc!=0 then
+    print "\nFailed with ";integer.h' rc;" at tag ";tag
+  endif
+endsub
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n--- Disconnected from client"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n--- Connected to client"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// This handler is called when there is an advert report waiting to be read
+//==============================================================================
+function HandlerAdvRpt() as integer
+  dim ad$,dta$,ndisc,rsi
+  rc = BleScanGetAdvReport(ad$,dta$,ndisc,rsi)
+  while rc==0
+    print "\nADV:";strhexize$(ad$);" ";strhexize$(dta$);" ";ndisc;" ";rsi
+    rc = BleScanGetAdvReport(ad$,dta$,ndisc,rsi)
+  endwhile
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is an advert report waiting to be read
+//==============================================================================
+sub WhiteListInit()
+  //set invalid whitelist handle
+  hWlist=-1
+  //now check maximum whitelists that can be defined and for that valid handle
+  //is not required
+  rc=BleWhiteListInfo(hWlist,0, val)  //get max number of whitelists allowes
+  AssertRC(100)
+  print "\n Max allowed whitelists = "; val
+
+  //create a whitelist
+  rc=BleWhitelistCreate(hWlist,8,8,0)
+  IF rc==0 THEN
+    //Add address we want to specifically look for
+    addr$="000016A40B1623"
+    rc=BleWhitelistAddAddr(hWlist,addr$)
+    AssertRC(110)
+    //Made a mistake so clear it
+    rc=BleWhitelistClear(hWlist)
+    AssertRC(120)
+    //now add the correct address
+    addr$="000016A40B1642"
+    rc=BleWhitelistAddAddr(hWlist,addr$)
+    AssertRC(130)
+    //now add first one in the trusted database
+    rc=BleWhitelistAddIndex(hWlist,0)
+    AssertRC(140)
+    //Change the filter property from default used in the create function
+    //so that connection requests are disallowed
+    rc=BleWhitelistSetFilter(hWlist,1)
+    AssertRC(150)
+    //now check the whitelist by interogating the whitelist handle
+    rc=BleWhiteListInfo(hWlist,101, val)  //get current number of mac addresses
+    AssertRC(160)
+    print "\n Current number of addresses = "; val
+  ENDIF
+endsub
+
+//==============================================================================
+//==============================================================================
+ONEVENT  EVBLEMSG             CALL HndlrBleMsg
+OnEvent  EVBLE_ADV_REPORT     CALL HandlerAdvRpt
+
+//Initiliase a whitelist
+WhiteListInit()
+
+//start adverts with whiteisting
+addr$=""
+rc=BleAdvertStart(0,addr$,50,0,hWlist)
+AssertRC(910)
+
+//Wait for events
+WAITEVENT
+
+//destroy the whitelist
+BleWhitelistDestroy(hWlist)

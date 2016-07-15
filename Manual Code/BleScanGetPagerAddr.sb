@@ -1,0 +1,30 @@
+//Example :: BleScanGetPagerAddr.sb
+DIM rc
+
+'//Scan for 20 seconds with no filtering
+rc = BleScanStart(10000, 0)
+
+IF rc==0 THEN
+    PRINT "\nScanning"
+ELSE
+    PRINT "\nError: "; INTEGER.H'rc
+ENDIF
+
+'//This handler will be called when scanning times out
+FUNCTION HndlrScanTO()
+    PRINT "\nScan timeout"
+ENDFUNC 0
+
+'//This handler will be called when an advert is received requesting a connection to this module
+FUNCTION HndlrFastPaged()
+    DIM periphAddr$, nRssi
+    rc = BleScanGetPagerAddr(periphAddr$, nRssi)
+    PRINT "\nAdvert received from peripheral "; StrHexize$(periphAddr$); " with RSSI ";nRssi
+    PRINT "\nrequesting a connection to this module"  
+    rc = BleScanStop()
+ENDFUNC 0
+
+ONEVENT EVBLE_SCAN_TIMEOUT CALL HndlrScanTO
+ONEVENT EVBLE_FAST_PAGED   CALL HndlrFastPaged
+
+WAITEVENT

@@ -1,0 +1,20 @@
+//Example :: UartInfo.sb
+DIM rc,start
+
+UartClose()
+
+IF UartInfo(0)==0 THEN
+	PRINT "\nThe Uart port was closed\n"
+ELSE
+	PRINT "\nThe Uart port was not closed\n"
+ENDIF
+
+PRINT "\nReceive ring buffer capacity:			";UartInfo(1)
+PRINT "\nTransmit ring buffer capacity:		";UartInfo(2)
+PRINT "\nNo. bytes waiting in transmit buffer:	";UartInfo(5)	
+
+start = GetTickCount()
+DO
+UNTIL UartInfo(5)==0
+PRINT "\n\nTook ";GetTickSince(start);" milliseconds for transmit buffer to be emptied"
+

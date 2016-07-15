@@ -1,0 +1,46 @@
+//Example :: EVGATTCTOUT.sb
+
+DIM rc,conHndl
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, adRpt$, addr$, scRpt$  
+	rc=BleAdvRptInit(adRpt$, 2, 0, 10)
+	IF rc==0 THEN : rc=BleScanRptInit(scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvRptsCommit(adRpt$,scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvertStart(0,addr$,50,0,0) : ENDIF
+	//open the gatt client with default notify/indicate ring buffer size
+	IF rc==0 THEN : rc = BleGattcOpen(0,0) : ENDIF
+ENDFUNC rc
+
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n- Disconnected"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n- Connected"
+    ENDIF
+ENDFUNC 1
+
+'//==============================================================================
+'//==============================================================================
+function HandlerGattcTout(cHndl) as integer
+    print "\nEVGATTCTOUT connHandle=";cHndl
+endfunc 1
+
+//==============================================================================
+// Main() equivalent
+//==============================================================================
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+OnEvent  EVGATTCTOUT        call HandlerGattcTout
+
+rc = OnStartup()
+
+WAITEVENT

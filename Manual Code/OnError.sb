@@ -1,0 +1,15 @@
+//Example :: OnError.sb
+DIM a,b,c
+SUB HandlerOnErr()				//Do this when an error occurs
+	DIM le
+	le = GetLastError()
+	PRINT "Error code 0x";le;" denotes a Divide by zero error.\n"
+	PRINT "Let's make b equal 25 instead of 0\n\n"
+	b=25
+ENDSUB
+a=100 : b=0
+ONERROR REDO HandlerOnErr 		//Calls the "HandlerOnErr" routine.
+										//After that, the error causing statement 
+										//(below) is reprocessed
+c=a/b
+print "c now equals ";c

@@ -1,0 +1,7 @@
+//Example :: HelloWorld.sb
+
+DIM i as integer		 		//declare our variable
+
+for i=1 to 10		 			//Perform the print ten times
+	print "Hello World \n"  //The \n forces a new line each time
+next	

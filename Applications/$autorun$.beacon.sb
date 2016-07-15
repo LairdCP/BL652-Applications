@@ -1,0 +1,309 @@
+// Copyright (c) 2014, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// This script will send alternating iBeacon and EddyStone advertisements, it shows how to
+// format both iBeacon and EddyStone UID and URL AD records. 
+//
+// These adverts are static and any changes need to be made to the #define values below and the 
+//  script will need to be recompiled and loaded to either a BT900, BL600 or BL652 module. 
+//
+// To calibrate the beacon you will use nRF Master Control Panel for Android and iOS. Measure the
+// TX power at 1m for iBeacon and at 0m for EddyStone and enter the resulting values at lines 
+// 55 and 56 below.
+// 
+//******************************************************//
+// Device Name
+//******************************************************//
+#define DEVICE_NAME        "Laird Beacon"
+//******************************************************//
+//------------------------------------------------------//
+//******************************************************//
+// Apple Specific Settings
+//******************************************************//
+
+//iBeacon Service UUID
+#define IBEACON_SVC_UUID   0x1900
+
+//Apple company ID, required for iBeacon advert
+#define APPLE_COMP_ID      0x004C
+
+//Apple approved iBeacon UUID
+#define APPLE_UUID         "\E2\C5\6D\B5\DF\FB\48\D2\B0\60\D0\F5\A7\10\96\E0"
+//========================================================//
+// Other valid Apple UUIDs:                                     //
+//========================================================//
+//   \5A\4B\CF\CE\17\4E\4B\AC\A8\14\09\2E\77\F6\B7\E5       //
+//   \74\27\8B\DA\B6\44\45\20\8F\0C\72\0E\AF\05\99\35     //
+//========================================================//
+
+//iBeacon Data Type, required for iBeacon advert
+#define BEACON_DATA_TYPE   0x02
+
+//iBeacon Major Number
+#define IBEACON_MAJOR_NUM  0xABBA
+
+//iBeacon Minor Number
+#define IBEACON_MINOR_NUM  0xEFFE
+//*******************************************************//
+//-------------------------------------------------------//
+//*******************************************************//
+// TX power
+// Required for both EddyStone (@0m) and iBeacon (@1m)
+//=======================================================//
+// Valid values: -90 to +8dBm in hexadecimal using a 
+// 2's complement value for negative numbers
+// Example: +4dBm = 0x04
+//          -4dBm = 0xFC
+//*******************************************************//
+#define TX_PWR_IBEACON     0xC4
+#define TX_PWR_EDDY        0xE2
+//*******************************************************//
+//-------------------------------------------------------//
+//*******************************************************//
+// EddyStone Specific Settings
+//*******************************************************//
+
+//Eddystone Service UUID
+#define EDDY_SVC_UUID      0xFEAA
+
+//EddyStone Frame Types
+#define UID                0x00
+#define URL                0x10
+#define TLM                0x20
+#define EID                0x30
+
+//EddyStone UID NameSpace
+//First 10 bytes SHA-1 Hash Conversion of 'lairdtech.com'
+#define EDDY_NAMESPACE     "\A0\14\C1\89\8B\D7\AB\0A\56\B0"
+
+//EddyStone UID Instance
+#define EDDY_INSTANCE      "\01\02\03\04\05\06"
+
+//EddyStone URL Prefix Encoding: http://www.
+#define HTTP               0x00
+//======================================================//
+// Other URL Prefix Encodings:
+//======================================================//
+// https://www.            0x01
+// http://                 0x02
+// https://                0x03
+//======================================================//
+
+//EddyStone URL Identifier Encoding: .com/
+#define COM                0x00
+//======================================================//
+// Other URL Identifier Encodings:
+//======================================================//
+// .org/                   0x01
+// .edu/                   0x02
+// .net/                   0x03
+// .info/                  0x04
+// .biz/                   0x05
+// .gov/                   0x06
+// .com                    0x07
+// .org                    0x08
+// .edu                    0x09
+// .net                    0x0A
+// .info                   0x0B
+// .biz                    0x0C
+// .gov                    0x0D
+//======================================================//
+
+//EddyStone URL
+#define EDDY_URL           "lairdtech"
+
+//AD Record Tags    
+#define FLAGS              0x01
+#define COMPLETE_LCL_NAME  0x09
+
+//Manufacturer Specific Data is required for iBeacon
+#define MANF_DATA          0xFF
+
+//16 bit Service Data is required for EddyStone
+#define SVC_DATA_16BIT     0x16
+
+//Advert Type ADV_SCAN
+//Could be ADV_NONCONN if no scan reports are used
+//Could also be ADV_IND if connectable for configuration 
+#define ADV_TYPE           2
+
+//Advert Interval, time between successive Adverts
+#define ADV_INTVL          250
+
+//Advert Timeout
+//In this app iBeacon and Eddystone will alternate TX with
+//this periodicity
+#define ADV_TMOUT          5000
+
+//Appearance of tag 512 == Generic tag
+#define APPEARANCE         512
+
+//General Discoverability; Limited Discoverability == 1
+#define DISCOVER_MODE      2
+
+//Connection values needed for GAP service regardless 
+//of whether connectable or not
+#define MIN_CONN_INTVL     15000    
+#define MAX_CONN_INTVL     25000
+#define CONN_SUP_TIMEOUT   750000
+#define SLAVE_LATENCY      5
+
+//Device Information Service info
+#define MANF_NAME          "Laird"
+#define MODEL              "Beacons"
+#define SERIAL_NUM         "1234"
+#define HW_REV             "1.0"
+#define APP_REV            "1.0" 
+#define SYSID              ""
+#define REGLST             ""
+#define PPID               ""
+
+//--------------------------------------------------------------------------------------
+// Global Variable Declarations
+//--------------------------------------------------------------------------------------
+dim rc
+//adRpt$ and scanRpt$ for iBeacon adverts
+dim adRpt$ : adRpt$ = ""
+dim scanRpt$ : scanRpt$ = ""
+//adRptE$ and scanRptE$ for EddyStone adverts
+dim adRptE$ : adRptE$ = ""
+dim scanRptE$ : scanRptE$ = ""
+//Keeps track of which advert cycle we are in, iBeacon vs. EddyStone
+dim advcyc : advcyc = 0
+
+Function SwapBytes(v)
+Endfunc ((v>>8)&0xFF) + ((v<<8)&0xFF00)
+
+Function iBeacon$()
+// Build iBeacon String, Only building Full string no options for partial strings in this example
+//---------------------------------------------------------------------------------------- 
+//Format:
+    // 0 1  2  3  4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9  0 1  2 3  4
+    // CompanyID
+    //      DataType
+    //         Length
+    //            UUID
+    //                                             Major
+    //                                                  Minor
+    //                                                       TxPower
+    // 4C00 02 15 E2C56DB5DFFB48D2B060D0F5A71096E0 BAAB FEEF C4
+//-----------------------------------------------------------------------------------------
+    dim ibeac$, maj$, min$, txpwr$, fibeac$
+
+    rc = BleEncode16(ibeac$,APPLE_COMP_ID,0)
+    rc = BleEncode8(ibeac$,BEACON_DATA_TYPE,2)
+    rc = BleEncode8(ibeac$,0x15,3) //Length of ibeacon data
+    rc = BleEncode16(maj$,SwapBytes(IBEACON_MAJOR_NUM),0)
+    rc = BleEncode16(min$,SwapBytes(IBEACON_MINOR_NUM),0)
+    rc = BleEncode8(txpwr$,TX_PWR_IBEACON,0)
+    fibeac$ = ibeac$ + APPLE_UUID + maj$ + min$ + txpwr$
+endfunc fibeac$
+
+    
+Function EddyStone1$()
+// Build EddyStone UID String
+//----------------------------------------------------
+//Format:
+    // 0 1  2  3  4 5 6 7 8 9 0 1 2 3  4 5 6 7 8 9  
+    // EddyStone_Svc_UUID
+    //      Frame_Type
+    //         TX_Power    
+    //            EddyStone_Namespace
+    //                                 EddyStone_Instance
+    // AAFE 00 E2 A014C1898BD7AB0A56B0 010203040506 
+//----------------------------------------------------
+    dim eddy1$, feddy1$
+
+    rc = BleEncode16(eddy1$,EDDY_SVC_UUID,0)
+    rc = BleEncode8(eddy1$,UID,2)
+    rc = BleEncode8(eddy1$,TX_PWR_EDDY,3)
+    feddy1$ = eddy1$ + EDDY_NAMESPACE + EDDY_INSTANCE
+endfunc feddy1$
+
+
+Function EddyStone2$()
+// Build EddyStone UID String
+//------------------------------------------------------------------
+//Format:
+    // 0 1  2  3  4 5 6 7 8 9 0 1 2 3 4 5
+    // EddyStone_Svc_UUID
+    //      Frame_Type
+    //         TX_Power
+    //            EddyStone_URL
+    // AAFE 10 E2 00646576696365776F727800
+//------------------------------------------------------------------
+    dim eddy2$, http$, com$, feddy2$
+
+    rc = BleEncode16(eddy2$,EDDY_SVC_UUID,0)
+    rc = BleEncode8(eddy2$,URL,2)
+    rc = BleEncode8(eddy2$,TX_PWR_EDDY,3)
+    rc = BleEncode8(http$,HTTP,0)
+    rc = BleEncode8(com$,COM,0)
+
+    feddy2$ = eddy2$ + http$ + EDDY_URL + com$
+endfunc feddy2$
+
+Sub Startup()
+    rc = BleGapSvcInit(DEVICE_NAME,0,APPEARANCE,MIN_CONN_INTVL,MAX_CONN_INTVL,CONN_SUP_TIMEOUT,SLAVE_LATENCY)
+    rc = BleSvcRegDevInfo(MANF_NAME,MODEL,SERIAL_NUM,HW_REV,APP_REV,SYSID,REGLST,PPID)
+endsub
+
+Sub BuildAdverts()
+    dim iBeacAD$ : iBeacAD$ = iBeacon$()
+    dim EddyAD1$ : EddyAD1$ = EddyStone1$()
+    dim EddyAD2$ : EddyAD2$ = EddyStone2$()
+    dim devname$ : devname$ = DEVICE_NAME
+
+    //Initialize adRpt$ and scanRpt$ for iBeacon
+    rc = BleAdvRptInit(adRpt$,DISCOVER_MODE,0,0)
+    rc = BleScanRptInit(scanRpt$)
+
+    //Initialize adRptE$ and scanRptE$ for EddyStone
+    rc = BleAdvRptInit(adRptE$,DISCOVER_MODE,0,0)
+    rc = BleScanRptInit(scanRptE$)
+
+    //Build iBeacon Advert and Scan AD elements
+    rc = BleAdvRptAppendAD(adRpt$,MANF_DATA,iBeacAD$)
+    rc = BleAdvRptAppendAD(scanRpt$,COMPLETE_LCL_NAME,devname$)
+
+    //Build EddyStone Advert and Scan AD elements
+    rc = BleAdvRptAddUuid16(adRptE$,EDDY_SVC_UUID,-1,-1,-1,-1,-1)
+    rc = BleAdvRptAppendAD(adRptE$,SVC_DATA_16BIT,EddyAD1$)
+    rc = BleAdvRptAppendAD(scanRptE$,SVC_DATA_16BIT,EddyAD2$)
+    rc = BleAdvRptAppendAD(scanRptE$,COMPLETE_LCL_NAME,devname$)
+endsub
+
+Function StartAds()
+    dim peer$ : peer$ = ""
+
+    if advcyc == 0 then
+        rc = BleAdvRptsCommit(adRpt$,scanRpt$)
+        rc = BleAdvertStart(ADV_TYPE,peer$,ADV_INTVL,ADV_TMOUT,0)
+        advcyc = 1
+    else
+        rc = BleAdvRptsCommit(adRptE$,scanRptE$)
+        rc = BleAdvertStart(ADV_TYPE,peer$,ADV_INTVL,ADV_TMOUT,0)
+        advcyc = 0
+    endif
+endfunc 1
+
+ONEVENT EVBLE_ADV_TIMEOUT    CALL    StartAds
+
+Startup()
+BuildAdverts()
+rc = StartAds()
+
+WaitEvent

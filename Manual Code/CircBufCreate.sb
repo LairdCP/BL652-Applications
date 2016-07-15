@@ -1,0 +1,14 @@
+//Example :: CircBufCreate.sb
+DIM circHandle, circHandle2, rc
+
+rc = CircBufCreate(16,circHandle)
+PRINT "\n";rc
+IF rc!=0 THEN
+	PRINT "\nThe circular buffer ";circHandle; "was not created"
+ENDIF
+
+rc = CircBufCreate(32000,circHandle2)
+PRINT "\n\n";rc
+IF rc!=0 THEN
+	PRINT "\n---> The circular buffer 'circHandle2' was not created"
+ENDIF

@@ -1,0 +1,9 @@
+//Example :: BleEncodeBits.sb
+
+DIM bA
+DIM attr$ : attr$=""
+
+//copy 5 bits from index 7 to string attr$
+ba=b'1110100001111
+PRINT BleEncodeBITS(attr$,20,bA,7,5)
+PRINT "\n";attr$

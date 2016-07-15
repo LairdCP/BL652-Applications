@@ -1,0 +1,2595 @@
+// Copyright (c) 2014, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+//TODO: Isolate carrat checking thing into its own function so that you can use it across apps easily
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// This app provides for a command interface over the uart and the protocol is
+// as follows:-
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Convention : (1) Case sensitive, and commands are presented in alphabetic order
+//              (2) If line ends with \ then it continues on next line. That does
+//                  not mean that it should be sent as multiple lines
+//              (3) Replace anything between ##
+//              (4) #INTaaaa# means a number in decimal, hex, octal or binary
+//                      format -> 23 == 0x17 == h'17 == o'23 == b'10111
+//                      aaaa is just a description
+//              (5) #HEXaaaa# means a string without delimitors consisting of hex
+//                      characters only aaaa is just a description
+//              (6) #STRaaaa# means a string without delimitors
+//                      aaaa is just a description
+//              (7) "STRaaaa" means a string which must have the " delimitor
+//                      aaaa is just a description
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// -----------------------------------------------------------------------------
+// bridge vsp
+//   - Bridge to the most recent VSP connection. All data arriving via UART will
+//     be sent over BLE via the VSP service.
+//
+// -----------------------------------------------------------------------------
+// bridge spp
+//   - Bridge to the most recent SPP connection. All data arriving via UART will
+//     be sent over this connection.
+//
+// -----------------------------------------------------------------------------
+// ^^^
+//   - Switch to command parser mode
+//
+// -----------------------------------------------------------------------------
+// advert report initadv #INTstridx# #INTadflags# #INTadappearance# #INTmaxdevname#
+//   - Initialise an advert report and store in string s$[#INTstridx#]
+//   - and populate it with flags AD with value #INTadflags#, apperance AD if
+//   - #INTadappearance# is 1 and device name (full or partial) based on the
+//   - value of #INTmaxdevname#
+//
+// -----------------------------------------------------------------------------
+// advert report initscn #INTstridx#
+//   - Initialise an advert scan report and store in string s$[#INTstridx#]
+//
+// -----------------------------------------------------------------------------
+// advert report ADuuid16 #INTstridx# #INTuuid0# #INTuuid1# #INTuuid2# #INTuuid3# #INTuuid4# #INTuuid5#
+//   - Append the advert report idendified by string s$[#INTstridx#] with
+//   - the service uuid 16 AD element with up to 6 16 bit uuids. If less than 6 uuids
+//   - are specified then set 0's and they will not be added
+//
+// -----------------------------------------------------------------------------
+// advert report ADuuid128 #INTstridx# #INTuuidhandle#
+//   - Append the advert report idendified by string s$[#INTstridx#] with
+//   - the service uuid 128 AD element and the 128 bit uuid is supplied by a
+//   - uuid handle that will have been returned from BleHandleUuid128() or
+//   - BleHandleUuidSibling() -- see the 'uuid' commands below
+//
+// -----------------------------------------------------------------------------
+// advert report ADany #INTstridx# #INTtag# #HEXdata$#
+//   - Append the advert report idendified by string s$[#INTstridx#] with
+//   - generic AD element whos tag will be #INTtag# and the data is as
+//   - per the data in #HEXdata$# which will be converted from a hx string
+//   - into a binary string before submitting to the stack
+//
+// -----------------------------------------------------------------------------
+// advert report commit #INTstridx0# #INTstridx1#
+//   - This is used to commit the advert and/or scan report to the stack.
+//   - The reports are in string s$[#INTstridx0#] and s$[#INTstridx1#]
+//   - and if any of them are empty strings, they will not be submitted
+//
+// -----------------------------------------------------------------------------
+// advert undirected #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
+//   - Use this to start adverts of type ADV_IND using the parameters specified
+//   - #INTfilterpolicy# is 0=Any, 1=Filter Scans, 2= Filer Conns, 3 = Filter both
+//   -   basically if #INTfilterpolicy# != 0 then filter is enabled and the whitelist
+//   -   is created from the trusted device database.
+//
+// -----------------------------------------------------------------------------
+// advert scan #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
+//   - Use this to start adverts of type ADV_SCAN_IND using the parameters specified
+//   - #INTfilterpolicy# is 0=Any, 1=Filter Scans, 2= Filer Conns, 3 = Filter both
+//   -   basically if #INTfilterpolicy# != 0 then filter is enabled and the whitelist
+//   -   is created from the trusted device database.
+//
+// -----------------------------------------------------------------------------
+// advert nonconn #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
+//   - Use this to start adverts of type ADV_NONCONN_IND using the parameters specified
+//   - #INTfilterpolicy# is 0=Any, 1=Filter Scans, 2= Filer Conns, 3 = Filter both
+//   -   basically if #INTfilterpolicy# != 0 then filter is enabled and the whitelist
+//   -   is created from the trusted device database.
+//
+// -----------------------------------------------------------------------------
+// advert directed         #INTintervalms# #INTtimeoutms# #INTfilterpolicy# #HEXaddr7Bytes#
+//   - Use this to start adverts of type ADV_DIRECT_IND using the parameters specified
+//   - and will be directed to the mac address #HEXaddr7Bytes#
+//   - #INTfilterpolicy# is 0=Any, 1=Filter Scans, 2= Filer Conns, 3 = Filter both
+//   -   basically if #INTfilterpolicy# != 0 then filter is enabled and the whitelist
+//   -   is created from the trusted device database.
+//
+// -----------------------------------------------------------------------------
+// advert stop
+//   - Use this to stop adverts
+//
+// -----------------------------------------------------------------------------
+// connect #HEXaddr7Bytes# #INTconntimeoutms# #INTminConnIntMs# #INTmaxConnIntMs# #INTsprvsnToutMs#
+//   - connect to peripheral with mac address #HEXaddr7Bytes# using parameters speccified
+//
+// -----------------------------------------------------------------------------
+// connect cancel
+//   - abort a connection attempt before it the self-timeout
+//
+// -----------------------------------------------------------------------------
+// connect config #INTcfgID# #INTvalue#
+//   - set connection configuration parameters
+//     #INTcfgID#
+//       0    Scan Interval in milliseconds (range 0..10240)
+//       1    Scan Window in milliseconds (range 0..10240)
+//       2    Slave Latency (0..1000)
+//       5    Multi-Link Connection Interval Periodicity (20..200)
+//
+// -----------------------------------------------------------------------------
+// disconnect #INTconnHandle#
+//    - disconnect the connection associated with the handle
+//
+// -----------------------------------------------------------------------------
+// gattc char first #INTconnHandle# #INTuuidHandle# #INTsvcStartAttrHandle# \
+//                  #INTsvcEndAttrHandle#
+//    --- gatt client functionality ---
+//    - Find the first characteristic starting from handle #INTsvcStartAttrHandle#
+//    - in the connection specified by #INTconnHandle# and specify a value of 0 for
+//    - #INTuuidHandle# to look for any characteristic, otherwise a uuid handle
+//    - that will have been obtained by using the uuid command
+//
+// -----------------------------------------------------------------------------
+// gattc char next #INTconnHandle#
+//    --- gatt client functionality ---
+//    - After calling 'gattc char first' command and getting a characteristic use
+//    - this command to get the next characteristic in the remote server for the
+//    - service that was identified by #INTsvcStartAttrHandle# in the
+//    - 'gatt char first' command
+//
+// -----------------------------------------------------------------------------
+// gattc close
+//    --- gatt client functionality ---
+//    - Close the gatt client and release heap memory
+//
+// -----------------------------------------------------------------------------
+// gattc desc first #INTconnHandle# #INTuuidHandle# #characteristic#
+//    --- gatt client functionality ---
+//    - Find the first descriptor for the characteristic whose value handle is
+//    - has the handle #INTcharStartAttrHandle# in the connection specified by
+//    - #INTconnHandle# and specify a value of 0 for #INTuuidHandle# to look for
+//    - any descriptor, otherwise a uuid handle that will have been obtained by
+//    - using the uuid command
+//
+// -----------------------------------------------------------------------------
+// gattc desc next #INTconnHandle#
+//    --- gatt client functionality ---
+//    - After calling 'gattc desc first' command and getting a descriptor use
+//    - this command to get the next descriptor in the remote server for the
+//    - characteristic that was identified by #characteristic# in the
+//    - 'gatt desc first' command
+//
+// -----------------------------------------------------------------------------
+// gattc findchar #INTconnHandle# #INTsvcUuidHandle# #INTsvcIndex# \
+//                #INTcharUuidHandle# #INTcharIndex#
+//    --- gatt client functionality ---
+//    - Use this command to locate a characteristic in a service. It is possible
+//    - to specify index values for both service and characteristic just in case
+//    - the remote server has multiple instances of service or characteristic
+//
+// -----------------------------------------------------------------------------
+// gattc finddesc #INTconnHandle# #INTsvcUuidHandle# #INTsvcIndex# \
+//                #INTcharUuidHandle# #INTcharIndex# #INTdescUuidHandle# \
+//                #INTdescIndex#
+//    --- gatt client functionality ---
+//    - Use this command to locate a descriptor in a characteristic of a specified
+//    - service. It is possible to specify index values for service, characteristic
+//    - and descriptor just in case the remote server has multiple instances of
+//    - service or characteristic or descriptor
+//
+// -----------------------------------------------------------------------------
+// gattc open #INTbuflen# #INTflags#
+//    --- gatt client functionality ---
+//    - Open the gatt client
+//
+// -----------------------------------------------------------------------------
+// gattc read #INTconnHandle# #INTattrHandle# #INToffset#
+//    --- gatt client functionality ---
+//    - Use this command to read the content of any particular attribute
+//    - in a remote server
+//
+// -----------------------------------------------------------------------------
+// gattc svc first #INTconnHandle# #INTstartAttrHandle# #INTsvcUuidHandle#
+//    --- gatt client functionality ---
+//    - Find the first service starting from handle #INTstartAttrHandle# in the
+//    - connection specified by #INTconnHandle# and specify a value of 0 for
+//    - #INTsvcUuidHandle# to look for any service, otherwise a uuid handle
+//    - that will have been obtained by using the uuid command
+//
+// -----------------------------------------------------------------------------
+// gattc svc next #INTconnHandle#
+//    --- gatt client functionality ---
+//    - After calling 'gattc svc first' command and getting a service use this
+//    - command to get the next service in the remote server
+//
+// -----------------------------------------------------------------------------
+// gattc tablemap #INTconnHandle#
+//    --- gatt client functionality CANNED ---
+//    - used to obtain the structure of the entire gatt table in the device
+//    - identified by the connection handle
+//    - ERROR 00000008 will be returned if gatt client is not idle
+//
+// -----------------------------------------------------------------------------
+// gattc write #INTconnHandle# #INTattrHandle# #HEXdata#
+//    --- gatt client functionality ---
+//    - Use this command to write a new value into an attribute of a remote
+//    - server and the data is specified as hex digits which will be converted
+//    - to binary before transmission
+//
+// -----------------------------------------------------------------------------
+// gattc write$ #INTconnHandle# #INTattrHandle# #STRdata#
+//    --- gatt client functionality ---
+//    - Use this command to write a new value into an attribute of a remote
+//    - server and the data is specified as a string
+//
+// -----------------------------------------------------------------------------
+// gattc writecmd #INTconnHandle# #INTattrHandle# #HEXdata#
+//    --- gatt client functionality ---
+//    - Use this command to write a new value into an attribute of a remote
+//    - server and the data is specified as hex digits which will be converted
+//    - to binary before transmission, without waiting for a response from the
+//    - GATT server
+//
+// -----------------------------------------------------------------------------
+// gattc writecmd$ #INTconnHandle# #INTattrHandle# #STRdata#
+//    --- gatt client functionality ---
+//    - Use this command to write a new value into an attribute of a remote
+//    - server and the data is specified as a string, without waiting for a
+//    - response from the GATT server
+//
+// -----------------------------------------------------------------------------
+// gatts attrmetadata #INTmdindex# #INTreadrights# #INTwriterights# #INTmaxdatalen# #INTvlen#
+//    --- gatt server functionality ---
+//    - calls BleAttrMetaData()
+//    - generate attribute metadata and store in amd[#INTmdindex#]
+//
+// -----------------------------------------------------------------------------
+// gatts char commit #STRattr# #INThsvcidx# #INTcharhandleidx#
+//    --- gatt server functionality ---
+//    - calls BleCharCommit()
+//    - Commit the characteristic and store the handle for the char in hChar[#INTcharhandleidx#]
+//
+// -----------------------------------------------------------------------------
+// gatts char descadd #STRattr# #INThuuid# #INTmddescidx#
+//    --- gatt server functionality ---
+//    - calls BleCharDescAdd()
+//    - add a generic descriptor to the character definition which has uuid #INThuuid#
+//    - and metadata amd[#INTmddescidx#]
+//
+// -----------------------------------------------------------------------------
+// gatts char descread #INTcharhandleidx# #INTdeschandle# #INToffset# #INTlength# #INTdescuuidhandle# #STRattr$#
+//    --- gatt server functionality ---
+//    - calls BleCharDescRead()
+//    - Use this to read the value of a descriptor that has been updated and
+//    - you will know because EVCHARDESC has been thrown
+//
+// -----------------------------------------------------------------------------
+// gatts char descprstnfrmt #INTformat# #INTexponent# #INTunit# #INTnamespace# #INTnsdesc#
+//    --- gatt server functionality ---
+//    - calls BleCharDescPrstnFrmt()
+//    - add the presentation format descriptor to the character definition
+//
+// -----------------------------------------------------------------------------
+// gatts char descuserdesc #STRuserdesc$# #INTmduseridx#
+//    --- gatt server functionality ---
+//    - calls BleCharDescUserDesc()
+//    - add the user descriptor to the character definition
+//
+// -----------------------------------------------------------------------------
+// gatts char indicate  #INTcharhandleidx# #STRattr#
+//    --- gatt server functionality ---
+//    - calls BleCharValueIndicate()
+//    - Write to the value of hChar[#INTcharhandleidx#] into the string specified
+//
+// -----------------------------------------------------------------------------
+// gatts char new #INTcharprops# #INThuuid# #INTmdvalidx# #INTmdcccdidx# #INTmdsccdidx#
+//    --- gatt server functionality ---
+//    - calls BleCharNew()
+//    - start the definition of a characteristic and is not commited to the table yet
+//
+// -----------------------------------------------------------------------------
+// gatts char notify  #INTcharhandleidx# #STRattr#
+//    --- gatt server functionality ---
+//    - calls BleCharValueNotify()
+//    - Write to the value of hChar[#INTcharhandleidx#] into the string specified
+//
+// -----------------------------------------------------------------------------
+// gatts char read  #INTcharhandleidx# #STRattr#
+//    --- gatt server functionality ---
+//    - calls BleCharValueRead()
+//    - Read the value of hChar[#INTcharhandleidx#] into the string specified
+//
+// -----------------------------------------------------------------------------
+// gatts char write  #INTcharhandleidx# #STRattr#
+//    --- gatt server functionality ---
+//    - calls BleCharValueWrite()
+//    - Write to the value of hChar[#INTcharhandleidx#] into the string specified
+//
+// -----------------------------------------------------------------------------
+// gatts getdevname
+//    --- gatt server functionality ---
+//    - calls BleGetDeviceName$() and prints the returned name
+//
+// -----------------------------------------------------------------------------
+// gatts service commit #INTstoreIndex#
+//    --- gatt server functionality ---
+//    - calls BleServiceCommit()
+//    - commit the service. In BL600 it is not required, BT900 it is
+//
+// -----------------------------------------------------------------------------
+// gatts service devinfo
+//    --- gatt server functionality ---
+//    - calls BleSvcRegDevInfo() and used to add  a device info service to the gatt table
+//    - It takes 8 string parameters. s$[0] to s$[7]. which must be initialised
+//    - using the command 'misc s$ set #INTidx# #STRescapedvalue#'
+//
+// -----------------------------------------------------------------------------
+// gatts service gap #STRescaped_devname# #INTwritable# #INTappearance# #INTminconnintus# #INTmaxconnintus# #INTsprtmoutus# #INTslavelatency#
+//    --- gatt server functionality ---
+//    - calls BleGapSvcInit() and used to update the gap service to the gatt table
+//
+// -----------------------------------------------------------------------------
+// gatts service new #INTtype# #INThUuid# #INTstoreIndex#
+//    --- gatt server functionality ---
+//    - calls BleServiceNew()
+//    - start a new service decleration. The handle for the service is returned
+//    - in hSvc[#INTstoreIndex#] which is then subsequently used in char devclerations
+//
+// -----------------------------------------------------------------------------
+// misc i  clearall
+//    - make all elements of the entire i[] array equal to 0
+//
+// -----------------------------------------------------------------------------
+// misc i set #INTidx# #INTval#
+//    - i[#INTidx#] = #INTval#
+//    - #INTidx# will be checked for valid index
+//
+// -----------------------------------------------------------------------------
+// misc s$ clearall
+//    - make all elements of the entire s$[] array empty
+//
+// -----------------------------------------------------------------------------
+// misc s$ set #INTidx# #STRescapedvalue#
+//    - s$[#INTidx#] = #STRescapedvalue#
+//    - #INTidx# will be checked for valid index
+//
+// -----------------------------------------------------------------------------
+// misc address
+//    - Outputs the modules bluetooth low energy address
+//
+// -----------------------------------------------------------------------------
+// uart set #INTnewspeed#
+//    - changes the baud rate for communication with the device with immediate
+//      effect. Valid values are  9600, 14400, 19200, 38400, 57600, 115200,
+//      230400, 460800, 921600.
+//
+// -----------------------------------------------------------------------------
+// ble pair #INTconnHandle# #INTenablebonding#
+//    - Security Manager related
+//    - This will result in BlePair() being called and is used to
+//      initiate a pairing and if #INTenablebonding# is nonzero then a bonding
+//      will be performed which means the trusted device database will be updated
+//
+// -----------------------------------------------------------------------------
+// ble pair accept #INTconnHandle# #INTaccept#
+//    - Accept or reject a just works pairing request
+//    - #INTaccept#
+//          0 - Reject
+//          1 - Accept
+//
+// -----------------------------------------------------------------------------
+// ble pair iocap #INTiocap#
+//    - Security Manager related
+//    - This will result in BleSecMngrIoCap() being called
+//    - valid values for #INTiocap# are
+//         0     None also known as ‘Just Works’ (unauthenticated pairing)
+//         1     Display with Yes/No input capability (authenticated pairing)
+//         2     Keyboard Only (authenticated pairing)
+//         3     Display Only (authenticated pairing – if other end has input cap)
+//         4     Keyboard only (authenticated pairing)
+//
+// -----------------------------------------------------------------------------
+// ble pair justworks #INTJWConf#
+//    - Security Manager related
+//    - This will result in BleSecMngrJustWorksConf() being called
+//    - valid values for #INTJWConf# are
+//         0     Pairings works as-is without confirmation
+//         1     Pairings requires confirmation
+//
+// -----------------------------------------------------------------------------
+// ble pair keysize #INTminsize# #INTmaxsize#
+//    - Security Manager related
+//    - This will result in BleSecMngrKeySizes() being called
+//    - Specifiy the minimum and maximum key lengths
+//
+// -----------------------------------------------------------------------------
+// ble pair passkey #INTconnHandle# #INTpasscode#
+//    - Security Manager related
+//    - This will result in BleSecMngrPasskey() being called
+//    - Valid value is 0 to 999999 for #INTpasscode# and
+//    - #INTconnHandle# sepecifies the connection handle
+//
+// -----------------------------------------------------------------------------
+// ble pair oobkey #INTconnHandle# #STRoobkey#
+//    - Security Manager related
+//    - This will result in BleSecMngrOOBkey() being called
+//TODO: comment
+//    - Valid value is 0 to 999999 for #INTpasscode# and
+//    - #INTconnHandle# sepecifies the connection handle
+//
+// -----------------------------------------------------------------------------
+// ble pair bondreq #INTbondreq#
+//    - Security Manager related
+//    - This will result in BleSecMngrBondReq() being called
+//    - Enable or disable bonding when pairing
+//    - #INTbondreq# sepecifies whether to bond or not when pairing
+//
+// -----------------------------------------------------------------------------
+// ble pair oobpref #INTprefoob#
+//    - Security Manager related
+//    - This will result in BleSecMngrOOBPref() being called
+//    - Changes whether OOB pairing is preferred or not
+//
+// -----------------------------------------------------------------------------
+// ble bond stats
+//    - Get the classic BT bonding manager database statistics.
+//
+// -----------------------------------------------------------------------------
+// ble bond getinfo #INTindex#
+//    - Retrieves the MAC address and other information from the trusted device database via an index.
+//
+// -----------------------------------------------------------------------------
+// ble bond persistkey #HEXaddr7Bytes#
+//    - Make the bonding for device #HEXaddr7Bytes# persistent
+//
+// -----------------------------------------------------------------------------
+// ble bond erasekey #HEXaddr7Bytes#
+//    - Erase a bonding from the database for the address #HEXaddr7Bytes#
+//
+// -----------------------------------------------------------------------------
+// ble bond eraseall
+//    - This function is used to erase all bondings in the database
+//
+// -----------------------------------------------------------------------------
+// ble encrypt #INTconnHandle# #INTminLtkSize# #INTmitmRequired#
+//    - This function is used to encrypt a connection for which a bond exists
+//    - Security Manager related
+//    - This will result in BleSecMngrPasskey() being called
+//    - Valid value is 0 to 999999 for #INTpasscode# and
+//    - #INTconnHandle# sepecifies the connection handle
+//    - #minLtkSize# sepecifies the minimum long term key size (7-16)
+//    - #mitmRequired# set to 1 to enable Man In The Middle Protection
+//
+// -----------------------------------------------------------------------------
+// scan abort
+//   - abort a scan operation (memory is not freed)
+//
+// -----------------------------------------------------------------------------
+// scan config #INTcfgID# #INTvalue#
+//   - set scanning configuration parameters
+//     #INTcfgID#
+//       0    Scan Interval in milliseconds (range 0..10240)
+//       1    Scan Window in milliseconds (range 0..10240)
+//       2    Scan Type (0=Passive, 1=Active)
+//       3    Advert Report Cache Size
+//
+// -----------------------------------------------------------------------------
+// scan start #INTscantimeoutms# #INThandlefilter#
+//   - Start a scan for adverts using the timeout #INTscantimeoutms#
+//   - set #INThandlefilter# to not use a whitelist
+//
+// -----------------------------------------------------------------------------
+// scan stop
+//   - abort a scan operation (memory is freed)
+//
+// -----------------------------------------------------------------------------
+// txpower = #INTdbm#
+//   - set tx power to #INTdbm#
+//
+// -----------------------------------------------------------------------------
+// txpower ?
+//   - get current tx power
+//
+// -----------------------------------------------------------------------------
+// uuid custom #HEX32hexChrs#
+//    - get a uuid handle for a 128 bit custom uuid specified as a 32 hex digits
+//    - i[0] will contain the uuid handle as well
+//
+// -----------------------------------------------------------------------------
+// uuid sig #INT16bitUuid#
+//    - get a uuid handle for a 16 bit BTSIG based uuid
+//    - i[0] will contain the uuid handle as well
+//
+// -----------------------------------------------------------------------------
+// uuid sibling #INTuuidHandle# #INT16bitUuid#
+//    - get a uuid handle for a 16 bit uuid that will have the same base uuid as
+//    - that specified by #INTuuidHandle# that was returned by the command
+//    - "uuid custom hhhhhh..hhhhhh" or a previous call of "uuid sibling ..."
+//    - i[0] will contain the uuid handle as well
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+        //Set this to 0 to disable all debugging messages
+#define ENABLE_DEBUG_PRINTS                             1
+
+        //Set this to 1 to enable direct sB UART bridging (faster throughput)
+#define USE_BRIDGE                                      1
+
+        //Number of connections
+#define NUM_OF_CONNS                                    8
+        //Number of spp ports
+#define NUM_OF_SPP_PORTS                                8
+        //Number of services
+#define NUM_OF_SVCS                                     4
+        //Number of attribure metadata
+#define NUM_OF_METADATA                                 4
+        //Number of characteristics
+#define NUM_OF_CHARS                                    8
+        //Size of i[]
+#define NUM_OF_I_PARAMS                                 (8)
+        //Size of s$[] and must be at least 8 elements for BleSvcRegDevInfo()
+#define NUM_OF_S_PARAMS                                 (8)
+
+#define VSP_MAX_CHARDATA_LEN                            (20)
+#define VSP_RX_CHAR_HANDLE                              (17)
+#define VSP_TX_CHAR_HANDLE                              (14)
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2    //msgCtx = alert level
+#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3    //msgCtx = alert level
+#define BLE_EVBLEMSGID_SERVICE_ERROR                    4    //msgCtx = resultcode
+#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5    //msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6    //msgCtx = not used
+#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7    //msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8    //msgCtx = not used
+#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9    //msgCtx = passcode to display
+#define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                 11   //msgCtx = 1 for passkey, 2 for 16 byte OOB data
+#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE           12   //msgCtx = new notification state 0=off, 1=on
+//#define FUTURE_USE                                    13
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE                14   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL           15   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER            16   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_UPDATED_BOND                     17   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                        18   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING            19   //msgCtx = current supply voltage
+#define BLE_EVBLEMSGID_UNENCRYPTED                      20   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE                 21   //msgCtx = connection handle
+
+
+//APP RUN MODES
+#define CMD_MODE                                        0
+#define BRIDGE_VSP_MODE                                 1
+#define BRIDGE_SPP_MODE                                 2
+
+//MISC
+#define CAR_PRESS_DELAY                                 100  //ms to wait between registering entries of '^'
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+sub HandlerOnErr()
+  if (ENABLE_DEBUG_PRINTS!=0) then
+    print "\n OnErr - ";GetLastError();"\n"
+  endif
+endsub
+onerror next HandlerOnErr
+
+//******************************************************************************
+// Debugging resource as early as possible
+//******************************************************************************
+
+//==============================================================================
+//==============================================================================
+sub AssertRC(byval rc as integer,byval tag as integer)
+  if (ENABLE_DEBUG_PRINTS!=0) && (rc!=0) then
+    print "\nFailed with ";integer.h' rc;" at tag ";tag
+  endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub DbgMsg(byval msg$ as string)
+  if (ENABLE_DEBUG_PRINTS!=0) then
+    print "\n";msg$
+  endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub DbgMsgVal(byval msg$ as string, byval vl as integer)
+  if (ENABLE_DEBUG_PRINTS!=0) then
+    print "\n";msg$;" ";vl
+  endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub DbgPrnAdvReport(byref rp$ as string)
+  if (ENABLE_DEBUG_PRINTS!=0) then
+    print "\nRpt=";strhexize$(rp$)
+  endif
+endsub
+
+
+//******************************************************************************
+// Debugging resource after libs
+//******************************************************************************
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+dim rc
+dim stRsp$ as string        //Uart rx data is stored here
+
+dim ok$,er$,pr$, uc$
+
+dim i[NUM_OF_I_PARAMS]      //Index 0 used for return values
+dim s$[NUM_OF_S_PARAMS]     //Must be at least 8 elements for BleSvcRegDevInfo()
+
+dim urtcmd$                 //CMD line from uart
+dim tkn$,tlen               //Used by command parser
+dim hSvc[NUM_OF_SVCS]       //gatts : handle for new service being created is in index 0
+dim amd[NUM_OF_METADATA]    //gatts : attribute meta data
+dim hchar[NUM_OF_CHARS]     //gatts : handles for characteristics
+dim hc[NUM_OF_CONNS+1]      //Contains connection handles
+dim conns                   //Number of connections
+dim gcState                 //gatt client state, 0=IDLE, 1=TableMapping
+dim urts                    //Will be <0 if uart parser suspended
+dim hcVsp                   //Handle of connection to use for VSP service
+dim vdta$                   //Data to send over virtual serial port
+dim vsplen                  //0 implies can send data. >0 waiting for notify event
+dim vspRxH                  //Handle of the RX char in the peripheral for VSP
+dim vspTxH                  //Handle of the TX char in the peripheral for VSP
+dim carCnt                  //Count variable for number of times '^' entered
+dim BridgeHandle            //Handle of sB UART bridge
+
+//******************************************************************************
+// Initialisse Global Variable
+//******************************************************************************
+
+ok$    = "\nOK"
+er$    = "\nERROR "
+pr$    = "\r\n>"
+uc$    = "\nUNKNOWN COMMAND"
+
+gcState = 0  //gatt client is idle
+urts=0       //Not suspended
+conns = 0    //Number of connections
+hcVsp = -1
+vsplen = 0
+vspRxH = VSP_RX_CHAR_HANDLE
+vspTxH = VSP_TX_CHAR_HANDLE
+BridgeHandle = 0
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+
+//==============================================================================
+//==============================================================================
+function ClearS()
+  dim j
+  for j = 0 to (NUM_OF_S_PARAMS-1)
+    s$[j]=""
+  next
+endfunc 0
+
+//==============================================================================
+//==============================================================================
+function ClearI()
+  dim j
+  for j = 0 to (NUM_OF_I_PARAMS-1)
+    i[j]=0
+  next
+endfunc 0
+
+//==============================================================================
+//release all connection handles
+//==============================================================================
+sub InitConnHandles()
+  dim z
+  for z=0 to (NUM_OF_CONNS)
+    hc[z]=-1
+  next
+endsub
+
+//==============================================================================
+//==============================================================================
+function AcqConnHandle(hConn)
+  dim z
+  for z=1 to (NUM_OF_CONNS)
+    if hc[z] == -1 then
+      hc[z]=hConn
+      exitfunc z
+    endif
+  next
+endfunc 0
+
+//==============================================================================
+//==============================================================================
+function RelConnHandle(hConn)
+  dim z
+  for z=1 to (NUM_OF_CONNS)
+    if hc[z] == hConn then
+      hc[z]=-1
+      exitfunc z
+    endif
+  next
+endfunc 0
+
+//==============================================================================
+//==============================================================================
+function GetConnHandle(hConn)
+  dim z
+  for z=1 to (NUM_OF_CONNS)
+    if hc[z] == hConn then
+      exitfunc z
+    endif
+  next
+endfunc 0
+
+//==============================================================================
+//==============================================================================
+sub UartRsp(rsp as integer)
+    if rsp == 0 then
+        print ok$;pr$
+    elseif rsp == -2 then
+        print pr$
+    elseif rsp == -4 then
+        print uc$;pr$
+    elseif rsp > 0 then
+        print er$;integer.h' rsp;pr$
+    endif
+endsub
+
+//==============================================================================
+//==============================================================================
+function InitiateTableMap(hConn)
+  rc = BleDiscServiceFirst(hConn,0,0)
+  if rc==0 then
+    gcState=1
+    exitfunc -1
+  endif
+endfunc rc
+
+//==============================================================================
+//==============================================================================
+sub TerminateTableMap(rc)
+  gcState=0
+  if rc==0x6052 then
+    //BLE_GATTC_NO_MORE_DATA
+    rc=0
+  endif
+  UartRsp(rc)
+endsub
+
+//==============================================================================
+//==============================================================================
+sub ShowConnParms(nCtx as integer)
+  dim intrvl,sprvto,slat
+  rc= BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
+  AssertRC(rc, 810)
+  if rc==0 then
+    DbgMsgVal("Conn Interval",intrvl)
+    DbgMsgVal("Conn Supervision Timeout",sprvto)
+    DbgMsgVal("Conn Slave Latency",slat)
+  endif
+endsub
+
+//==============================================================================
+// for = Y returns -1 and val==Y
+// for ? returns 0
+// otherwise return 1
+//==============================================================================
+function ParseSetQuery(byref val as integer)
+  rc = 1
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen > 0 then
+    if strcmp(tkn$,"?")==0 then
+      rc=0
+    elseif strcmp(tkn$,"=")==0 then
+      tlen = ExtractIntToken(urtcmd$,val)
+      if tlen > 0 then
+        rc=-1
+      endif
+    endif
+  endif
+endfunc rc
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function ExtractIntTokens(u$,stIdx,num)
+  while num>0
+    tlen = ExtractIntToken(u$,i[stIdx])
+    if tlen == 0 then
+      exitfunc 4
+    endif
+    num=num-1
+    stIdx = stIdx+1
+  endwhile
+endfunc 0
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function ExtractStrTokens(u$,stIdx,num)
+  while num>0
+    tlen = ExtractStrToken(u$,s$[stIdx])
+    if tlen == 0 then
+      exitfunc 3
+    endif
+    num=num-1
+    stIdx = stIdx+1
+  endwhile
+endfunc 0
+
+//Empty functions as module does not have BTC support
+function _inquiry()
+endfunc 0
+
+function _spp()
+endfunc 0
+
+function _hid()
+endfunc 0
+
+function _btc()
+endfunc 0
+
+function _btcbond()
+endfunc 0
+
+sub OnSetModeCmd()
+endsub
+
+sub OnSetModeSpp()
+endsub
+
+//Empty handlers as module does not have BTC support
+function HandlerUartRxSpp()
+endfunc 1
+
+function HandlerSppDataCmd()
+endfunc 1
+
+//-------------------------------------------------------------------------
+//#CMD#// txpower = #INTdbm#       - set tx power to #INTdbm#
+//#CMD#// txpower ?                - get tx power
+//-------------------------------------------------------------------------
+function _TxPower()
+  rc = ParseSetQuery(i[1])
+  select rc
+  case 0
+    print "\nCurrent TxPower = ";SysInfo(2008)
+    rc=0
+  case -1
+    print "\nSet TxPower = ";i[1]
+    rc=BleTxPowerSet(i[1])
+  case else
+  endselect
+endfunc rc
+
+//-------------------------------------------------------------------------
+//#CMD#// advert report initadv   #INTstridx# #INTadflags# #INTadappearance# #INTmaxdevname#
+//#CMD#// advert report initscn   #INTstridx#
+//#CMD#// advert report ADuuid16  #INTstridx# #INTuuid0# #INTuuid1# #INTuuid2# #INTuuid3# #INTuuid4# #INTuuid5#
+//#CMD#// advert report ADuuid128 #INTstridx# #INTuuidhandle#
+//#CMD#// advert report ADany     #INTstridx# #INTtag# #HEXdata$#
+//#CMD#// advert report commit    #INTstridx0# #INTstridx1#
+//#CMD#// advert undirected       #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
+//#CMD#// advert scan             #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
+//#CMD#// advert nonconn          #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
+//#CMD#// advert directed         #INTintervalms# #INTtimeoutms# #INTfilterpolicy# #HEXaddr7Bytes#
+//#CMD#// advert stop
+//#CMD#// advert config           #INTcfgidx# #INTcfgval#
+//-------------------------------------------------------------------------
+function _Advert()
+  dim prAdr$
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"report")==0 then
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"initadv")==0 then
+      //Extract 4 (#INTstridx# #INTadflags# #INTadappearance# #INTmaxdevname#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,4)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleAdvRptInit(s$[i[1]],i[2],i[3],i[4])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"initscn")==0 then
+      //Extract 1 (#INTstridx#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleScanRptInit(s$[i[1]])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"ADuuid16")==0 then
+      //Extract 7 (#INTstridx# #INTuuid0# #INTuuid1# #INTuuid2# #INTuuid3# #INTuuid4# #INTuuid5#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,7)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleAdvRptAddUuid16(s$[i[1]],i[2],i[3],i[4],i[5],i[6],i[7])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"ADuuid128")==0 then
+      //Extract 2 (#INTstridx# #INTuuidhandle#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,2)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleAdvRptAddUuid128(s$[i[1]],i[2])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"ADany")==0 then
+      //Extract 2 (#INTstridx# #INTtag#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,2)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 1 (#HEXdata$#) and store starting at s[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      s$[1]=StrDehexize$(s$[1]) //Convert from hex to binary
+      exitfunc BleAdvRptAppendAD(s$[i[1]],i[2],s$[1])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"commit")==0 then
+      //Extract 2 (#INTstridx0# #INTstridx1#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,2)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleAdvRptsCommit(s$[i[1]],s$[i[2]])
+    endif
+    prAdr$=""
+  endif
+  //=================================================
+  if strcmp(tkn$,"undirected")==0 then
+    //Extract 3 (#INTintervalms# #INTtimeoutms# #INTfilterpolicy#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleAdvertStart(0,prAdr$,i[1],i[2],i[3])
+  endif
+  //=================================================
+  if strcmp(tkn$,"scan")==0 then
+    //Extract 3 (#INTintervalms# #INTtimeoutms# #INTfilterpolicy#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleAdvertStart(2,prAdr$,i[1],i[2],i[3])
+  endif
+  //=================================================
+  if strcmp(tkn$,"nonconn")==0 then
+    //Extract 3 (#INTintervalms# #INTtimeoutms# #INTfilterpolicy#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleAdvertStart(3,prAdr$,i[1],i[2],i[3])
+  endif
+  //=================================================
+  if strcmp(tkn$,"directed")==0 then
+    //Extract 3 (#INTintervalms# #INTtimeoutms# #INTfilterpolicy#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    //Extract 1 (#HEXaddr7Bytes#) and store starting at s$[1] which has to be a mac address
+    rc = ExtractStrTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    prAdr$=StrDehexize$(s$[1])
+    if strlen(prAdr$) != 7 then
+      exitfunc 5
+    endif
+    exitfunc BleAdvertStart(1,prAdr$,i[1],i[2],i[3])
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"config")==0 then
+      //Extract 2 (#INTcfgidx# #INTcfgval#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,2)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleAdvertConfig(i[1],i[2])
+    endif
+  //=================================================
+  if strcmp(tkn$,"stop")==0 then
+    exitfunc BleAdvertStop()
+  endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  scan abort
+//#CMD#//  scan stop
+//#CMD#//  scan config #INTcfgID# #INTvalue#
+//#CMD#//  scan start #INTscantimeoutms# #INThandlefilter#
+//-------------------------------------------------------------------------
+function _Scan()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  if strcmp(tkn$,"stop")==0 then
+    //Cancel the connection attempt (release memory)
+    exitfunc BleScanStop()
+  endif
+  if strcmp(tkn$,"abort")==0 then
+    //Cancel the connection attempt (do not release memory)
+    exitfunc BleScanAbort()
+  endif
+  if strcmp(tkn$,"config")==0 then
+    //Extract 2 : (cfgID value) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleScanConfig(i[1],i[2])
+  endif
+  if strcmp(tkn$,"start")==0 then
+    //Extract 2 : (scantimeoutms handleFilter) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleScanStart(i[1],i[2])
+  endif
+  endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  connect cancel
+//#CMD#//  connect config #INTcfgID# #INTvalue#
+//#CMD#//  connect connparms #INTconnHandle# #INTminConnIntMs# #INTmaxConnIntMs# #INTsprvsnToutMs# #INTslavelatency#
+//#CMD#//  connect #HEXaddr7Bytes# #INTconntimeoutms# #INTminConnIntMs# #INTmaxConnIntMs# #INTsprvsnToutMs#
+//-------------------------------------------------------------------------
+function _Connect()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"cancel")==0 then
+    //Cancel the connection attempt
+    exitfunc BleConnectCancel()
+  endif
+  //=================================================
+  if strcmp(tkn$,"config")==0 then
+    //Extract 2 : (#INTcfgID# #INTvalue#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleConnectConfig(i[1],i[2])
+  endif
+  //=================================================
+  if strcmp(tkn$,"connparms")==0 then
+    //Extract 5 : (#INTconnHandle# #INTminConnIntMs# #INTmaxConnIntMs# #INTsprvsnToutMs# #INTslavelatency#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,5)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleSetCurConnParms(hc[i[1]],i[2],i[3],i[4],i[5])
+  endif
+
+  //=================================================
+  //The current token has to be a mac address
+  s$[1]=StrDehexize$(tkn$)
+  if strlen(s$[1]) != 7 then
+    exitfunc 5
+  endif
+  //Extract 4 : (conntimeoutms minConnIntMs maxConnIntMs sprvsnToutMs) and store starting at i[1]
+  rc = ExtractIntTokens(urtcmd$,1,4)
+  if rc != 0 then
+    exitfunc rc
+  endif
+endfunc BleConnect(s$[1],i[1],i[2],i[3],i[4])
+
+//-------------------------------------------------------------------------
+//#CMD#//  disconnect #INTconnHandle#
+//-------------------------------------------------------------------------
+function _Disconnect()
+  //Extract the optional handle
+  tlen = ExtractIntToken(urtcmd$,i[1])
+  //Handle was supplied
+endfunc BleDisconnect(hc[i[1]])
+
+//-------------------------------------------------------------------------
+//#CMD#//  uuid sig #INT16bitUuid#
+//#CMD#//  uuid custom #HEX32hexChrs#
+//#CMD#//  uuid sibling #INTuuidHandle# #INT16bitUuid#
+//-------------------------------------------------------------------------
+function _uuid()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  if strcmp(tkn$,"sig")==0 then
+    //Extract 1 (#INT16bitUuid#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    i[0] = BleHandleUuid16(i[1])
+    print "\n0x";integer.h' i[0];"\r"
+    exitfunc 0
+  endif
+  if strcmp(tkn$,"custom")==0 then
+    //Extract 1 (#HEX32hexChrs#) and store starting at s$[1]
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    s$[1]=StrDehexize$(tkn$)
+    if strlen(s$[1]) != 16 then
+      exitfunc 5
+    endif
+    i[0] = BleHandleUuid128(s$[1])
+    print "\n0x";integer.h' i[0];"\r"
+    exitfunc 0
+  endif
+  if strcmp(tkn$,"sibling")==0 then
+    //Extract 2 (#INTuuidHandle# #INT16bitUuid#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    i[0] = BleHandleUuidSibling(i[1],i[2])
+    print "\n0x";integer.h' i[0];"\r"
+    exitfunc 0
+  endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  gattc open       #INTbuflen# #INTflags#
+//#CMD#//  gattc close
+//#CMD#//  gattc svc first  #INTconnHandle# #INTstartAttrHandle# #INTsvcUuidHandle#
+//#CMD#//  gattc svc next   #INTconnHandle#
+//#CMD#//  gattc char first #INTconnHandle# #INTuuidHandle# #INTsvcStartAttrHandle# #INTsvcEndAttrHandle#
+//#CMD#//  gattc char next  #INTconnHandle#
+//#CMD#//  gattc desc first #INTconnHandle# #INTuuidHandle# #INTcharStartAttrHandle#
+//#CMD#//  gattc desc next  #INTconnHandle#
+//#CMD#//  gattc findchar   #INTconnHandle# #INTsvcUuidHandle# #INTsvcIndex# #INTcharUuidHandle# #INTcharIndex#
+//#CMD#//  gattc finddesc   #INTconnHandle# #INTsvcUuidHandle# #INTsvcIndex# #INTcharUuidHandle# #INTcharIndex# #INTdescUuidHandle# #INTdescIndex#
+//#CMD#//  gattc tablemap   #INTconnHandle#
+//#CMD#//  gattc read       #INTconnHandle# #INTattrHandle# #INToffset#
+//#CMD#//  gattc write      #INTconnHandle# #INTattrHandle# #HEXdata#
+//#CMD#//  gattc write$     #INTconnHandle# #INTattrHandle# #STRdata#
+//#CMD#//  gattc writecmd   #INTconnHandle# #INTattrHandle# #HEXdata#
+//#CMD#//  gattc writecmd$  #INTconnHandle# #INTattrHandle# #STRdata#
+//-------------------------------------------------------------------------
+function _Gattc()
+  dim cmdid
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"open")==0 then
+    //Extract 2 (#INTbuflen# #INTflags#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleGattcOpen(i[1],i[2])
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"close")==0 then
+    //No parms to extract
+    BleGattcClose()
+    exitfunc 0
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"svc")==0 then
+    if gcState!=0 then
+      exitfunc 8
+    endif
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    if strcmp(tkn$,"first")==0 then
+      //Extract 3 (#INTconnHandle# #INTstartAttrHandle# #INTsvcUuidHandle#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,3)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleDiscServiceFirst(hc[i[1]],i[2],i[3])
+    endif
+    if strcmp(tkn$,"next")==0 then
+      //Extract 1 (#INTconnHandle#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleDiscServiceNext(hc[i[1]])
+    endif
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"char")==0 then
+    if gcState!=0 then
+      exitfunc 8
+    endif
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    if strcmp(tkn$,"first")==0 then
+      //Extract 4 (#INTconnHandle# #INTuuidHandle# #INTsvcStartAttrHandle# #INTsvcEndAttrHandle#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,4)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleDiscCharFirst(hc[i[1]],i[2],i[3],i[4])
+    endif
+    if strcmp(tkn$,"next")==0 then
+      //Extract 1 (#INTconnHandle#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleDiscCharNext(hc[i[1]])
+    endif
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"desc")==0 then
+    if gcState!=0 then
+      exitfunc 8
+    endif
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    if strcmp(tkn$,"first")==0 then
+      //Extract 3 (#INTconnHandle# #INTuuidHandle# #INTcharStartAttrHandle#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,3)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleDiscDescFirst(hc[i[1]],i[2],i[3])
+    endif
+    if strcmp(tkn$,"next")==0 then
+      //Extract 1 (#INTconnHandle#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleDiscDescNext(hc[i[1]])
+    endif
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"findchar")==0 then
+    //Extract 5 (#INTconnHandle# #INTsvcUuidHandle# #INTsvcIndex# #INTcharUuidHandle# #INTcharIndex#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,5)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleGattcFindChar(hc[i[1]],i[2],i[3],i[4],i[5])
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"finddesc")==0 then
+    //Extract 7 (#INTconnHandle# #INTsvcUuidHandle# #INTsvcIndex# #INTcharUuidHandle# #INTcharIndex# #INTdescUuidHandle# #INTdescIndex#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,7)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleGattcFindDesc(hc[i[1]],i[2],i[3],i[4],i[5],i[6],i[7])
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"tablemap")==0 then
+    if gcState!=0 then
+      exitfunc 8
+    endif
+    //Extract 1 (#INTconnHandle#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc InitiateTableMap(hc[i[1]])
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if strcmp(tkn$,"read")==0 then
+    //Extract 3 (#INTconnHandle# #INTattrHandle# #INToffset#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleGattcRead(hc[i[1]],i[2],i[3])
+  endif
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  cmdid=0
+  if strcmp(tkn$,"write")==0 then
+    cmdid=1
+  endif
+  if strcmp(tkn$,"write$")==0 then
+    cmdid=2
+  endif
+  if cmdId != 0 then
+    //Extract 3 (#INTconnHandle# #INTattrHandle# #HEXdata#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    if cmdid==1 then
+      //Extract 1 (#HEXdata#) and store starting at s$[1]
+      tlen = ExtractStrToken(urtcmd$,s$[1])
+      if tlen == 0 then
+        exitfunc 5
+      endif
+      s$[1]=StrDehexize$(s$[1])
+      tlen = strlen(s$[1])
+    else
+      //Extract 1 (#STRdata#) and store starting at s$[1]
+      tlen = ExtractStrToken(urtcmd$,s$[1])
+    endif
+    if tlen<1  then
+      exitfunc 5
+    endif
+    exitfunc BleGattcWrite(hc[i[1]],i[2],s$[1])
+  endif
+  cmdid=0
+  if strcmp(tkn$,"write")==0 then
+    cmdid=0x01
+  endif
+  if strcmp(tkn$,"write$")==0 then
+    cmdid=0x02
+  endif
+  if strcmp(tkn$,"writecmd")==0 then
+    cmdid=0x11
+  endif
+  if strcmp(tkn$,"writecmd$")==0 then
+    cmdid=0x12
+  endif
+  if cmdId != 0 then
+    //Extract 3 (#INTconnHandle# #INTattrHandle# #HEXdata#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    if (cmdid & 0xF)==1 then
+      //Extract 1 (#HEXdata#) and store starting at s$[1]
+      tlen = ExtractStrToken(urtcmd$,s$[1])
+      if tlen == 0 then
+        exitfunc 5
+      endif
+      s$[1]=StrDehexize$(s$[1])
+      tlen = strlen(s$[1])
+    else
+      //Extract 1 (#STRdata#) and store starting at s$[1]
+      tlen = ExtractStrToken(urtcmd$,s$[1])
+    endif
+    if tlen<1  then
+      exitfunc 5
+    endif
+    if (cmdid & 0xF0)==0 then
+      exitfunc BleGattcWrite(hc[i[1]],i[2],s$[1])
+    else
+      exitfunc BleGattcWriteCmd(hc[i[1]],i[2],s$[1])
+    endif
+  endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  gatts getdevname
+//#CMD#//  gatts service new        #INTtype# #INThUuid# #INTstoreIndex#
+//#CMD#//  gatts service commit     #INTstoreIndex#
+//#CMD#//  gatts service gap        #STRescaped_devname# #INTwritable# #INTappearance# #INTminconnintus# #INTmaxconnintus# #INTsprtmoutus# #INTslavelatency#
+//#CMD#//  gatts service devinfo
+//#CMD#//  gatts attrmetadata       #INTmdindex# #INTreadrights# #INTwriterights# #INTmaxdatalen# #INTvlen#
+//#CMD#//  gatts char new           #INTcharprops# #INThuuid# #INTmdvalidx# #INTmdcccdidx# #INTmdsccdidx#
+//#CMD#//  gatts char descuserdesc  #STRuserdesc$# #INTmduseridx#
+//#CMD#//  gatts char descprstnfrmt #INTformat# #INTexponent# #INTunit# #INTnamespace# #INTnsdesc#
+//#CMD#//  gatts char descadd       #STRattr# #INThuuid# #INTmddescidx#
+//#CMD#//  gatts char commit        #STRattr# #INThsvcidx# #INTcharhandleidx#
+//#CMD#//  gatts char read          #INTcharhandleidx# #STRattr#
+//#CMD#//  gatts char write         #INTcharhandleidx# #STRattr#
+//#CMD#//  gatts char notify        #INTcharhandleidx# #STRattr#
+//#CMD#//  gatts char indicate      #INTcharhandleidx# #STRattr#
+//#CMD#//  gatts char descread      #INTcharhandleidx# #INTdeschandle# #INToffset# #INTlength# #INTdescuuidhandle# #STRattr#
+//-------------------------------------------------------------------------
+function _Gatts()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"getdevname")==0 then
+    print "\n";BleGetDeviceName$();"\r"
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"service")==0 then
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"new")==0 then
+      //Extract 3 (#INTtype# #INThUuid# #INTstoreIndex#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,3)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleServiceNew(i[1],i[2],hSvc[i[3]])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"commit")==0 then
+      //Extract 1 (#INTstoreIndex#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleServiceCommit(hSvc[i[3]])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"gap")==0 then
+      //Extract 1 (#STRescaped_devname#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      StrDeEscape(s$[1])
+      //Extract 6 (#INTwritable# #INTappearance# #INTminconnintus# #INTmaxconnintus# #INTsprtmoutus# #INTslavelatency#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,6)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleGapSvcInit(s$[1],i[1],i[2],i[3],i[4],i[5],i[6])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"devinfo")==0 then
+      exitfunc BleSvcRegDevInfo(s$[0],s$[1],s$[2],s$[3],s$[4],s$[5],s$[6],s$[7])
+    endif
+  endif
+  //=================================================
+  if strcmp(tkn$,"attrmetadata")==0 then
+    //Extract 5 (#INTmdindex# #INTreadrights# #INTwriterights# #INTmaxdatalen# #INTvlen#) and store starting at i[0]
+    rc = ExtractIntTokens(urtcmd$,0,5)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    amd[i[0]] = BleAttrMetaData(i[1],i[2],i[3],i[4],rc)
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"char")==0 then
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"new")==0 then
+      //Extract 5 (#INTcharprops# #INThuuid# #INTmdvalidx# #INTmdcccdidx# #INTmdsccdidx#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,5)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharNew(i[1],i[2],amd[i[3]],amd[i[4]],amd[i[5]])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"descuserdesc")==0 then
+      //Extract 1 (#STRuserdesc$#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 1 (#INTmduseridx#) and store starting at i[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharDescUserDesc(s$[1],amd[i[1]])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"descprstnfrmt")==0 then
+      //Extract 5 (#INTformat# #INTexponent# #INTunit# #INTnamespace# #INTnsdesc#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,5)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharDescPrstnFrmt(i[1],i[2],i[3],i[4],i[5])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"descadd")==0 then
+      //Extract 1 (#STRattr$#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 2 (#INThuuid# #INTmddescidx#) and store starting at i[1]
+      rc = ExtractStrTokens(urtcmd$,1,2)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharDescAdd(i[1],s$[1],amd[i[2]])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"commit")==0 then
+      //Extract 1 (#STRattr$#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 2 (#INThsvcidx# #INTcharhandleidx#) and store starting at i[1]
+      rc = ExtractStrTokens(urtcmd$,1,2)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharCommit(hSvc[i[1]],s$[1],hchar[i[2]])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"read")==0 then
+      //Extract 1 (#INTcharhandleidx#) and store starting at i[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 1 (#STRattr$#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharValueRead(hChar[i[1]],s$[1])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"write")==0 then
+      //Extract 1 (#INTcharhandleidx#) and store starting at i[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 1 (#STRattr$#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharValueWrite(hChar[i[1]],s$[1])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"Notify")==0 then
+      //Extract 1 (#INTcharhandleidx#) and store starting at i[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 1 (#STRattr$#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharValueNotify(hChar[i[1]],s$[1])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"indicate")==0 then
+      //Extract 1 (#INTcharhandleidx#) and store starting at i[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 1 (#STRattr$#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharValueIndicate(hChar[i[1]],s$[1])
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"descread")==0 then
+      //Extract 5 (#INTcharhandleidx# #INTdeschandle# #INToffset# #INTlength# #INTdescuuidhandle#) and store starting at i[1]
+      rc = ExtractStrTokens(urtcmd$,1,5)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      //Extract 1 (#STRattr$#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      exitfunc BleCharDescRead(hChar[i[1]],i[2],i[3],i[4],i[5],s$[1])
+    endif
+  endif
+endfunc 5
+
+
+//-------------------------------------------------------------------------
+//#CMD#//  ble pair keysize    #INTminsize# #INTmaxsize#
+//#CMD#//  ble pair iocap      #INTiocap#
+//#CMD#//  ble pair justworks  #INTJWConf#
+//#CMD#//  ble pair passkey    #INTconnHandle# #INTpasscode#
+//#CMD#//  ble pair oobkey     #INTconnHandle# #STRoobcode#
+//#CMD#//  ble pair bondreq    #INTbondreq#
+//#CMD#/   ble pair accept     #INTconnHandle# #INTaccept#
+//#CMD#/   ble pair oobpref    #INTprefoob#
+//#CMD#//  ble pair            #INTconnHandle# #INTenablebonding#
+//-------------------------------------------------------------------------
+function _BlePair()
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+        exitfunc 5
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"keysize")==0 then
+        //Extract 2 (#INTminsize# #INTmaxsize#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,2)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc BleSecMngrKeySizes(i[1],i[2])
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"iocap")==0 then
+        //Extract 1 (#INTiocap#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc BleSecMngrIoCap(i[1])
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"justworks")==0 then
+        //Extract 1 (#INTJWConf#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc BleSecMngrJustWorksConf(i[1])
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"passkey")==0 then
+        //Extract 2 (#INTconnHandle# #INTpasscode#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,2)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc BleSecMngrPassKey(hc[i[1]],i[2])
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"oobkey")==0 then
+        //Extract 1 (#INTconnHandle#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        //Extract 1 (#STRoobkey#) and store starting at s$[1]
+        tlen = ExtractStrToken(urtcmd$,s$[1])
+        if tlen<1  then
+          exitfunc 5
+        endif
+        print "\ncode is [";s$[1];"]\n"
+        s$[1] = StrDehexize$(s$[1])
+        print "\ncode hex [";s$[1];"]\n"
+        exitfunc BleSecMngrOOBKey(hc[i[1]],s$[1])
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"bondreq")==0 then
+        //Extract 1 (#INTbondreq#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc BleSecMngrBondReq(i[1])
+    endif
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"accept")==0 then
+        //Extract 2 (#INTconnHandle# #INTaccept#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,2)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc BleAcceptPairing(hc[i[1]],i[2])
+    endif
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"oobpref")==0 then
+        //Extract 1 (#INTprefoob#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc BLESECMNGROOBPREF(i[1])
+
+    endif
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //Store the connection handle
+    i[1] = StrValDec(tkn$)
+
+    //Extract 1 (#INTenablebonding#) and store starting at i[2]
+    rc = ExtractIntTokens(urtcmd$,2,1)
+    if rc != 0 then
+        exitfunc rc
+    endif
+
+    exitfunc BlePair(hc[i[1]], i[2])
+endfunc 5
+
+//------------------------------------------------------------------------------
+//#CMD#//  ble encrypt       #INTconnHandle# #INTminLtkSize# #INTmitmRequired#
+//------------------------------------------------------------------------------
+function _BleEncrypt()
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //Extract 3 (#INTconnHandle# #INTminLtkSize# #INTmitmRequired#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+        exitfunc rc
+    endif
+    exitfunc BleEncryptConnection(hc[i[1]], i[2], i[3])
+endfunc 5
+
+//ble encrypt #INTconnHandle# #INTminLtkSize# #INTmitmRequired#
+//minLtkSize = minimum long term key size (7-16)
+//mitmRequired = set to 1 to enable MITM protection
+
+// -------------------------------------------------------------------------
+// #CMD#//  ble bond stats
+// #CMD#//  ble bond persistkey #HEXaddr7Bytes#
+// #CMD#//  ble bond getinfo #INTindex#
+// #CMD#//  ble bond erasekey #HEXaddr7Bytes#
+// #CMD#//  ble bond eraseall
+// -------------------------------------------------------------------------
+function _BleBond()
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+        exitfunc 5
+    endif
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"stats")==0 then
+        i[0]=BleBondingStats(i[1],i[2])
+        print "\n Capacity=";i[0];" Rolling=";i[1];" Persistent=";i[2];"\r"
+        exitfunc 0
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    elseif strcmp(tkn$,"persistkey")==0 then
+        //Extract 1 : (#HEXaddr7Bytes#) and store at i[1])
+        rc = ExtractStrTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        s$[1] = StrDehexize$(s$[1])
+        exitfunc BleBondingPersistKey(s$[1])
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    elseif strcmp(tkn$,"getinfo")==0 then
+        //Extract 1 : (#INTindex#) and store at i[1])
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        rc=BleBondMngrGetInfo(i[1], s$[1], i[2])
+        if rc != 0 then
+            exitfunc rc
+        endif
+        print "\n(";i[2];"): ";StrHexize$(s$[1]);" : ";integer.h'i[2]
+        exitfunc 0
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    elseif strcmp(tkn$,"erasekey")==0 then
+        //Extract 1 : (#HEXaddr7Bytes#) and store at i[1])
+        rc = ExtractStrTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        s$[1]=StrDehexize$(s$[1])
+        if strlen(s$[1]) != 7 then
+            exitfunc 5
+        endif
+        exitfunc BleBondingEraseKey(s$[1])
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    elseif strcmp(tkn$,"eraseall")==0 then
+        exitfunc BleBondingEraseAll()
+    endif
+endfunc 5
+
+
+//-------------------------------------------------------------------------
+//#CMD#//  ble bond
+//#CMD#//  ble pair
+//#CMD#//  ble encrypt
+//-------------------------------------------------------------------------
+function _Ble()
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+        exitfunc 5
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"bond")==0 then
+        exitfunc _BleBond()
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"pair")==0 then
+        exitfunc _BlePair()
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"encrypt")==0 then
+        exitfunc _BleEncrypt()
+    endif
+endfunc 5
+
+
+//-------------------------------------------------------------------------
+//#CMD#//  misc s$ clearall
+//#CMD#//  misc s$ set #INTidx# #STRescapedvalue#
+//#CMD#//  misc i  clearall
+//#CMD#//  misc i  set #INTidx# #INTval#
+//#CMD#//  misc address
+//-------------------------------------------------------------------------
+function _Misc()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"s$")==0 then
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"clearall")==0 then
+      exitfunc ClearS()
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"set")==0 then
+      //Extract 1 (#INTidx#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      if (i[1] < 0) || (i[1] >= NUM_OF_S_PARAMS) then
+        exitfunc 6
+      endif
+      //Extract 1 (#STRescapedvalue#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,i[1],1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      StrDeEscape(s$[i[1]])
+      exitfunc 0
+    endif
+  endif
+  //=================================================
+  if strcmp(tkn$,"i")==0 then
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"clearall")==0 then
+      exitfunc ClearI()
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"set")==0 then
+      dim idx
+      tlen = ExtractIntToken(urtcmd$,idx)
+      if tlen == 0 then
+        exitfunc 5
+      endif
+      if (idx < 0) || (idx >= NUM_OF_I_PARAMS) then
+        exitfunc 6
+      endif
+      tlen = ExtractIntToken(urtcmd$,i[idx])
+      if tlen == 0 then
+        exitfunc 5
+      endif
+      exitfunc 0
+    endif
+  endif
+  //=================================================
+  if strcmp(tkn$,"address")==0 then
+    dim Tmp$ : Tmp$ = sysinfo$(4)
+    Tmp$ = strhexize$(Tmp$)
+    print "BLE Address: ";Tmp$;"\n"
+    exitfunc -2
+  endif
+endfunc 5
+
+
+//-------------------------------------------------------------------------
+//#CMD#//  uart set #INTnewspeed#
+//-------------------------------------------------------------------------
+function _Uart()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"set")==0 then
+    //Extract 1 (#INTnewspeed#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    if (i[1] != 9600 && i[1] != 14400 && i[1] != 19200 && i[1] != 38400 && i[1] != 57600 && i[1] != 115200 && i[1] != 230400 && i[1] != 460800 && i[1] != 921600) then
+      exitfunc 6
+    endif
+    UartClose()
+    rc = UartOpen(i[1], 0, 0, "CN81H")
+    exitfunc 0
+  endif
+endfunc 5
+
+
+//-------------------------------------------------------------------------
+//#CMD#// bridge vsp
+//#CMD#// bridge spp
+//-------------------------------------------------------------------------
+function _bridge()
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+        exitfunc 5
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"vsp")==0 then
+        rc=SendMsgApp(0,BRIDGE_VSP_MODE)
+        exitfunc -1 //Give no response to user
+    endif
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"spp")==0 then
+        rc=SendMsgApp(0,BRIDGE_SPP_MODE)
+        exitfunc -1
+    endif
+endfunc 5
+
+
+//==============================================================================
+//==============================================================================
+function OnUartCmd() as integer
+  rc=-2 //Default response is ">"
+  tlen = ExtractStrToken(urtcmd$,tkn$) //Get first token
+  if tlen > 0 then
+
+    if strcmp(tkn$,"advert")==0 then
+      rc = _Advert()
+
+    elseif strcmp(tkn$,"scan")==0 then
+      rc = _Scan()
+
+    elseif strcmp(tkn$,"connect")==0 then
+      rc = _Connect()
+
+    elseif strcmp(tkn$,"disconnect")==0 then
+      rc = _Disconnect()
+
+    elseif strcmp(tkn$,"ble")==0 then
+      rc = _Ble()
+
+    elseif strcmp(tkn$,"txpower")==0 then
+      rc = _TxPower()
+
+    elseif strcmp(tkn$,"gattc")==0 then
+      rc = _Gattc()
+
+    elseif strcmp(tkn$,"gatts")==0 then
+      rc = _Gatts()
+
+    elseif strcmp(tkn$,"uuid")==0 then
+      rc = _uuid()
+
+    elseif strcmp(tkn$,"misc")==0 then
+      rc = _misc()
+
+    elseif strcmp(tkn$,"uart")==0 then
+      rc = _Uart()
+
+    elseif strcmp(tkn$,"inquiry")==0 then
+      rc = _inquiry()
+
+    elseif strcmp(tkn$,"spp")==0 then
+      rc = _spp()
+
+    elseif strcmp(tkn$,"hid")==0 then
+      rc = _hid()
+
+    elseif strcmp(tkn$,"btc")==0 then
+      rc = _btc()
+
+    elseif strcmp(tkn$,"bridge")==0 then
+      rc = _bridge()
+
+    elseif strcmp(tkn$,"exit")==0 || strcmp(tkn$,"quit")==0  then
+      exitfunc 0
+
+    else
+        rc=-4 //Send an "UNKNOWN COMMAND" response to user
+
+    endif
+  endif
+  //Send a response back to the user
+  UartRsp(rc)
+endfunc 1
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+//==============================================================================
+function HandlerUartRxCmd() as integer
+  dim nMatch
+
+  if urts < 0 then
+    //Uart parser is suspended
+    exitfunc 1
+  endif
+
+  //Check if CR has been received
+  nMatch=UartReadMatch(stRsp$,13)
+  if nMatch!=0 then
+    //CR exists in the input buffer
+    urtcmd$ = strsplitleft$(stRsp$,nMatch)
+    exitfunc OnUartCmd()
+  endif
+endfunc 1
+
+//* Changed controlling mode via DTR to submitting "ato" and "^^^" because controlling via DTR is not supported on the BT900
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+//==============================================================================
+// function HandlerUartRxVsp() as integer
+  //Just write to the VSP service
+  // if vsplen==0 then
+    // vsplen  = UartReadN(vdta$, VSP_MAX_CHARDATA_LEN )
+    // if vsplen > 0 then
+      // can send to the VSP service in the peripheral
+      // rc=BleGattcWriteCmd(hcVsp,vspRxH,vdta$)
+      // print vdta$
+      // vdta$=""
+    // endif
+  // endif
+// endfunc 1
+
+//==============================================================================
+//This handler is called when data has arrived at the serial port (transparent)
+//==============================================================================
+function HandlerUartRxVsp() as integer
+    //print "\nuart vsp: "
+    //Just write to the VSP service
+    if vsplen==0 then
+        vsplen = UartReadN(vdta$, VSP_MAX_CHARDATA_LEN)
+        //print vdta$
+        if vsplen > 0 then
+            //Process '^' if sent
+            if StrCmp(vdta$,"^")==0 then
+                vsplen=0
+                vdta$=""
+
+                if TimerRunning(0)==0 then
+                    carCnt = carCnt + 1
+                    if carCnt<3 then
+                        TimerStart(0,CAR_PRESS_DELAY,0)
+                    else
+                        rc=SendMsgApp(0,CMD_MODE)    //* Using this for switching between bridge and cmd mode
+                    endif
+                else    //Invalid press
+                    TimerCancel(0)
+                    carCnt = 0
+                endif
+
+            else
+                //Can send to the VSP service in the peripheral
+                rc=BleGattcWriteCmd(hcVsp,vspRxH,vdta$)
+                //print vdta$
+                vdta$=""
+            endif
+        endif
+    endif
+endfunc 1
+
+
+//==============================================================================
+// This handler is called when there is a BLE message
+//==============================================================================
+function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as integer
+  dim hz
+
+  select nMsgId
+  case BLE_EVBLEMSGID_CONNECT
+    hz = AcqConnHandle(nCtx)
+    conns = conns + 1
+    print "\n --- Connect: (";integer.h' nCtx;") handle=";hz
+    if hz == 0 then
+      //Could not store the handle so drop the connection
+      rc = BleDisconnect(nCtx)
+      print " DROPPED"
+    else
+      //Accepted so display connection parameters
+      ShowConnParms(nCtx)
+      //Always assume most recent connection for VSP
+      hcVsp = hc[hz]
+    endif
+
+  case BLE_EVBLEMSGID_DISCONNECT
+    hz = RelConnHandle(nCtx)
+    conns = conns - 1
+    print "\n --- Disconnect: (";integer.h' nCtx;") handle=";hz;pr$
+
+  case BLE_EVBLEMSGID_DISPLAY_PASSKEY
+    DbgMsgVal("Display Pairing Passkey ",nCtx)
+
+  case BLE_EVBLEMSGID_NEW_BOND
+    DbgMsg(" +++ New Bond")
+
+  case BLE_EVBLEMSGID_UPDATED_BOND
+    DbgMsg(" +++ Updated Bond")
+
+  case BLE_EVBLEMSGID_ENCRYPTED
+    DbgMsg(" +++ Encrypted Connection")
+
+  case BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER
+    DbgMsgVal(" -- Conn to Bonded Master ",nCtx)
+
+  case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
+    DbgMsgVal(" +++ Auth Key Request, type=",nCtx)
+
+  case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+    ShowConnParms(nCtx)
+
+  case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
+    DbgMsg(" ??? Conn Parm Negotiation FAILED")
+
+  case else
+    DbgMsgVal("Unknown Ble Msg", nMsgId)
+  endselect
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is an advert timeout
+//==============================================================================
+function HandlerBlrAdvTimOut() as integer
+  DbgMsg( "\nAdverts timeout" )
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is an advert report waiting to be read
+//==============================================================================
+function HandlerAdvRpt() as integer
+  dim ad$,dta$,ndisc,rsi
+  rc = BleScanGetAdvReport(ad$,dta$,ndisc,rsi)
+  while rc==0
+    print "\nADV:";strhexize$(ad$);" ";strhexize$(dta$);" ";ndisc;" ";rsi
+    rc = BleScanGetAdvReport(ad$,dta$,ndisc,rsi)
+  endwhile
+endfunc 1
+
+
+//==============================================================================
+// This handler is called when there is a connection attempt timeout
+//==============================================================================
+function HandlerBlrConnTimOut() as integer
+
+  DbgMsg( "\nConnection attempt stopped via timeout" )
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a scan attempt timeout
+//==============================================================================
+function HandlerBlrScanTimOut() as integer
+
+  DbgMsg( "\nScanning stopped via timeout" )
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a scan attempt timeout
+//==============================================================================
+function HandlerFastPaged() as integer
+  dim ad$,rsi
+  rc = BleScanGetPagerAddr(ad$,rsi)
+  if rc != 0 then
+    DbgMsg( "\nBleScanGetPagerAddr() failed " )
+  endif
+  print "\nFast Paged by : "; strhexize$(ad$); " rssi = ";rsi
+
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerPrimSvc(hConn,hUuid,hStart,hEnd) as integer
+  select gcState
+  case 0
+    print "\nEVDISCPRIMSVC("
+    print "hConn=";integer.h' hConn;",hUuid=";integer.h' hUuid
+    print ",hStart=";hStart;",hEnd=";hEnd;")"
+
+  case 1  //Tablemapping
+    if hStart!=0 then
+      //S: hStart,(hEnd),hUuid
+      print "\nS:";hStart;" ,(";hEnd;") ,";integer.h' hUuid
+      //And get all characteristics of this service
+      rc=BleDiscCharFirst(hConn,0,hStart,hEnd)
+      if rc!=0 then
+        TerminateTableMap(rc)
+      endif
+    else
+      //Reached end of remote gatt table
+      TerminateTableMap(0)
+    endif
+
+  case else
+  endselect
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerCharDisc(hConn,hUuid,cProp,hVal,hiUuid) as integer
+  select gcState
+  case 0
+    print "\nEVDISCCHAR("
+    print "hConn=";integer.h' hConn;",hCharUuid=";integer.h' hUuid;",hIncUuid=";hiUuid
+    print ",hVal=";hVal;",Props=";integer.h' cProp;")"
+
+  case 1  //Tablemapping
+    if hVal!=0 then
+      //C: hVal,cProp,hUuid,hiUuid
+      print "\n C:";hVal;" ,";integer.h' cProp;" ,";integer.h' hUuid;" ,";hiUuid
+      //And get all descriptors of this characteristics
+      rc=BleDiscDescFirst(hConn,0,hVal)
+      if rc!=0 then
+        TerminateTableMap(rc)
+      endif
+    else
+      //No more chars in this service, so go for next service
+      rc = BleDiscServiceNext(hConn)
+      if rc!=0 then
+        TerminateTableMap(rc)
+      endif
+    endif
+
+  case else
+  endselect
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerDescDisc(hConn,hUuid,hDesc) as integer
+  select gcState
+  case 0
+    print "\nEVDISCDESC("
+    print "hConn=";integer.h' hConn;",hDescUuid=";integer.h' hUuid;",hDesc=";hDesc;")"
+
+  case 1  //Tablemapping
+    if hDesc!=0 then
+      //D: hDesc,hUuid
+      print "\n  D:";hDesc;" ,";integer.h' hUuid
+    endif
+    //And get all descriptors of this characteristics
+    rc=BleDiscDescNext(hConn)
+    if rc!=0 then
+      //No more descc in this char, so go for next char
+      rc = BleDiscCharNext(hConn)
+      if rc!=0 then
+        rc = BleDiscServiceNext(hConn)
+        if rc!=0 then
+          TerminateTableMap(rc)
+        endif
+      endif
+    endif
+
+  case else
+  endselect
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerFindChar(hConn,cProp,hVal,hiUuid) as integer
+  print "\nEVFINDCHAR("
+  print "hConn=";integer.h' hConn;",hIncUuid=";integer.h' hiUuid
+  print ",hVal=";hVal;",Props=";integer.h' cProp;")"
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerFindDesc(hConn,hDesc) as integer
+  print "\nEVFINDDESC("
+  print "hConn=";integer.h' hConn;",hDesc=";hDesc;")"
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerAttrWrite(hConn,aHndl,nSts) as integer
+    print "\nEVATTRWRITE(hConn=";integer.h' hConn;",handle=";aHndl;",status=";nSts;")"
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerAttrRead(hConn,hAttr,nSts) as integer
+  dim a$,ofst
+  print "\nEVATTRREAD(hConn=";hConn;",handle=";hAttr;",status=";nSts;")"
+  if nSts == 0 then
+    rc = BleGattcReadData(hConn,hAttr,ofst,a$)
+    if rc==0 then
+      print "\n >BleGattcReadData(data=";StrHexize$(a$);",offset=";ofst;")"
+      print "\n                  (data=";StrEscape$(a$);")"
+    endif
+  endif
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a EVCHARVAL message
+//==============================================================================
+function HandlerCharVal(BYVAL hChar AS INTEGER, byval offset, byval len) as integer
+  print "\nEVCHARVAL(hChar=";integer.h' hChar;",offset=";offset;",len=";len;")"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a CHARHVC message
+//==============================================================================
+function HandlerCharHvc(BYVAL hChar AS INTEGER) as integer
+    print "\nEVCHARHVC(hChar=";integer.h' hChar;")"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a CHARCCCD message
+//==============================================================================
+function HandlerCharCccd(BYVAL hChar AS INTEGER, BYVAL nVal AS INTEGER) as integer
+  print "\nEVCHARCCCD(hChar=";integer.h' hChar;",value=";nVal;")"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a CHARSCCD message
+//==============================================================================
+function HandlerCharSccd(BYVAL hChar AS INTEGER, BYVAL nVal AS INTEGER) as integer
+  print "\nEVCHARSCCD(hChar=";integer.h' hChar;",value=";nVal;")"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a CHARDESC message
+//==============================================================================
+function HandlerCharDesc(BYVAL hChar AS INTEGER, BYVAL hDesc AS INTEGER) as integer
+  dim duid,a$,rc
+  print "\nEVCHARDESC(hChar=";integer.h' hChar;",hDesc=";integer.h' hDesc;")"
+
+  //Read the descriptor data
+  rc = BleCharDescRead(hChar,hDesc,0,512,duid,a$)
+  print "\n > BleCharDescRead (0,512) = "
+  print "hUuid=";integer.h' duid;",data=";StrHexize$(a$);",len=";StrLen(a$);") returned ";integer.h' rc
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerAttrNtfyCmd() as integer
+  dim hConn,hAttr,att$,dscd
+  print "\nEVATTRNOTIFY()"
+  do
+    rc=BleGattcNotifyRead(hConn,hAttr,att$,dscd)
+    if rc==0 then
+      print "\n >BleGattcNotifyRead("
+      print "hConn=";integer.h' hConn;",handle=";hAttr;",Dumped=";dscd
+      print ",data=";StrHexize$(att$);")"
+    endif
+  dowhile rc==0
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerAttrNtfyVsp() as integer
+  dim hConn,hAttr,att$,dscd
+  //print "\nEVATTRNOTIFY(vsp)"
+  do
+    rc=BleGattcNotifyRead(hConn,hAttr,att$,dscd)
+    if rc==0 then
+      if vspTxH == hAttr then
+        print att$
+      else
+        //print "\n >BleGattcNotifyRead("
+        print "hConn=";integer.h' hConn;",handle=";hAttr;",Dumped=";dscd
+        print ",data=";StrHexize$(att$);")"
+      endif
+    endif
+  dowhile rc==0
+endfunc 1
+
+//==============================================================================
+// When WriteCmd or a Notify has been sent and baseband confirmed
+//==============================================================================
+function HandlerNotifyBufCmd() as integer
+  print "\nEVNOTIFYBUF"
+endfunc 1
+
+//==============================================================================
+// When WriteCmd or a Notify has been sent and baseband confirmed
+//==============================================================================
+function HandlerNotifyBufVsp() as integer
+  vsplen=0
+endfunc HandlerUartRxVsp()
+
+
+//==============================================================================
+// Called when the state of sio28 changes. Connected to DTR output of PC
+//==============================================================================
+function HandlerSio28() as integer
+  if GpioRead(28) then
+    //DTR Deasserted so NOT command mode
+    if conns>0 then
+      OnEvent  EVUARTRX       call HandlerUartRxVsp
+      Onevent  EVNOTIFYBUF    call HandlerNotifyBufVsp
+      OnEvent  EVATTRNOTIFY   call HandlerAttrNtfyVsp
+    endif
+  else
+    //DTR Deasserted so command mode
+    OnEvent  EVUARTRX       call HandlerUartRxCmd
+    Onevent  EVNOTIFYBUF    call HandlerNotifyBufCmd
+    OnEvent  EVATTRNOTIFY   call HandlerAttrNtfyCmd
+  endif
+endfunc 1
+
+//* Using this instead of HandlerSio28 to switch modes
+//==============================================================================
+// Called after SendMsgApp is called. Used to switch between command and bridge mode
+//==============================================================================
+function SetMode(msgID, cmd) as integer
+    if cmd==BRIDGE_VSP_MODE then
+        //DTR Deasserted so NOT command mode
+        if conns>0 then
+            OnEvent  EVUARTRX       call HandlerUartRxVsp
+            Onevent  EVNOTIFYBUF    call HandlerNotifyBufVsp
+            OnEvent  EVATTRNOTIFY   call HandlerAttrNtfyVsp
+            print ok$
+        endif
+
+    elseif cmd==CMD_MODE then
+        OnSetModeCmd()      //Let sblib handle it first
+        IF USE_BRIDGE == 1 THEN
+            IF BridgeHandle != 0 THEN
+//                rc = STREAMUNBRIDGE(BridgeHandle)
+                BridgeHandle = 0
+            ENDIF
+        ENDIF
+        //DTR Deasserted so command mode
+        OnEvent  EVUARTRX       call HandlerUartRxCmd
+        Onevent  EVNOTIFYBUF    call HandlerNotifyBufCmd
+        OnEvent  EVATTRNOTIFY   call HandlerAttrNtfyCmd
+        carCnt=0
+        UartRsp(0)
+
+    endif
+endfunc 1
+
+
+//******************************************************************************
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVUARTRX                 call HandlerUartRxCmd
+Onevent  EVNOTIFYBUF              call HandlerNotifyBufCmd
+OnEvent  EVATTRNOTIFY             call HandlerAttrNtfyCmd
+
+OnEvent  EVBLE_ADV_TIMEOUT        call HandlerBlrAdvTimOut
+OnEvent  EVBLEMSG                 call HandlerBleMsg
+OnEvent  EVBLE_CONN_TIMEOUT       call HandlerBlrConnTimOut
+OnEvent  EVBLE_SCAN_TIMEOUT       call HandlerBlrScanTimOut
+OnEvent  EVBLE_ADV_REPORT         call HandlerAdvRpt
+OnEvent  EVBLE_FAST_PAGED         call HandlerFastPaged
+
+OnEvent  EVDISCPRIMSVC            call HandlerPrimSvc
+OnEvent  EVDISCCHAR               call HandlerCharDisc
+OnEvent  EVDISCDESC               call HandlerDescDisc
+OnEvent  EVFINDCHAR               call HandlerFindChar
+OnEvent  EVFINDDESC               call HandlerFindDesc
+OnEvent  EVATTRWRITE              call HandlerAttrWrite
+OnEvent  EVATTRREAD               call HandlerAttrRead
+
+OnEvent  EVCHARVAL                call HandlerCharVal
+OnEvent  EVCHARHVC                call HandlerCharHvc
+OnEvent  EVCHARCCCD               call HandlerCharCccd
+OnEvent  EVCHARSCCD               call HandlerCharSccd
+OnEvent  EVCHARDESC               call HandlerCharDesc
+
+
+
+//OnEvent  EVGPIOCHAN0              call HandlerSio28
+OnEvent  EVMSGAPP                 call SetMode
+
+//------------------------------------------------------------------------------
+// Initialise Services and then wait for events
+//------------------------------------------------------------------------------
+
+//==============================================================================
+//==============================================================================
+sub Initialise()
+  InitConnHandles()
+endsub
+
+//==============================================================================
+//==============================================================================
+// sub Startup()
+    // dim devNme$ : devNme$ = SysInfo$(0)
+    //Ensure we can detect changes in nAutorun (SIO28)
+    // if StrCmp(devNme$, "Laird BT900") then
+        // rc=GpioBindEvent(0,4,2)         //DTR -> SIO 4 on BT900
+        // AssertRC(rc, 2574)
+    // elseif StrCmp(devNme$, "Laird BL600") || StrCmp(devNme$, "Laird BL620") then
+        // rc=GpioBindEvent(0,28,2)        //DTR -> SIO 28 on BL6XX
+        // AssertRC(rc, 2577)
+    // endif
+// endsub
+
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+Initialise()
+//Startup()
+
+//Send user prompt for uart based command interface
+dim Tmp$ : Tmp$ = sysinfo$(4)
+Tmp$ = strhexize$(Tmp$)
+print "\n\r";BleGetDeviceName$();" - ";Tmp$;"\n\r\n\r"
+Tmp$ = ""
+//Send an OK response
+UartRsp(0)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WaitEvent

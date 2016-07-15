@@ -1,0 +1,87 @@
+//Example :: EvCharDesc.sb
+DIM hMyChar,rc,at$,conHndl, hOtherDescr
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup$()
+    DIM rc, hSvc, at$, adRpt$, addr$, scRpt$, hOtherDscr,attr$, attr2$, rc2
+    attr$="Hi"
+    DIM charMet : charMet = BleAttrMetaData(1,0,20,0,rc)
+    
+    //Commit svc with handle 'hSvcUuid'
+    rc=BleServiceNew(1,BleHandleUuid16(0x18EE),hSvc)            
+    //initialise characteristic - readable
+    rc=BleCharNew(0x02,BleHandleUuid16(1),charMet,0,0)   
+    
+    //Add user descriptor - variable length
+    attr$="my char desc"
+    rc=BleCharDescUserDesc(attr$,BleAttrMetadata(1,1,20,1,rc2))
+    
+    //commit char initialised above, with initial value "char value" to service 'hSvc'
+    attr2$="char value"
+    rc=BleCharCommit(hSvc,attr2$,hMyChar)
+    
+    //commit service to GATT table
+    rc=BleServiceCommit(hSvc)
+
+    rc=BleAdvertStart(0,addr$,20,300000,0)
+ENDFUNC attr$
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+    rc=GpioUnbindEvent(1)
+ENDSUB
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n--- Disconnected from client"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n--- Connected to client"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// Called when data arrives via UART
+//==============================================================================
+FUNCTION HndlrUartRx()
+ENDFUNC 0
+
+//==============================================================================
+// Client has written to writeable descriptor
+//==============================================================================
+FUNCTION HndlrCharDesc(BYVAL hChar AS INTEGER, BYVAL hDesc AS INTEGER) AS INTEGER
+    dim duid,a$,rc
+    IF hChar == hMyChar THEN
+        rc = BleCharDescRead(hChar,hDesc,0,20,duid,a$)
+        IF rc ==0 THEN 
+            PRINT "\nNew value for desriptor ";hDesc;" with uuid ";integer.h'duid;" is ";a$
+        ELSE
+            PRINT "\nCould not read the descriptor value"
+        ENDIF
+    ELSE
+        PRINT "\nThis is for some other characteristic"
+    ENDIF
+ENDFUNC 1
+
+ONEVENT  EVBLEMSG    CALL HndlrBleMsg
+ONEVENT  EVCHARDESC  CALL HndlrCharDesc
+ONEVENT  EVUARTRX    CALL HndlrUartRx
+
+PRINT "\nOther Descriptor Value: ";OnStartup$()
+PRINT "\nWrite a new value \n--- Press any key to exit\n"
+
+WAITEVENT
+
+CloseConnections()
+
+PRINT "\nExiting..."

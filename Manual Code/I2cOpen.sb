@@ -1,0 +1,10 @@
+//Example :: I2cOpen.sb
+DIM handle
+DIM rc : rc=I2cOpen(100000,0,handle)
+
+IF rc!= 0 THEN
+	PRINT "\nFailed to open I2C interface with error code "; INTEGER.h' rc
+ELSE
+	PRINT "\nI2C open success \nHandle is ";handle
+ENDIF
+

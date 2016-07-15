@@ -1,0 +1,114 @@
+//Example :: EvAuthCccd.sb
+
+DIM hMyChar,rc,at$,conHndl
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, hSvc, metaSuccess, at$, attr$, adRpt$, addr$, scRpt$  
+    attr$="Hi"
+    DIM svcUuid : svcUuid=0x18EE
+    DIM charUuid : charUuid = BleHandleUuid16(1)
+    DIM charMet : charMet = BleAttrMetaDataex(1,1,20,0,metaSuccess)
+    DIM hSvcUuid : hSvcUuid = BleHandleUuid16(svcUuid)
+    DIM mdCccd : mdCccd = BleAttrMetadataex(1,1,2,8,rc)   //CCCD metadata for char, write auth
+    
+    //Commit svc with handle 'hSvcUuid'
+    rc=BleSvcCommit(1,hSvcUuid,hSvc)            
+    //Initialise char, write/read enabled, accept signed writes, indicatable
+    rc=BleCharNew(0x6A,charUuid,charMet,mdCccd,0)     
+    //Commit char initialised above, with initial value "hi" to service 'hMyChar'
+    rc=BleCharCommit(hSvc,attr$,hMyChar)
+    rc=BleScanRptInit(scRpt$) 
+    //Add 1 service handle to scan report
+    rc=BleAdvRptAddUuid16(scRpt$,hSvc,-1,-1,-1,-1,-1)
+    //Commit reports to GATT table - adRpt$ is empty
+    rc=BleAdvRptsCommit(adRpt$,scRpt$)
+    rc=BleAdvertStart(0,addr$,20,300000,0)
+    rc=GpioBindEvent(1,11,1)     //Channel 1, bind to low transition on GPIO pin 11
+ENDFUNC rc
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+    rc=GpioUnbindEvent(1)
+ENDSUB
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n--- Disconnected from client"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n--- Connected to client"
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// Indication acknowledgement from client handler
+//==============================================================================
+FUNCTION HndlrCharHvc(BYVAL charHandle AS INTEGER) AS INTEGER 
+  IF charHandle == hMyChar THEN
+    PRINT "\nGot confirmation of recent indication"
+  ELSE
+        PRINT "\nGot confirmation of some other indication: ";charHandle
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+// Handler to service button 0 pressed
+//==============================================================================
+FUNCTION HndlrBtn1Pr() AS INTEGER
+    CloseConnections()
+ENDFUNC 1
+
+//==============================================================================
+// CCCD descriptor authorisation
+//==============================================================================
+FUNCTION HndlrAuthCccd(BYVAL connHandle,BYVAL charHandle, BYVAL readWrite) AS INTEGER
+    DIM value$
+
+    IF charHandle==hMyChar THEN
+        IF readWrite != 0x0 THEN
+
+            rc=BleAuthorizeDesc(connHandle,charHandle, -1 ,3)  //grant access
+            IF readWrite == 0x10002 THEN
+                PRINT "\nSending indication..."
+                value$="hello"  
+                IF BleCharValueIndicate(hMyChar,value$)!=0 THEN
+                    PRINT "\nFailed to indicate new value"
+                ENDIF
+            ELSE
+                PRINT "\nIndications were disabled"
+            ENDIF
+        ENDIF
+    ELSE
+        PRINT "\nThis is for some other characteristic"
+    ENDIF
+ENDFUNC 1
+
+ONEVENT  EVBLEMSG    CALL HndlrBleMsg
+ONEVENT  EVCHARHVC   CALL HndlrCharHvc
+ONEVENT  EVAUTHCCCD  CALL HndlrAuthCccd
+ONEVENT  EVGPIOCHAN1 CALL HndlrBtn1Pr
+
+IF OnStartup()==0 THEN
+    rc = BleCharValueRead(hMyChar,at$)
+    PRINT "\nValue of the characteristic ";hMyChar;" is: ";at$
+    PRINT "\nYou can write to the CCCD characteristic."
+    PRINT "\nThe BL600 will then indicate a new characteristic value\n"
+    PRINT "\n--- Press button 1 to exit"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+WAITEVENT
+
+PRINT "\nExiting..."

@@ -1,0 +1,8 @@
+//Example :: ExtractStrToken.sb
+DIM sentence$, token$, tknlen
+sentence$="My name is BL652, from     Laird"
+PRINT "\nSentence is :";sentence$
+DO
+  tknlen = ExtractStrToken(sentence$,token$)
+  PRINT "\nToken (len ";tknlen;") = :";token$
+UNTIL tknlen==0

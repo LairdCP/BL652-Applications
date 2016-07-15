@@ -1,0 +1,17 @@
+//Example :: ForNext.sb
+DIM a
+FOR a=1 TO 2			
+  PRINT "Hello"	
+NEXT	
+
+print "\n"
+		
+FOR a=2 DOWNTO 1		
+  PRINT "Hello"	
+NEXT
+
+print "\n"	
+		
+FOR a=1 TO 4	STEP 2	
+  PRINT "Hello"	
+NEXT

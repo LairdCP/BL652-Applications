@@ -1,0 +1,182 @@
+// Copyright (c) 2015, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// This creates a minimal static iBeacon without remote configuration features.
+// Configure the settings for the application below then program the module.
+//
+// - Version 0.90, Updated 14/10/2015
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+    //Advertising interval (ms)
+#define ADVERT_INTERVAL 200
+    //Advertising timeout (ms)
+#define ADVERT_TIMEOUT 60000
+    //If set to 1, will restart advertising when it times out, otherwise sits idle
+#define RESTART_ADVERTISING 1
+    //Desired transmit power level (dBm). BL600 can be: 4, 0, -4, -8, -12, -16, -20, -55. BT900 can be: 8, 4, 0, -4, -8, -12, -16, -20.
+#define TXPOWER -4
+    //When set to 1: enables erasing the module if the pin specified below is toggled low (module must be set in VSP mode)
+#define ENABLE_WIPE 1
+    //SIO_XX pin that when toggled to ground (if enabled above) will erase the module. On the BL600-DVK 16 is connected to BTN_0 and on the BT900-DVK 13 is connected to BTN_0.
+#define WIPE_PIN 13
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+//Company ID
+//0x004C : Apple
+dim CompanyID : CompanyID = 0x004C
+
+//Major ID (0x0000 = 0xFFFF)
+dim MajorID : MajorID = 0x1234
+
+//Minor ID (0x0000 = 0xFFFF)
+dim MinorID : MinorID = 0x5678
+
+//Power calibration (0x00 - 0xFF)
+//Set this by advertising and measuring the RSSI 1m away from the BL600 or BT900 then updating this value with the average value recorded
+dim PowerCalibration : PowerCalibration = 0xBC
+
+//16-Byte UUID
+//\e2\c5\6d\b5\df\fb\48\d2\b0\60\d0\f5\a7\10\96\e0 : Apple
+dim UUID$ : UUID$ = "\e2\c5\6d\b5\df\fb\48\d2\b0\60\d0\f5\a7\10\96\e0"
+
+//Result code
+dim rc
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//--------------------------------------------------------------------------
+// Function for swapping bytes
+//--------------------------------------------------------------------------
+function SwapBytes(v)
+    //Swaps endianness (2-byte)
+endfunc ((v>>8)&0xFF) + ((v<<8)&0xFF00)
+
+//--------------------------------------------------------------------------
+// Function for setting up and commiting adverts
+//--------------------------------------------------------------------------
+function SetupAdverts()
+    //Sets up adverts
+    dim Dat$[5]
+    dim advRpt$
+    dim scanRpt$
+    dim FullAd$
+
+    //Convert & format 2-byte company ID
+    rc = BleEncode16(Dat$[0], CompanyID, 0)
+    //Convert & format UUID string
+    rc = BleEncodeString(Dat$[1], 0, UUID$, 0, strlen(UUID$))
+    //Swaps endianness
+    MajorID = SwapBytes(MajorID)
+    //Convert & format 2-byte Major ID
+    rc = BleEncode16(Dat$[2], MajorID, 0)
+    //Swaps endianness
+    MinorID = SwapBytes(MinorID)
+    //Convert & format 2-byte Minor ID
+    rc = BleEncode16(Dat$[3], MinorID, 0)
+    //Convert & format 1-byte Power Calibration value
+    rc = BleEncode8(Dat$[4], PowerCalibration, 0)
+    //Generally discoverable
+    rc = BleAdvRptInit(advRpt$, 2, 0, 0)
+    //Initialise empty scan report
+    rc = BleScanRptInit(scanRpt$)
+    //Add all the formatted data to the string (\02 is data type [\02 = iBeacon] and \15 is length of the tag)
+    FullAd$ = Dat$[0] + "\02\15" + Dat$[1] + Dat$[2] + Dat$[3] + Dat$[4]
+    //Add iBeacon data to advert report under manufacturer specific tag
+    rc = BleAdvRptAppendAd(advRpt$, 0xFF, FullAd$)
+    //Save advert data
+    rc = BleAdvRptsCommit(advRpt$, scanRpt$)
+endfunc 1
+
+//--------------------------------------------------------------------------
+// Function for starting to advertise
+//--------------------------------------------------------------------------
+function StartAdverts()
+    dim addr$ : addr$ = ""
+
+    //Starts advertising
+    rc = BleAdvertStart(3, addr$, ADVERT_INTERVAL, ADVERT_TIMEOUT, 0)
+endfunc 1
+
+//******************************************************************************
+// Event handler functions
+//******************************************************************************
+
+//--------------------------------------------------------------------------
+// Handler function for starting to advertise
+//--------------------------------------------------------------------------
+function HndlrAdvTimeout()
+    //Runs when adverts time out
+    if (RESTART_ADVERTISING == 1) then
+        //Mode set to restart advertising
+        rc = StartAdverts()
+    endif
+endfunc 1
+
+//--------------------------------------------------------------------------
+// Handler function for erasing flash file system
+//--------------------------------------------------------------------------
+function HndlrEraseFFS()
+    //Runs when erase FFS pin has been toggled
+    rc = GpioUnassignEvent(0)
+    rc = BleAdvertStop()
+    rc = EraseFileSystem(1)
+endfunc 0
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+OnEvent  EvBle_Adv_Timeout  call HndlrAdvTimeout
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+//Set TX power
+rc = BleTxPowerSet(TXPOWER)
+
+//Setup and start advertising
+rc = SetupAdverts()
+rc = StartAdverts()
+
+//Setup module wiping
+if (ENABLE_WIPE == 1) then
+    //Enable weak pull-up resistor
+    rc = GpioSetFunc(WIPE_PIN, 1, 2)
+    //Toggle on high->low transistion
+    rc = GpioAssignEvent(0, WIPE_PIN, 1)
+    //Event handler when toggle is detected
+    OnEvent EvDetectChan0 call HndlrEraseFFS
+endif
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WaitEvent

@@ -1,0 +1,41 @@
+//Example :: BleCharDescAdd.sb
+
+DIM rc, metaSuccess,usrDesc$ : usrDesc$="A description" 
+DIM charUuid : charUuid = BleHandleUuid16(1)
+DIM charMet : charMet = BleAttrMetaData(1,1,20,0,metaSuccess)
+DIM mdUsrDsc : mdUsrDsc = charMet
+DIM mdSccd : mdSccd = charMet
+           
+//initialise char, write/read enabled, accept signed writes, indicatable
+rc=BleCharNew(0x4B,charUuid,charMet,0,mdSccd)     
+rc=BleCharDescUserDesc(usrDesc$,mdUsrDsc)
+rc=BleCharDescPrstnFrmt(0x0E,2,0x271A,0x01,0x0000)
+
+// ~ ~ ~
+// other descriptors
+// ~ ~ ~
+
+//++++
+//Add the other Descriptor 0x29XX  -- first one
+//++++
+DIM mdChrDsc : mdChrDsc = BleAttrMetadata(1,0,20,0,metaSuccess) 
+DIM attr$ : attr$="some_value1"
+rc=BleCharDescAdd(0x2905,attr$,mdChrDsc)
+
+//++++
+//Add the other Descriptor 0x29XX  -- second one
+//++++
+attr$="some_value2"
+rc=rc+BleCharDescAdd(0x2906,attr$,mdChrDsc)
+
+//++++
+//Add the other Descriptor 0x29XX  -- last one
+//++++
+attr$="some_value3"
+rc=rc+BleCharDescAdd(0x2907,attr$,mdChrDsc)
+
+IF rc==0 THEN
+    PRINT "\nOther descriptors added successfully"
+ELSE   
+    PRINT "\nFailed"
+ENDIF

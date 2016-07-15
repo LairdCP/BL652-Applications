@@ -1,0 +1,108 @@
+//Example :: BleGattcFindChar.sb
+//
+//Remote server has 5 prim services with 16 bit uuid and 3 with 128 bit uuids
+//  3 of the 16 bit uuid are the same value 0xDEAD and 
+//  2 of the 128 bit uuids are also the same 112233445566778899AABBCCDDEEFF
+//
+// Server created using BleGattcTblFindChar.sub invoked in _OpenMcp.scr
+// using Nordic Usb Dongle PC10000
+
+DIM rc,at$,conHndl,uHndl,uuid$,sIdx,cIdx
+
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+    DIM rc, adRpt$, addr$, scRpt$  
+	rc=BleAdvRptInit(adRpt$, 2, 0, 10)
+	IF rc==0 THEN : rc=BleScanRptInit(scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvRptsCommit(adRpt$,scRpt$) : ENDIF
+    IF rc==0 THEN : rc=BleAdvertStart(0,addr$,50,0,0) : ENDIF
+	//open the gatt client with default notify/indicate ring buffer size
+	IF rc==0 THEN : rc = BleGattcOpen(0,0) : ENDIF
+ENDFUNC rc
+
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc=BleDisconnect(conHndl)
+    rc=BleAdvertStop()
+ENDSUB
+
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
+    DIM uu$,uHndS,uHndC
+    conHndl=nCtx
+    IF nMsgID==1 THEN
+        PRINT "\n\n- Disconnected"
+        EXITFUNC 0
+    ELSEIF nMsgID==0 THEN
+        PRINT "\n- Connected, so scan remote Gatt Table for ALL services"
+		uHndS = BleHandleUuid16(0xDEAD)
+		uu$ = "112233445566778899AABBCCDDEEFF00"
+		uu$ = StrDehexize$(uu$)
+		uHndC = BleHandleUuid128(uu$)
+		sIdx = 2
+		cIdx = 1 //valHandle will be 32
+		rc = BleGattcFindChar(conHndl,uHndS,sIdx,uHndC,cIdx)  
+		IF rc==0 THEN
+		    //BleDiscCharFirst() will exit with 0 when operation is complete
+		    WAITEVENT
+		ENDIF
+		sIdx = 1
+		cIdx = 3 //does not exist
+		rc = BleGattcFindChar(conHndl,uHndS,sIdx,uHndC,cIdx)  
+		IF rc==0 THEN
+		    //BleDiscCharFirst() will exit with 0 when operation is complete
+		    WAITEVENT
+		ENDIF
+		CloseConnections()
+    ENDIF
+ENDFUNC 1
+
+'//==============================================================================
+'//==============================================================================
+function HandlerFindChar(cHndl,cProp,hVal,isUuid) as integer
+    print "\nEVFINDCHAR "
+    print " cHndl=";cHndl
+    print " Props=";cProp
+    print " valHndl=";hVal
+    print " ISvcUuid=";isUuid
+	IF hVal == 0 THEN
+	    PRINT "\nDid NOT find the characteristic"
+	ELSE
+	    PRINT "\nFound the characteristic at handle ";hVal
+	    PRINT "\nSvc Idx=";sIdx;" Char Idx=";cIdx
+	ENDIF	
+endfunc 0
+
+
+//==============================================================================
+// Main() equivalent
+//==============================================================================
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+OnEvent  EVFINDCHAR         call HandlerFindChar
+
+//Register base uuids with the underlying stack, otherwise the services with the
+//128bit uuid's will be delivered with a uuid handle == FF000000 == UNKNOWN
+uuid$ = "112233445566778899AABBCCDDEEFF00"
+uuid$ = StrDehexize$(uuid$)
+uHndl = BleHandleUuid128(uuid$)
+uuid$ = "1122DEAD5566778899AABBCCDDBEEF00"
+uuid$ = StrDehexize$(uuid$)
+uHndl = BleHandleUuid128(uuid$)
+
+IF OnStartup()==0 THEN
+    PRINT "\nAdvertising, and Gatt Client is open\n"
+ELSE
+    PRINT "\nFailure OnStartup"
+ENDIF
+
+WAITEVENT
+PRINT "\nExiting..."

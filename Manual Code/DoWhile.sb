@@ -1,0 +1,7 @@
+﻿//Example :: DoWhile.sb
+DIM a AS INTEGER	//don’t really need to supply AS INTEGER
+a=1
+DO
+  a = a+1
+  PRINT a
+DOWHILE a<10		//loop will end when A gets to the value 10

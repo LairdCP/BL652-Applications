@@ -1,0 +1,30 @@
+//Example :: UartSetRTS.sb
+DIM rv
+
+//--- Open comport so that DCD and RI are outputs
+
+rv=UartOpen(9600,0,0,"TO81H")	//open as DTE at 300 baudrate, odd parity
+                                //8 databits, 1 stopbits, cts/rts flow control
+
+// RTS output has automatically been asserted
+
+IF rv==0 THEN
+  UartSetRts(0)   //has no effect because flow control was enabled
+  UartSetRts(1)   //has no effect because flow control was enabled
+ENDIF
+
+UartClose()
+
+rv=UartOpen(9600,0,0,"TO81H")	//open as DTE at 300 baudrate, odd parity
+                                //8 databits, 1 stopbits, no cts/rts flow control
+
+// RTS output has automatically been asserted
+
+IF rv==0 THEN
+  UartSetRts(0)   //RTS will be deasserted
+  UartSetRts(1)   //RTS will be asserted
+ENDIF
+
+
+
+

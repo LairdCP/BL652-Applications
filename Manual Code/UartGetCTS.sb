@@ -1,0 +1,7 @@
+//Example :: UartGetCTS.sb
+
+IF UartGetCTS()==0 THEN
+    PRINT "\nCTS line is not asserted"
+ELSEIF UartGetCTS()==1 THEN
+    PRINT "\nCTS line is asserted"
+ENDIF

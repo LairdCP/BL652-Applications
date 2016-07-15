@@ -1,0 +1,7 @@
+//Example :: RIGHT$.sb
+DIM newstring$              
+DIM s$              
+
+s$="Parse"
+newstring$ = RIGHT$(s$,4)           
+PRINT newstring$; "\n"

@@ -1,0 +1,12 @@
+//Example :: UartClose.sb
+UartClose()
+
+IF UartInfo(0)==0 THEN
+	PRINT "\nThe Uart port was closed"
+ELSE
+	PRINT "\nThe Uart port was not closed"
+ENDIF
+
+IF UartInfo(0)!=0 THEN
+	PRINT "\nand now it is open"
+ENDIF

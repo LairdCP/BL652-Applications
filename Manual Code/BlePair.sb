@@ -1,0 +1,127 @@
+//Example :: BlePair.sb
+dim rc, pr$, hC, hDesc
+dim s$ : s$ = "\02\00"      //value to write to cccd to enable indications
+
+//This example app was tested with a BL600 running the health thermometer sensor sample app which requires bonding.
+//It connects, tries to read from the temperature characteristic and then initiates a bonding procedure when it fails.
+
+#define GATT_SERVER_ADDRESS         "\01\F6\36\27\A6\0B\EA"
+#define AUTHENTICATION_REQUIRED     0x0105  
+
+#define SERVICE_UUID                0x1809   
+#define CHAR_UUID                   0x2a1c   
+#define DESC_UUID                   0x2902  
+
+
+'//------------------------------------------------------------------------------
+'// For debugging
+'// --- rc = result code
+'// --- ln = line number         
+'//------------------------------------------------------------------------------
+Sub AssertRC(rc,ln)   
+    if rc!=0 then
+        print "\nFail :";integer.h' rc;" at tag ";ln
+    endif
+EndSub
+
+
+'//------------------------------------------------------------------------------
+'// This handler is called when there is a significant BLE event
+'//------------------------------------------------------------------------------
+function HndlrBleMsg(byval nMsgId as integer, byval nCtx as integer) 
+    select nMsgId
+        case 0
+            hC = nCtx
+            print "\nConnected, Finding Temp Measurement Char"
+            rc=BleGattcFindDesc(nCtx,  BleHandleUuid16(SERVICE_UUID), 0, BleHandleUuid16(CHAR_UUID), 0, BleHandleUuid16(DESC_UUID), 0)
+            AssertRC(rc,35)
+        case 1
+            print "\n\n --- Disconnected"                     
+        case 10
+            print "\nNew bond created"           
+            print "\n\nAttempting to enable indications again"
+            rc=BleGattcWrite(hC, hDesc, s$)
+            AssertRC(rc,58)            
+        case 11
+            print "\nPair request: Accepting"
+            rc=BleAcceptPairing(hC,1)
+            AssertRC(rc,52)
+            print "\nPairing in progress"
+        case 17   
+            print "\nNew pairing/bond has replaced old key"
+        case 18
+            print "\nConnection now encrypted"
+        case else
+    endselect
+endfunc 1
+
+
+'//------------------------------------------------------------------------------
+'// Called after BleGattcFindDesc returns success
+'//------------------------------------------------------------------------------
+function HndlrFindDesc(hConn, hD) 
+    if hD==0 then
+        print "\nCCCD not found"
+        exitfunc 0
+    endif
+    
+    hDesc = hD
+    print "\nTemp Measurement Char CCCD Found. Attempting to enable indications"
+    rc=BleGattcWrite(hConn, hDesc, s$)
+    AssertRC(rc,58)  
+endfunc 1
+
+
+'//------------------------------------------------------------------------------
+'// Called after BleGattcRead returns success
+'//------------------------------------------------------------------------------
+function HndlrAttrWriteExit(hConn, hAttr, nSts)
+endfunc 0
+
+'//------------------------------------------------------------------------------
+'// Called after BleGattcRead returns success
+'//------------------------------------------------------------------------------
+function HndlrAttrWrite(hConn, hAttr, nSts) 
+    if nSts == 0 then
+        print "\nIndications enabled"
+        print "\nDisabling indications"
+        s$ = "\00\00"
+        rc=BleGattcWrite(hC, hDesc, s$) 
+        onevent evattrwrite call HndlrAttrWriteExit
+        exitfunc 1
+        
+    elseif nSts == AUTHENTICATION_REQUIRED then
+        print "\n\nAuthentication required."       
+        '//bond with the peer
+        rc=BlePair(hConn, 1) 
+        AssertRC(rc,75)        
+        print " Bonding..."         
+    endif
+endfunc 1
+
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+rc=BleSecMngrIoCap(0)           //set io capability to just works
+rc=BleSecMngrJustWorksConf(1)   //module will wait for confirmation (EVBLEMSG 11) before just works pairing
+
+rc=BleGattcOpen(0,0)
+pr$ = GATT_SERVER_ADDRESS
+rc=BleConnect(pr$, 10000, 25, 100, 30000000)
+AssertRC(rc,91)
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------  
+onevent evblemsg   call HndlrBleMsg
+onevent evfinddesc call HndlrFindDesc
+onevent evattrwrite call HndlrAttrWrite
+
+
+waitevent
+
+print "\nExiting..."
+
+
+

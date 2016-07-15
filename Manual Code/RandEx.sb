@@ -1,0 +1,3 @@
+//Example :: RandEx.sb
+DIM x : x=500
+PRINT "\nRandom number between 0 and ";x;" is ";RANDEX(x)

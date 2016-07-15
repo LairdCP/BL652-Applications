@@ -1,0 +1,166 @@
+// Copyright (c) 2013, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// Close the uart to reduce current consumption if the rx and tx buffers are
+// empty and there has been no uart activity for a set timeout. The RX gpio pin
+// is configured to monitor a high to low transition and once that happens
+// the uart is re-opened. While the uart is closed the RTS line is left asserted
+// and the TX pin on idle state so that the peer device is non the wiser.
+//
+// The incoming character that will result in the uart being re-opened will be
+// lost.
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+#define UART_IDLE_TIMER           (7)
+#define UART_IDLE_OPEN_TIMER      (6)
+#define UART_IDLE_TIMEOUT_MS      (4000)
+#define UART_OPEN_DELAY_MS        (10)
+#define UART_GPIO_ASSIGN_CHANNEL  (0)
+
+//******************************************************************************
+// Library Import
+//******************************************************************************
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+dim stRsp$
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+sub OnStartup()
+  dim rc
+  //Close the uart
+  UartClose()
+  //Open the uart
+  rc=UartOpen(115200,0,0,"CN81H")
+  //Start the uart inactivity timer
+  TimerStart(UART_IDLE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+endsub
+
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// Uart Inactivity timer handler
+//==============================================================================
+function handlerUartTimer() as integer
+  dim rc
+  //Close the uart, and set up TX/RX/RTS lines as gpio and for a hi-lo transition
+  //on the RX line to be detected
+  if UartCloseEx(1) == 0 then  
+    rc=GpioSetFunc(6,2,1)   //TX  - set high on default
+    rc=GpioSetFunc(5,2,0)   //RTS - set low by default 
+    rc=GpioSetFunc(8,1,2)   //RX  - Pull high input & irq on hi2lo transition
+    rc=GpioAssignEvent(UART_GPIO_ASSIGN_CHANNEL,8,1)
+    if rc != 0 then 
+      print "\nGpioAssignEvent() Failed"
+    endif
+  endif
+endfunc 1
+
+//==============================================================================
+// Delay before uart is opened
+//==============================================================================
+function handlerOpenDelay() as integer
+  dim rc
+  //Free up the level transition detection
+  rc=GpioUnAssignEvent(UART_GPIO_ASSIGN_CHANNEL)
+  //Open the uart
+  rc=UartOpen(115200,0,0,"CN81H")
+  //Send an ack character
+  print "!"
+endfunc 1
+
+
+//==============================================================================
+// Uart needs to be opened, because a hi to lo transition on RX has been detected
+//==============================================================================
+function handlerUartDetect() as integer
+  //Start delay before opening
+  TimerStart(UART_IDLE_OPEN_TIMER,UART_OPEN_DELAY_MS,0)
+endfunc 1
+
+//==============================================================================
+// Called when there is data in the rx buffer
+//==============================================================================
+function HandlerUartRx() as integer
+  dim nMatch
+
+  nMatch=UartReadMatch(stRsp$,13)
+  if nMatch!=0 then
+    print "\n Got :";stRsp$
+    stRsp$=""
+  endif
+  
+  if UartInfo(6) == 0 then 
+    //Start the uart inactivity timer
+    TimerStart(UART_IDLE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+  else
+    //Buffers are not empty
+    TimerCancel(UART_IDLE_TIMER)
+  endif
+endfunc 1
+
+//==============================================================================
+// Called when there is data in the rx buffer
+//==============================================================================
+function HandlerUartTxEmpty() as integer
+  if UartInfo(6) == 0 then 
+    //Start the uart inactivity timer
+    TimerStart(UART_IDLE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+  else
+    //Buffers are not empty
+    TimerCancel(UART_IDLE_TIMER)
+  endif
+endfunc 1
+
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+onevent EVTMR7          call handlerUartTimer
+onevent EVTMR6          call handlerOpenDelay
+onevent EVDETECTCHAN0   call handlerUartDetect
+OnEvent EVUARTRX        call HandlerUartRx
+OnEvent EVUARTTXEMPTY   call HandlerUartTxEmpty
+
+OnStartup()
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+waitevent
+

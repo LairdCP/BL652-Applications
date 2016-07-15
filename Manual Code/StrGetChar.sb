@@ -1,0 +1,8 @@
+//Example :: StrGetChar.sb
+DIM s$
+s$="Hello"
+PRINT s$;"\n"
+PRINT StrGetChr(s$,0), "-> ASCII value for 'H' \n"  
+PRINT StrGetChr(s$,1), "-> ASCII value for'e' \n"   
+PRINT StrGetChr(s$,-100), "-> error \n" 
+PRINT StrGetChr(s$,6), "-> error \n"    

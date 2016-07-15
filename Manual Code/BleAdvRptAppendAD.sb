@@ -1,0 +1,9 @@
+//Example :: BleAdvRptAppendAD.sb
+DIM scnRpt$,ad$  
+ad$="\01\02\03\04"
+
+PRINT BleScanRptInit(scnRpt$)
+
+IF BleAdvRptAppendAD(scnRpt$,0x31,ad$)==0 THEN //6 bytes will be used up in the report
+	PRINT "\nAD with data '";ad$;"' was appended to the advert report"
+ENDIF

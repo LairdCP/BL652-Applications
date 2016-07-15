@@ -1,0 +1,30 @@
+ //Example :: BleDecodeBits.sb
+
+ DIM chrHandle,v1,svcHandle,rc, ts$,decStr$
+ DIM ba : ba=0
+ DIM mdVal : mdVal = BleAttrMetadata(1,1,50,0,rc)
+ //"ABCDEFGHIJ"
+ DIM attr$ : attr$="41\42\43\44\45\46\47\48\49\4A"
+ DIM uuid : uuid = 0x1853
+
+ rc=BleServiceNew(1, BleHandleUuid16(uuid), svcHandle)
+
+ rc=BleCharNew(0x07,BleHandleUuid16(0x2A1C),mdVal,0,0)
+ rc=BleCharCommit(svcHandle,attr$,chrHandle)
+
+ rc=BleServiceCommit(svcHandle)
+
+ rc=BleCharValueRead(chrHandle,attr$)
+
+ //read max 14 bits from index 20 in the string to index 10
+ rc=BleDecodeBITS(attr$,20,ba,10,14)
+ PRINT "\nbit array = ", INTEGER.B' ba
+
+ //read max 14 bits from index 20 in the string to index 10
+ ba=0x12345678
+ PRINT "\n\nbit array = ",INTEGER.B' ba
+
+ rc=BleDecodeBITS(attr$,14000,ba,0,14)
+ PRINT "\nbit array now = ", INTEGER.B' ba
+ //ba will not have been modified because index 14000
+ //doesn't exist in attr$

@@ -1,0 +1,27 @@
+ //Example :: BleDecodeS8.sb
+
+ DIM chrHandle,v1,svcHandle,rc
+ DIM mdVal : mdVal = BleAttrMetadata(1,1,50,0,rc)
+ DIM attr$ : attr$="\00\01\02\03\04\85\86\87\88\89"
+ DIM uuid : uuid = 0x1853
+
+ //create random service just for this example
+ rc=BleServiceNew(1, BleHandleUuid16(uuid), svcHandle)
+
+ //create char and commit as part of service commited above
+ rc=BleCharNew(0x07,BleHandleUuid16(0x2A1C),mdVal,0,0)
+ rc=BleCharCommit(svcHandle,attr$,chrHandle)
+
+ rc=BleServiceCommit(svcHandle)
+
+ rc=BleCharValueRead(chrHandle,attr$)
+
+ //read signed byte from index 2
+ rc=BleDecodeS8(attr$,v1,2)
+ PRINT "\ndata in Hex = 0x"; INTEGER.H'v1
+ PRINT "\ndata in Decimal = "; v1;"\n"
+
+ //read signed byte from index 6 - two's complement of -122
+ rc=BleDecodeS8(attr$,v1,6)
+ PRINT "\ndata in Hex = 0x"; INTEGER.H'v1
+ PRINT "\ndata in Decimal = "; v1;"\n"

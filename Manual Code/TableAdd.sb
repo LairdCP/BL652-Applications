@@ -1,0 +1,8 @@
+//Example :: TableAdd.sb
+DIM t$ : PRINT TableInit(t$);"\n"
+PRINT TableAdd(t$,"Hello",1);"\n"       
+PRINT TableAdd(t$,"everyone",2);"\n"        
+PRINT TableAdd(t$,"to",300);"\n"        
+PRINT TableAdd(t$,"",3);"\n"
+PRINT t$                                
+//Tokens are stored in TLV format: \Tag\LengthValue         

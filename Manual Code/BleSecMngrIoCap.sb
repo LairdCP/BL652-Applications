@@ -1,0 +1,2 @@
+//Example :: BleSecMngrIoCap.sb
+PRINT BleSecMngrIoCap(1)

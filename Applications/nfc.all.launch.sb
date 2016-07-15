@@ -1,0 +1,318 @@
+//******************************************************************************
+// Example App File : nfc.all.launch.sb
+//
+// TODO: this description
+// simple app that creates 4 NDEF records (Windows launcher, android launcher, text, url)
+//
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+sub HandlerOnErr()
+  print "\n OnErr - ";GetLastError();"\n"
+endsub
+onerror next HandlerOnErr
+
+//******************************************************************************
+// Debugging resource as early as possible
+//******************************************************************************
+
+//==============================================================================
+//==============================================================================
+sub AssertRC(byval rc as integer,byval tag as integer)
+  if rc!=0 then
+    print "\nFailed with ";integer.h' rc;" at tag ";tag
+  endif
+endsub
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+dim rc            //Result code
+dim nfcHandle     //NFC handle
+dim ndefHandle    //NDEF handle
+
+dim records       //Used for listing space (Records used)
+dim memTotal      //Used for listing space (Memory total)
+dim memUsed       //Used for listing space (Memory used)
+
+//******************************************************************************
+// Initialisse Global Variable
+//******************************************************************************
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+#define NFC_MSGIN_NFCFIELDOFF               (2)
+#define NFC_MSGIN_NFCFIELDON                (3)
+#define NFC_MSGIN_NFCTAGREAD                (7)
+//==============================================================================
+function HandlerNfc(msgid) as integer
+  print "\nEVNFC "
+  select(msgid)
+  case NFC_MSGIN_NFCFIELDOFF
+    print "FIELD OFF"
+  case NFC_MSGIN_NFCFIELDON
+    print "FIELD ON"
+  case NFC_MSGIN_NFCTAGREAD
+    print "TAG READ"
+  case else
+  endselect
+endfunc 1
+
+function NFC_AddWP(ndHandle, ByVal AppID$)
+    //Adds a windows phone application opener NFC tag
+    dim Type$ : Type$ = "windows.com/LaunchApp"
+    dim ID$ : ID$ = ""
+    dim Lang$ : Lang$ = ""
+    dim Payload$ : Payload$ = "\00\01\0CWindowsPhone&{" + AppID$ + "}\00\01\20"
+    rc = NfcNdefRecAddGeneric(ndHandle, 3, Type$, ID$, Lang$, 0xFFFFFFFF, Payload$)
+    AssertRC(rc, 84)
+endfunc rc
+
+function NFC_AddAndroid(ndHandle, ByVal AppPackage$)
+    //Adds an android application package opener NFC tag
+    dim Type$ : Type$ = "android.com:pkg"
+    dim ID$ : ID$= ""
+    dim Lang$ : Lang$ = ""
+    rc = NfcNdefRecAddGeneric(ndHandle, 4, Type$, ID$, Lang$, 0xFFFFFFFF, AppPackage$)
+    AssertRC(rc, 94)
+endfunc rc
+
+function CompressURL$(URL$)
+    //Compresses a URL to use a smaller NDEF record size
+    dim URLTest$
+
+    URLTest$ = left$(URL$, 11)
+    if StrCmp(URLTest$, "http://www.") == 0 then
+        exitfunc "\01" + right$(URL$, strlen(URL$)-11)
+    endif
+
+    URLTest$ = left$(URL$, 12)
+    if StrCmp(URLTest$, "https://www.") == 0 then
+        exitfunc "\02" + right$(URL$, strlen(URL$)-12)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "http://") == 0 then
+        exitfunc "\03" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 8)
+    if StrCmp(URLTest$, "https://") == 0 then
+        exitfunc "\04" + right$(URL$, strlen(URL$)-8)
+    endif
+
+    URLTest$ = left$(URL$, 4)
+    if StrCmp(URLTest$, "tel:") == 0 then
+        exitfunc "\05" + right$(URL$, strlen(URL$)-4)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "mailto:") == 0 then
+        exitfunc "\06" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 26)
+    if StrCmp(URLTest$, "ftp://anonymous:anonymous@") == 0 then
+        exitfunc "\07" + right$(URL$, strlen(URL$)-26)
+    endif
+
+    URLTest$ = left$(URL$, 10)
+    if StrCmp(URLTest$, "ftp://ftp.") == 0 then
+        exitfunc "\08" + right$(URL$, strlen(URL$)-10)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "ftps://") == 0 then
+        exitfunc "\09" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 6)
+    if StrCmp(URLTest$, "sftp://") == 0 then
+        exitfunc "\0A" + right$(URL$, strlen(URL$)-6)
+    elseif StrCmp(URLTest$, "smb://") == 0 then
+        exitfunc "\0B" + right$(URL$, strlen(URL$)-6)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "nfs://") == 0 then
+        exitfunc "\0C" + right$(URL$, strlen(URL$)-7)
+    elseif StrCmp(URLTest$, "ftp://") == 0 then
+        exitfunc "\0D" + right$(URL$, strlen(URL$)-7)
+    elseif StrCmp(URLTest$, "dav://") == 0 then
+        exitfunc "\0E" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 9)
+    if StrCmp(URLTest$, "news://") == 0 then
+        exitfunc "\0F" + right$(URL$, strlen(URL$)-9)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "telnet://") == 0 then
+        exitfunc "\10" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 4)
+    if StrCmp(URLTest$, "imap://") == 0 then
+        exitfunc "\11" + right$(URL$, strlen(URL$)-4)
+    elseif StrCmp(URLTest$, "rtsp://") == 0 then
+        exitfunc "\12" + right$(URL$, strlen(URL$)-4)
+    endif
+
+    URLTest$ = left$(URL$, 5)
+    if StrCmp(URLTest$, "urn:") == 0 then
+        exitfunc "\13" + right$(URL$, strlen(URL$)-5)
+    elseif StrCmp(URLTest$, "pop:") == 0 then
+        exitfunc "\14" + right$(URL$, strlen(URL$)-5)
+    elseif StrCmp(URLTest$, "sip:") == 0 then
+        exitfunc "\15" + right$(URL$, strlen(URL$)-5)
+    endif
+
+    URLTest$ = left$(URL$, 8)
+    if StrCmp(URLTest$, "sips:") == 0 then
+        exitfunc "\16" + right$(URL$, strlen(URL$)-8)
+    elseif StrCmp(URLTest$, "tftp:") == 0 then
+        exitfunc "\17" + right$(URL$, strlen(URL$)-8)
+    endif
+
+    URLTest$ = left$(URL$, 10)
+    if StrCmp(URLTest$, "btspp://") == 0 then
+        exitfunc "\18" + right$(URL$, strlen(URL$)-10)
+    endif
+
+    URLTest$ = left$(URL$, 9)
+    if StrCmp(URLTest$, "btl2cap://") == 0 then
+        exitfunc "\19" + right$(URL$, strlen(URL$)-9)
+    endif
+
+    URLTest$ = left$(URL$, 10)
+    if StrCmp(URLTest$, "btgoep://") == 0 then
+        exitfunc "\1A" + right$(URL$, strlen(URL$)-10)
+    endif
+
+    URLTest$ = left$(URL$, 11)
+    if StrCmp(URLTest$, "tcpobex://") == 0 then
+        exitfunc "\1B" + right$(URL$, strlen(URL$)-11)
+    endif
+
+    URLTest$ = left$(URL$, 7)
+    if StrCmp(URLTest$, "irdaobex://") == 0 then
+        exitfunc "\1C" + right$(URL$, strlen(URL$)-7)
+    endif
+
+    URLTest$ = left$(URL$, 11)
+    if StrCmp(URLTest$, "file://") == 0 then
+        exitfunc "\1D" + right$(URL$, strlen(URL$)-11)
+    endif
+
+    URLTest$ = left$(URL$, 12)
+    if StrCmp(URLTest$, "urn:epc:id:") == 0 then
+        exitfunc "\1E" + right$(URL$, strlen(URL$)-12)
+    elseif StrCmp(URLTest$, "urn:epc:tag:") == 0 then
+        exitfunc "\1F" + right$(URL$, strlen(URL$)-12)
+    elseif StrCmp(URLTest$, "urn:epc:pat:") == 0 then
+        exitfunc "\20" + right$(URL$, strlen(URL$)-12)
+    elseif StrCmp(URLTest$, "urn:epc:raw:") == 0 then
+        exitfunc "\21" + right$(URL$, strlen(URL$)-12)
+    endif
+
+    URLTest$ = left$(URL$, 8)
+    if StrCmp(URLTest$, "urn:epc:") == 0 then
+        exitfunc "\22" + right$(URL$, strlen(URL$)-8)
+    elseif StrCmp(URLTest$, "urn:nfc:") == 0 then
+        exitfunc "\23" + right$(URL$, strlen(URL$)-8)
+    endif
+endfunc "\00" + URL$
+
+function NFC_AddURL(ndHandle, ByVal URL$)
+    //Adds a URL NFC tag
+    dim Type$ : Type$ = "U"
+    dim ID$ : ID$ = ""
+    dim Lang$ : Lang$ = ""
+    URL$ = CompressURL$(URL$)
+
+    //Add URL
+    rc = NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, URL$)
+    AssertRC(rc, 253)
+endfunc rc
+
+function NFC_AddText(ndHandle, ByVal Text$)
+    //Adds text NFC tag
+    dim Type$ : Type$ = "T"
+    dim ID$ : ID$ = ""
+    dim Lang$ : Lang$= " en" //This is the language code, change it to your desired language code if not using English text
+    rc = strsetchr(Lang$, strlen(Lang$)-1, 0) //Prepend the language code length and sets encoding to UTF-8
+    rc = NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, Text$)
+    AssertRC(rc, 263)
+endfunc rc
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVNFC  call HandlerNfc
+
+//------------------------------------------------------------------------------
+// Initialise and then wait for events
+//------------------------------------------------------------------------------
+
+//Enable NFC hardware interface, it already is, so will succeed
+rc = NfcHardwareState(0, 1)
+AssertRC(rc, 281)
+
+//Open NFC and return the handle
+rc = NfcOpen(0, "\00", nfcHandle)
+AssertRC(rc, 285)
+
+//Create a new NDEF message object that has a maximum size of 128 bytes
+rc = NfcNdefMsgNew(256, ndefHandle)
+AssertRC(rc, 289)
+
+//Add a windows phone launcher
+rc = NFC_AddWP(ndefHandle, "60332576-f8e3-4790-9677-9659bcde8a68")
+
+//Add an android launcher
+rc = NFC_AddAndroid(ndefHandle, "com.lairdtech.lairdtoolkit")
+
+//Add text
+rc = NFC_AddText(ndefHandle, "NFC demo application on the Laird BL652 module")
+
+//Add a URL
+rc = NFC_AddURL(ndefHandle, "http://www.lairdtech.com")
+
+//Inspect the status of the ndef message object
+rc = NfcNdefMsgGetInfo(ndefHandle,records,memTotal,memUsed)
+if rc == 0 then
+  print "\nNDEF Info: Records=";records;" TotalMem=";memTotal;" UsedMem=";memUsed
+endif
+
+//Commit the NDEF message to the stack
+rc = NfcNdefMsgCommit(nfcHandle,ndefHandle)
+AssertRC(rc, 311)
+
+//Enable field Sense
+rc = NfcFieldSense(nfcHandle,1)
+AssertRC(rc, 315)
+
+//------------------------------------------------------------------------------
+// Wait for an event.
+//------------------------------------------------------------------------------
+WaitEvent

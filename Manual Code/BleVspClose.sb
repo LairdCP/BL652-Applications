@@ -1,0 +1,30 @@
+//Example :: BleVspClose.sb
+
+DIM tx$,rc,scRpt$,adRpt$,addr$,hndl
+
+//handler when VSP tx buffer is empty
+FUNCTION HandlerVSpTxEmpty() AS INTEGER
+    PRINT "\n\nVSP tx buffer empty"
+    BleVspClose()
+ENDFUNC 0
+
+PRINT "\nDevice name is "; BleGetDeviceName$()
+
+//Open the VSP, advertise
+rc = BleVSpOpen(128,128,0,hndl)
+rc = BleScanRptInit(scRpt$)
+rc = BleAdvRptAddUuid128(scRpt$,hndl)
+adRpt$=""
+rc = BleAdvRptsCommit(adRpt$,scRpt$)
+addr$=""  
+rc = BleAdvertStart(0,addr$,20,300000,0)
+
+//This message will send when connected to client
+tx$="send this data and will close when sent"
+rc = BleVSpWrite(tx$)
+
+ONEVENT  EVVSPTXEMPTY  CALL HandlerVSpTxEmpty
+
+WAITEVENT
+
+PRINT "\nExiting..."

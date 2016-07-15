@@ -1,0 +1,8 @@
+//Example :: UartFlushTx.sb
+DIM s$ : s$ = "Hello World"
+DIM rc : rc = UartWrite(s$)
+
+UartFlush(10)		//Will flush before all chars have been transmitted
+
+PRINT UartInfo(5); " bytes in the tx buffer after flushing"
+

@@ -1,0 +1,6 @@
+//Example :: StrXOR.sb
+DIM number$
+number$="01234"
+PRINT StrXOR(number$,0,5,0)         //XOR: 48,49,50,51,52,0
+PRINT StrXOR(number$,0,5,10)        //XOR: 48,49,50,51,52,10 
+PRINT StrXOR(number$,0,5,1000)      //XOR: 48,49,50,51,52,1000

@@ -1,0 +1,33 @@
+//Example :: OnEvent.sb
+DIM rc
+
+FUNCTION Btn0press()
+  PRINT "\nButton 0 has been pressed"
+ENDFUNC 1								//Will continue waiting for an event
+
+FUNCTION Btn0rel()
+  PRINT "\nButton 0 released. Resume waiting for an event\n"
+ENDFUNC 1									
+
+FUNCTION Btn1press()
+	PRINT "\nButton 1 has been pressed"
+ENDFUNC 1
+
+FUNCTION Btn1rel()
+	PRINT "\nButton 1 released. No more waiting for events\n"
+ENDFUNC 0
+
+rc = gpiobindevent(0,16,0)				//binds a gpio transition high on sio16 (button 0) to event 0
+rc = gpiobindevent(1,16,1)          	//binds a gpio transition low on sio16 (button 0) to event 1
+rc = gpiobindevent(2,17,0)         		//binds a gpio transition high on sio16 (button 0) to event 2
+rc = gpiobindevent(3,17,1)          	//binds a gpio transition low on sio16 (button 0) to event 3
+
+onevent evgpiochan0 call Btn0rel   		//detects when button 0 is released and calls the function
+onevent evgpiochan1 call Btn0press		//detects when button 0 is pressed and calls the function
+onevent evgpiochan2 call Btn1rel   		//detects when button 1 is released and calls the function
+onevent evgpiochan3 call Btn1press 		//detects when button 1 is pressed and calls the function
+
+PRINT "\nWaiting for an event...\n"
+WAITEVENT								//wait  for an event  to occur
+
+PRINT "\nGot here because evgpiochan3 happened"

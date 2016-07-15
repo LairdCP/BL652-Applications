@@ -1,0 +1,20 @@
+ //Example :: BleDecodeTimestamp.sb
+
+ DIM chrHandle,v1,svcHandle,rc, ts$
+ DIM mdVal : mdVal = BleAttrMetadata(1,1,50,0,rc)
+ //5th May 2013, 10:31:24
+ DIM attr$ : attr$="\00\01\02\DD\07\05\05\0A\1F\18"
+ DIM uuid : uuid = 0x1853
+
+ rc=BleServiceNew(1, BleHandleUuid16(uuid), svcHandle)
+
+ rc=BleCharNew(0x07,BleHandleUuid16(0x2A1C),mdVal,0,0)
+ rc=BleCharCommit(svcHandle,attr$,chrHandle)
+
+ rc=BleServiceCommit(svcHandle)
+
+ rc=BleCharValueRead(chrHandle,attr$)
+
+ //read 7 byte timestamp from the index 3 in the string
+ rc=BleDecodeTimestamp(attr$,ts$,3)
+ PRINT "\nTimestamp = "; StrHexize$(ts$)

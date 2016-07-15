@@ -1,0 +1,9 @@
+//Example :: StrEscape$.sb
+
+DIM t$, s$ : s$="Hello world"
+
+PRINT "\n";s$;"\nLength: "; StrLen(s$)
+t$=StrEscape$(s$)
+PRINT "\n\nEscaped: "; t$
+PRINT "\nLength: "; StrLen(t$)
+ 
