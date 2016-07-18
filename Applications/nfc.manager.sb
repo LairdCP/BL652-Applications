@@ -22,7 +22,7 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 // NFC manager for BL652
-//   Version 0.85
+//   Version 0.90
 //
 // This app provides for a command interface over the uart and the protocol is
 // as follows:-
@@ -113,6 +113,12 @@
 //   - Will clear all tags and reset their values to the default.
 //
 // -----------------------------------------------------------------------------
+// nfc events #INTstate#
+//   - Enables or disables the NFC status event messages:
+//   -   0: Disable status messages
+//   -   1: Enable status messages
+//
+// -----------------------------------------------------------------------------
 // misc address
 //   - Outputs the Bluetooth address of the module.
 //
@@ -136,8 +142,6 @@
 //   - Will exit the application
 //
 //******************************************************************************
-
-//TODO: make a lowercase() function to put strings into lowercase for string comparisons
 
 //******************************************************************************
 // Definitions
@@ -556,6 +560,23 @@ function NFC_AddText(ndHandle, ByVal Text$)
 endfunc NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, Text$)
 
 //-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function HandlerNfc(msgID) as integer
+    //This handler is called when an NFC related event occurs
+    print "\nEVNFC msgID=";msgID
+    if (msgID == 2) then
+        //NFC field off
+        print "NFC field off"
+    elseif (msgID == 3) then
+        //NFC field on
+        print "NFC field on"
+    elseif (msgID == 7) then
+        //NFC tag read
+        print "NFC tag reading complete"
+    endif
+endfunc 1
+
+//-------------------------------------------------------------------------
 //#CMD#//  nfc open                                   - Open NFC
 //#CMD#//  nfc close                                  - Close NFC
 //#CMD#//  nfc hardware    #INTstate#                 - Will enable or disable NFC on the multifunction pins: 1 = enable, 0 = disable. Please note if NFC is disabled, the BL652 firmware will need to be reflashed using the JLINK interface (UART interface will not enable it) to re-enable the NFC pins
@@ -568,6 +589,7 @@ endfunc NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, Text$)
 //#CMD#//  nfc commit                                 - Update and apply changes to NDEF record specified by handle
 //#CMD#//  nfc enable      #INTstate#                 - Enable or disable NFC sensing (1 = enable, 0 = disable. Please note that NFC must be opened and tags must have been committed first)
 //#CMD#//  nfc space                                  - Show used/free NDEF space
+//#CMD#//  nfc events      #INTstate#                 - Enables or disables the NFC status event (1 = enable, 0 = disable).
 //-------------------------------------------------------------------------
 function _NFC()
     tlen = ExtractStrToken(urtcmd$,tkn$)
@@ -614,6 +636,7 @@ function _NFC()
 
         if (i[1] != 0 && i[1] != 1) then
             //Invalid parameter provided
+            exitfunc 5
         elseif (NFCHandle != -1) then
             //Change NFC field status
             NFCFieldStatus = i[1]
@@ -671,6 +694,24 @@ function _NFC()
             print "\nTags have not yet been commited."
             exitfunc -2
         endif
+    elseif strcmp(tkn$,"events")==0 then
+        //Extract 1 : (enabled) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+
+        if (i[1] != 0 && i[1] != 1) then
+            //Invalid parameter provided
+            exitfunc 5
+        elseif (i[0] == 0) then
+            //Disable NFC events
+            OnEvent  EVNFC  disable
+        elseif (i[0] == 1) then
+            //Enable NFC events
+            OnEvent  EVNFC  call HandlerNfc
+        endif
+        exitfunc 0
     elseif strcmp(tkn$,"tag")==0 then
         tlen = ExtractStrToken(urtcmd$,tkn$)
         if tlen == 0 then
@@ -721,8 +762,12 @@ function _NFC()
                 print "No type provided. Valid types are: Text, URL, WApp, AApp."
                 exitfunc rc
             endif
-//todo: Should check input here
-            if (NDEFTagType[i[1]-1] == -1) then
+
+            if (i[1] < 1 || i[1] > NUM_OF_NDEF) then
+                //Invalid tag number
+                print "\nInvalid tag index"
+                exitfunc -2
+            elseif (NDEFTagType[i[1]-1] == -1) then
                 print "\nThere is no tag at index ";i[1]
                 exitfunc -2
             else
@@ -782,9 +827,7 @@ function _NFC()
                 NDEFSize = NDEFSize + 10 + strlen(NDEFTagPayload$[q])
             elseif (NDEFTagType[q] == NDEF_TYPE_URL) then
                 dim TmpStr$ : TmpStr$ = CompressURL$(NDEFTagPayload$[q])
-//                NDEFSize = NDEFSize + 8 + strlen(NDEFTagPayload$[q])
                 NDEFSize = NDEFSize + 8 + strlen(TmpStr$)
-//todo: test if ^ works
                 TmpStr$ = ""
             elseif (NDEFTagType[q] == NDEF_TYPE_WAPP) then
                 NDEFSize = NDEFSize + 48 + strlen(NDEFTagPayload$[q])
