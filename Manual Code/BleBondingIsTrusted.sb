@@ -1,0 +1,21 @@
+//Example :: BleBondingIsTrusted.sb
+
+DIM rc, addr$, realaddr$, Central, KeyInfo, Age, Count
+
+addr$ = "000016A4123456"
+realaddr$ = strdehexize$(addr$)
+
+print "Address: ";addr$;"\n"
+rc = BleBondingIsTrusted(realaddr$, Central, KeyInfo, Age, Count)
+print "Is Trusted: ";rc;"\n"
+
+if (rc != 0) then
+    //Output details
+    if (Central == 0) then
+        print "Peripheral"
+    elseif (Central == 1) then
+        print "Central"
+    endif
+    print " device, keyinfo: ";integer.b'KeyInfo
+    print " Age: ";Age;" Count: ";count;"\n"
+endif
