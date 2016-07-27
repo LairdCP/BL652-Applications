@@ -37,10 +37,10 @@
 #define ENABLE_DEBUG_PRINTS                  1
 
 //LSR 128 bit Base UUID (Using LSR UUID to be compatible with phone app)
-#define LSR_BASE_UUID                      "\33\47\00\00\FB\94\11\E2\A8\E4\F2\3C\91\AE\C0\5E\"
+#define LSR_BASE_UUID                      "\33\47\00\00\FB\94\11\E2\A8\E4\F2\3C\91\AE\C0\5E"
 
 //GPIO Service responsible for button notifications and turning LEDs on and off
-#define	GPIO_SVC_UUID           0xAAA0
+#define GPIO_SVC_UUID           0xAAA0
 #define INPUTS_CHAR_UUID        0xAAA1    
 #define OUTPUTS_CHAR_UUID       0xAAA2
 #define BTNS_CHAR_UUID          0xAAA3
@@ -103,7 +103,7 @@
 //BLE_APPEARANCE_GENERIC_TAG
 #define APPEARANCE                           512 
 
-#define GPIO_TEMP_SENSOR               		 3
+#define GPIO_TEMP_SENSOR                   3
 //DiscoverableMode (2==General)
 #define DISCOVERY_MODE                       2
 //Advertise type (0==Connectable, 2==Not Connectable)
@@ -197,13 +197,13 @@ Sub CreateSvc()
     dim hBseUuid : hBseUuid=BleHandleUuid128(bseUuid$)
 
     hGpioSvcUuid=BleHandleUuidSibling(hBseUuid,GPIO_SVC_UUID)
-	hRangeSvcUuid=BleHandleUuidSibling(hBseUuid,RANGE_SVC_UUID)
-	hTempSvcUuid=BleHandleUuidSibling(hBseUuid,TEMP_SVC_UUID)
-	hVccSvcUuid=BleHandleUuidSibling(hBseUuid,VCC_SVC_UUID)
+  hRangeSvcUuid=BleHandleUuidSibling(hBseUuid,RANGE_SVC_UUID)
+  hTempSvcUuid=BleHandleUuidSibling(hBseUuid,TEMP_SVC_UUID)
+  hVccSvcUuid=BleHandleUuidSibling(hBseUuid,VCC_SVC_UUID)
     dim dta$ : dta$="\00"
     dim rc2,rc3
-	dim hInputs
-	dim hOutputs
+  dim hInputs
+  dim hOutputs
 
     //***************************************************************************
     //Create Btn LED Service
@@ -211,13 +211,13 @@ Sub CreateSvc()
     rc=BleServiceNew(1,hGpioSvcUuid,hGpioSvc)
     AssertRC(rc,211)
 
-	//Initialise GATT Server Total Inputs Char - Read
+  //Initialise GATT Server Total Inputs Char - Read
     rc=BleCharNew(0x02, BleHandleUuidSibling(hBseUuid,(INPUTS_CHAR_UUID)), BleAttrMetaData(1,0,1,1,rc2),0,0)
     AssertRC(rc,215) : AssertRC(rc2,215) : AssertRC(rc3,215)
     rc=BleCharCommit(hGpioSvc,dta$,hInputs)
     AssertRC(rc,217)
   
-	//Initialise GATT Server Total Outputs Char - Read
+  //Initialise GATT Server Total Outputs Char - Read
     rc=BleCharNew(0x02, BleHandleUuidSibling(hBseUuid,(OUTPUTS_CHAR_UUID)), BleAttrMetaData(1,0,1,1,rc2),0,0)
     AssertRC(rc,221) : AssertRC(rc2,221) : AssertRC(rc3,221)
     rc=BleCharCommit(hGpioSvc,dta$,hOutputs)
@@ -229,7 +229,7 @@ Sub CreateSvc()
     rc=BleCharCommit(hGpioSvc,dta$,hSerLeds)
     AssertRC(rc,229)
   
-	//Initialise GATT Server Buttons Characteristic - Read/Notify
+  //Initialise GATT Server Buttons Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(BTNS_CHAR_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,233) : AssertRC(rc2,233) : AssertRC(rc3,233)
     rc=BleCharCommit(hGpioSvc,dta$,hSerBtns)
@@ -239,18 +239,18 @@ Sub CreateSvc()
     AssertRC(rc,238)  
   
     //***************************************************************************
-	//Create Range Test Service
+  //Create Range Test Service
     //***************************************************************************
     rc=BleServiceNew(1,hRangeSvcUuid,hRangeSvc)
     AssertRC(rc,244)
   
-	//Initialise GATT Server RSSI Characteristic - Read/Notify
+  //Initialise GATT Server RSSI Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(RSSI_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,248) : AssertRC(rc2,248) : AssertRC(rc3,248)
     rc=BleCharCommit(hRangeSvc,dta$,hRssi)
     AssertRC(rc,245)
 
-	//Initialise GATT Server Packet ID Characteristic - Read/Notify
+  //Initialise GATT Server Packet ID Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(PKT_ID_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,254) : AssertRC(rc2,254) : AssertRC(rc3,254)
     rc=BleCharCommit(hRangeSvc,dta$,hPktId)
@@ -260,27 +260,27 @@ Sub CreateSvc()
     AssertRC(rc,259)
     
     //***************************************************************************
-	//Create Temperature Service
+  //Create Temperature Service
     //***************************************************************************
     rc=BleServiceNew(1,hTempSvcUuid,hTempSvc)
     AssertRC(rc,265)
   
-	//Initialise GATT Server Temperature Data Characteristic - Read/Notify
+  //Initialise GATT Server Temperature Data Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(TEMP_DATA_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,269) : AssertRC(rc2,269) : AssertRC(rc3,269)
-	rc=BleCharCommit(hTempSvc,dta$,hTempData)
+  rc=BleCharCommit(hTempSvc,dta$,hTempData)
     AssertRC(rc,271)
   
     rc=BleServiceCommit(hTempSvc)
     AssertRC(rc,274)  
   
     //***************************************************************************
-	//Create Voltage Service
+  //Create Voltage Service
     //***************************************************************************
     rc=BleServiceNew(1,hVccSvcUuid,hVccSvc)
     AssertRC(rc,280)
   
-	//Initialise GATT Server Temperature Data Characteristic - Read/Notify
+  //Initialise GATT Server Temperature Data Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(VCC_DATA_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,284) : AssertRC(rc2,284) : AssertRC(rc3,284)  
     rc=BleCharCommit(hVccSvc,dta$,hVccData)
@@ -289,25 +289,25 @@ Sub CreateSvc()
     rc=BleServiceCommit(hVccSvc)
     AssertRC(rc,289)     
   
-	dim inputs$ : inputs$="\02"
-	dim outputs$ : outputs$="\02"
-	rc=BleCharValueWrite(hInputs,inputs$)
-	AssertRC(rc,294)
+  dim inputs$ : inputs$="\02"
+  dim outputs$ : outputs$="\02"
+  rc=BleCharValueWrite(hInputs,inputs$)
+  AssertRC(rc,294)
   
-	rc=BleCharValueWrite(hOutputs,outputs$)   
-	AssertRC(rc,297)
-	
-	dim initialVcc$ : initialVcc$ = "\30\00"
-	rc=BleCharValueWrite(hVccData,initialVcc$)   
-	AssertRC(rc,301)
-	
-	dim intialZeroVal$ : intialZeroVal$ = "\00\00"
-	rc=BleCharValueWrite(hSerBtns,intialZeroVal$)   
-	AssertRC(rc,305)
+  rc=BleCharValueWrite(hOutputs,outputs$)   
+  AssertRC(rc,297)
+  
+  dim initialVcc$ : initialVcc$ = "\30\00"
+  rc=BleCharValueWrite(hVccData,initialVcc$)   
+  AssertRC(rc,301)
+  
+  dim intialZeroVal$ : intialZeroVal$ = "\00\00"
+  rc=BleCharValueWrite(hSerBtns,intialZeroVal$)   
+  AssertRC(rc,305)
     rc=BleCharValueWrite(hPktId,intialZeroVal$)   
-	AssertRC(rc,307)
+  AssertRC(rc,307)
     rc=BleCharValueWrite(hTempData,intialZeroVal$)   
-	AssertRC(rc,309)	
+  AssertRC(rc,309)  
   
 EndSub
 
@@ -324,12 +324,12 @@ Sub MakeAdvRpts()
 
     //Initialise scan report
     rc=BleScanRptInit(scnRpt$)
-	AssertRC(rc,326)
+  AssertRC(rc,326)
     //Add local name to scan report; append BT MAC ADDR
-	dim mac$ : mac$=sysinfo$(4)
-	dim macAscci$ : macAscci$=STRHEXIZE$(mac$)
-	STRSHIFTLEFT(macAscci$,2)
-	dn$=dn$+"-"+macAscci$
+  dim mac$ : mac$=sysinfo$(4)
+  dim macAscci$ : macAscci$=STRHEXIZE$(mac$)
+  STRSHIFTLEFT(macAscci$,2)
+  dn$=dn$+"-"+macAscci$
     rc=BleAdvRptAppendAD(scnRpt$,0x09,dn$)
     AssertRC(rc,333)
 
@@ -389,10 +389,10 @@ Sub OnStartup()
 
     InitGpios()  
   
-	EnableTempSensor()
+  EnableTempSensor()
   
-	rc = BleVSpOpen(tsz,rsz,0,uuhdl)
-	AssertRC(rc,394)
+  rc = BleVSpOpen(tsz,rsz,0,uuhdl)
+  AssertRC(rc,394)
 
     StartAdvertising()   
 EndSub
@@ -406,32 +406,32 @@ EndSub
 // New Characteristic value
 //------------------------------------------------------------------------------
 Function HndlrCharVal(charHndl, offset, len)  
-	dim i,s$
-	//Get characteristic value
-	rc=BleCharValueRead(charHndl, s$)
-	AssertRC(rc,411)
+  dim i,s$
+  //Get characteristic value
+  rc=BleCharValueRead(charHndl, s$)
+  AssertRC(rc,411)
 
-	if charHndl==hSerLeds then
-		//Write values to LEDs
-		dim onOrOffVal
-		rc=BleDecodeU8(s$,onOrOffVal, 0)
-		
-		select(onOrOffVal)
-		    case 0
-			    GpioWrite(GPIO_LED0,0)
-				GpioWrite(GPIO_LED1,0)
-			case 1
-		        GpioWrite(GPIO_LED1,1)
-				GpioWrite(GPIO_LED0,0)			
-			case 2
-		        GpioWrite(GPIO_LED1,0)
-				GpioWrite(GPIO_LED0,1)				
-			case 3
-		        GpioWrite(GPIO_LED0,1)
-				GpioWrite(GPIO_LED1,1)
-		    case else
-		endselect
-	endif
+  if charHndl==hSerLeds then
+    //Write values to LEDs
+    dim onOrOffVal
+    rc=BleDecodeU8(s$,onOrOffVal, 0)
+    
+    select(onOrOffVal)
+        case 0
+          GpioWrite(GPIO_LED0,0)
+        GpioWrite(GPIO_LED1,0)
+      case 1
+            GpioWrite(GPIO_LED1,1)
+        GpioWrite(GPIO_LED0,0)      
+      case 2
+            GpioWrite(GPIO_LED1,0)
+        GpioWrite(GPIO_LED0,1)        
+      case 3
+            GpioWrite(GPIO_LED0,1)
+        GpioWrite(GPIO_LED1,1)
+        case else
+    endselect
+  endif
 EndFunc 1
 
 //------------------------------------------------------------------------------
@@ -440,9 +440,9 @@ EndFunc 1
 Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
     
     select(nMsgId)
-		case BLE_EVBLEMSGID_CONNECT
-			rc=BleConnRssiStart(connHndl,4,10)
-			AssertRC(rc,444)
+    case BLE_EVBLEMSGID_CONNECT
+      rc=BleConnRssiStart(connHndl,4,10)
+      AssertRC(rc,444)
         case else
     endselect
 EndFunc 1
@@ -457,14 +457,14 @@ Function HndlrGpio()
 
     dim val$
     
-	rc=StrSetChr(val$, !GpioRead(GPIO_BTN1), 1)
+  rc=StrSetChr(val$, !GpioRead(GPIO_BTN1), 1)
     AssertRC(rc,460)
     
-	rc=StrSetChr(val$, !GpioRead(GPIO_BTN0), 0)
+  rc=StrSetChr(val$, !GpioRead(GPIO_BTN0), 0)
     AssertRC(rc,463)
 
-	rc=BleCharValueNotify(hSerBtns,val$)
-	AssertRC(rc,466)
+  rc=BleCharValueNotify(hSerBtns,val$)
+  AssertRC(rc,466)
 
     OnEvent EvGpioChan0 call HndlrGpio
     OnEvent EvGpioChan1 call HndlrGpio
@@ -487,28 +487,28 @@ Function HndlrCccd(charHndl, val)
         endif
     elseif charHndl == hRssi then
         if val==1 then
-			RssiNotEn=1
+      RssiNotEn=1
         else
-			RssiNotEn=0
+      RssiNotEn=0
         endif
     elseif charHndl == hPktId then
         if val==1 then
-			TimerStart(0,250,1) 
+      TimerStart(0,250,1) 
         else
-			TimerCancel(0) 
-			PacketId=0
+      TimerCancel(0) 
+      PacketId=0
         endif
     elseif charHndl == hTempData then
         if val==1 then
-			TimerStart(1,1000,1) 
+      TimerStart(1,1000,1) 
         else
-			TimerCancel(1) 
+      TimerCancel(1) 
         endif
     elseif charHndl == hVccData then
         if val==1 then
-			TimerStart(2,5000,1) 
+      TimerStart(2,5000,1) 
         else
-			TimerCancel(2) 
+      TimerCancel(2) 
         endif
   endif
   
