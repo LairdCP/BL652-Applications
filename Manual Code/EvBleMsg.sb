@@ -9,7 +9,6 @@ FUNCTION HndlrBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER)
     SELECT nMsgId
         CASE 0
             PRINT "\nBLE Connection ";nCtx
-            rc = BleAuthenticate(nCtx)
         CASE 1
             PRINT "\nDisconnected ";nCtx;"\n"
         CASE 18
@@ -28,24 +27,22 @@ FUNCTION HndlrBlrAdvTimOut()
    PRINT "\nExiting..."
 ENDFUNC 0
 
-FUNCTION Btn0Press()
+FUNCTION HndlrUartRx()   
+    rc=BleAdvertStop()
     PRINT "\nExiting..."
 ENDFUNC 0
 
-rc = GpioSetFunc(16,1,2)
-rc = GpioBindEvent(0,16,1)
 
 ONEVENT  EVBLEMSG           CALL HndlrBleMsg
 ONEVENT  EVBLE_ADV_TIMEOUT  CALL HndlrBlrAdvTimOut
-ONEVENT  EVGPIOCHAN0        CALL Btn0Press
+ONEVENT  EVUARTRX           CALL HndlrUartRx
 
-// start adverts
+//Start adverts
 IF BleAdvertStart(0,addr$,100,10000,0)==0 THEN
     PRINT "\nAdverts Started"
-    PRINT "\nPress button 0 to exit\n"
+    PRINT "\nPress any key to exit\n"
 ELSE
     PRINT "\n\nAdvertisement not successful"
 ENDIF
 
 WAITEVENT
-

@@ -1,4 +1,4 @@
 //Example :: GpioSetFunc.sb
 PRINT GpioSetFunc(15,1,2)    //Digital In SIO 15, strong pull up resistor
-PRINT GpioSetFunc(20,3,0)    //Analog In SIO 20 (Trim Pot), default settings
+PRINT GpioSetFunc(3,3,0)     //Analog In SIO 3 (Temperature sensor), default settings
 PRINT GpioSetFunc(17,2,1)    //SIO17 (LED0) digital out, initial output high

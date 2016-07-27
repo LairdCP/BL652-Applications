@@ -1,0 +1,5 @@
+//Example :: GpioSetFuncEx.sb
+
+PRINT GpioSetFuncEx(15,1,"\02")    //Digital In SIO 15, strong pull up resistor
+PRINT GpioSetFuncEx(3,3,"")        //Analog In SIO 3 (Temperature Sensor), default settings
+PRINT GpioSetFuncEx(17,2,"\01")    //SIO17 (LED0) digital out, initial output high

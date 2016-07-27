@@ -3,12 +3,11 @@ dim rc, i1, i2
 i2 = 1
 i1 = 1
 
-
-'//------------------------------------------------------------------------------
-'// For debugging
-'// --- rc = result code
-'// --- ln = line number         
-'//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// For debugging
+// --- rc = result code
+// --- ln = line number         
+//------------------------------------------------------------------------------
 Sub AssertRC(rc,ln)   
     if rc!=0 then
         print "\nFail :";integer.h' rc;" at tag ";ln
@@ -18,18 +17,16 @@ Sub AssertRC(rc,ln)
 EndSub
 
 rc=GpioSetFunc(17,2,1)
-AssertRC(rc,16)
+AssertRC(rc,20)
 
-rc=GpioSetFunc(18,2,1)
-AssertRC(rc,19)
-
+rc=GpioSetFunc(19,2,1)
+AssertRC(rc,23)
 
 function HandlerTmr0()
     i1=!i1
-    GpioWrite(18,i1)
+    GpioWrite(19,i1)
     AssertRC(rc,30)
 endfunc 1
-
 
 function HandlerTmr1()
     i2=!i2
@@ -39,7 +36,6 @@ endfunc 1
 
 function HandlerUartRx()
 endfunc 0
-
 
 TimerStart(0,500,1)
 TimerStart(1,1000,1)

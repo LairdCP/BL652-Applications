@@ -1,4 +1,4 @@
-// Copyright (c) 2013, Laird
+// Copyright (c) 2016, Laird
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -27,9 +27,7 @@
 // closing the UART
 //
 // After running this application you should see <4uA at the current measurement
-// header pins (CONN1). Remove the jumper and place an ammeter in series.
-//
-// gpiosetfunc(SIO,function,sub function)
+// header pins (J7). Remove the jumper and place an ammeter in series.
 //
 //******************************************************************************
 
@@ -59,13 +57,17 @@ dim rc          //Declare rc as a variable (result code)
 // Equivalent to main() in C
 //******************************************************************************
 
-rc=gpiosetfunc(15,2,0)  //Sets Buzzer to digital out low
-rc=gpiosetfunc(18,2,0)  //Sets LED 0 to digital out low
+PRINT "To get the expected low power consumption please remove jumpers J3 and J4 on your DVK-BL652 board."
+
+rc=gpiosetfunc(17,2,0)  //Sets LED 0 to digital out low
 rc=gpiosetfunc(19,2,0)  //Sets LED 1 to digital out low
-rc=gpiosetfunc(4,2,0)   //Disables the temperature sensor
+rc=gpiosetfunc(3,2,0)   //Disables the temperature sensor
+while (uartinfo(5) > 0)
+    //Wait for the UART transmit buffer to empty
+endwhile
 uartclose()             //Closes the UART
-rc=gpiosetfunc(21,2,1)  //TX - set high on default
-rc=gpiosetfunc(23,2,0)  //RTS
+rc=gpiosetfunc(6,2,1)   //TX - set high on default
+rc=gpiosetfunc(5,2,0)   //RTS
 
 //Put module into deep sleep
 rc = SystemStateSet(0)
