@@ -86,43 +86,43 @@ sub InitTempSensor()
   AssertRC(rc, 86)
 
   //First byte selects the gain (default, 1/6 scaling)
-  //Second byte selects the resolution (8 bit)
+  //Second byte selects the resolution (12-bit)
   //Third byte selects the acquisition time (default).
   //See the BL652 extension manual for further details
-  rc = GPIOSETFUNCEX(GPIO_TEMP_SENSOR, 3, "\00\08\00")
+  rc = GPIOSETFUNCEX(GPIO_TEMP_SENSOR, 3, "\00\0C\00")
   AssertRC(rc, 93)
 endsub
 
 // -----------------------------------------------------------------------------
 // Bandgap = 600mv
-// Max Adc = 1024 (8 bit mode), 2048 (10 bit mode), 4096 (12 bit mode)
+// Max Adc = 1024 (8-bit mode), 2048 (10-bit mode), 4096 (12-bit mode)
 // Gain scaled by 1/6 (Please see the BL652 manual for additional options)
 //
 // Hence mV = (((adc/MaxADC) * Bandgap)*6)/1
 // refactoring for integer maths gives
 //  mv = (adc * Bandgap * 6)/(MaxADC)
-//  mv = (adc * 600 * 6)/1024 [8 bit mode]
-//  mv = (adc * 600 * 6)/2048 [10 bit mode]
-//  mv = (adc * 600 * 6)/4096 [12 bit mode]
+//  mv = (adc * 600 * 6)/1024 [8-bit mode]
+//  mv = (adc * 600 * 6)/2048 [10-bit mode]
+//  mv = (adc * 600 * 6)/4096 [12-bit mode]
 // -----------------------------------------------------------------------------
 function Adc2Mv(adc)
-    //By default, ADC pins are in 8-bit mode.
+    //By default, ADC pins are in 8-bit mode. This application uses 12-bit mode.
 
     //8-bit resolution
-    adc = (adc*225)/16
+    //adc = (adc*225)/16
 
     //10-bit resolution
     //adc = (adc*225)/64
 
     //12-bit resolution
-    //adc = (adc*225)/256
+    adc = (adc*225)/256
 endfunc adc
 
 //-----------------------------------------------------------------------------
-//  ((1864-mV)*16)/1889 * 10 in 10th of mV
+// Returns temperature in celsius times by 10 (260 = 26.0c)
 //-----------------------------------------------------------------------------
 function Mv2Temperature(mv)
-    mv = ((mv*10 - 18663) / -117)*10
+    mv = ((mv*100 - 185830) / -117)
 endfunc mv
 
 //******************************************************************************
