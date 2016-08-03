@@ -47,11 +47,6 @@
 //     be sent over BLE via the VSP service.
 //
 // -----------------------------------------------------------------------------
-// bridge spp
-//   - Bridge to the most recent SPP connection. All data arriving via UART will
-//     be sent over this connection.
-//
-// -----------------------------------------------------------------------------
 // ^^^
 //   - Switch to command parser mode
 //
