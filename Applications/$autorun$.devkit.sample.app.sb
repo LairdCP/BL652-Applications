@@ -22,11 +22,15 @@
 // +++++  which consists of all characters up to the first . and excluding it ++
 // +++++                                                                      ++
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
-// BleLed.gatt.server_mod.sb  ??? do we intend to leave the '_mod' in the file name
+//	
+// $autorun$.devkit.sample.app.sb
+// (Version 0.9)
 //  -- Created to demonstrating the following:
-//     ??? Some description here
-//     ??? Some description here
+//     - Range Test Service (Packet ID and RSSI)
+//     - Voltage Service
+//     - Temperature Service
+//     - GPIO Service
+//     - Virtual Serial Port Service
 //
 //******************************************************************************
 
@@ -34,115 +38,100 @@
 //******************************************************************************
 // Definitions
 //******************************************************************************
-#define ENABLE_DEBUG_PRINTS                  1
+
+//Error code result when the Ble advert is full
+#define BleAdvertSpaceError                           0x6008
+
+//Error code result when the Ble Buffer is full
+#define BleBufferSpaceError                           0x6208
+
+//Set to 1 to enable debug output printing
+#define ENABLE_DEBUG_PRINTS                           1
+
+//Size of VSP buffers (0 uses default)
+#define TSZ                                           0  //TX
+#define RSZ                                           0  //RX
 
 //LSR 128 bit Base UUID (Using LSR UUID to be compatible with phone app)
-#define LSR_BASE_UUID                      "\33\47\00\00\FB\94\11\E2\A8\E4\F2\3C\91\AE\C0\5E"
+#define LSR_BASE_UUID                                 "\33\47\00\00\FB\94\11\E2\A8\E4\F2\3C\91\AE\C0\5E"
 
 //GPIO Service responsible for button notifications and turning LEDs on and off
-#define GPIO_SVC_UUID           0xAAA0
-#define INPUTS_CHAR_UUID        0xAAA1    
-#define OUTPUTS_CHAR_UUID       0xAAA2
-#define BTNS_CHAR_UUID          0xAAA3
-#define LEDS_CHAR_UUID          0xAAA4
+#define GPIO_SVC_UUID                                 0xAAA0
+#define INPUTS_CHAR_UUID                              0xAAA1
+#define OUTPUTS_CHAR_UUID                             0xAAA2
+#define BTNS_CHAR_UUID                                0xAAA3
+#define LEDS_CHAR_UUID                                0xAAA4
 
 //Range test service, reports RSSI and Packet ID
-#define RANGE_SVC_UUID          0xAAB0
-#define RSSI_UUID               0xAAB1
-#define PKT_ID_UUID             0xAAB2
+#define RANGE_SVC_UUID                                0xAAB0
+#define RSSI_UUID                                     0xAAB1
+#define PKT_ID_UUID                                   0xAAB2
 
 //Temperature service, reports temperature data
-#define TEMP_SVC_UUID           0xAAC0
-#define TEMP_DATA_UUID          0xAAC1
+#define TEMP_SVC_UUID                                 0xAAC0
+#define TEMP_DATA_UUID                                0xAAC1
 
 //Voltage service, reports the micro's Vcc
-#define VCC_SVC_UUID            0xAAF0
-#define VCC_DATA_UUID           0xAAF1
+#define VCC_SVC_UUID                                  0xAAF0
+#define VCC_DATA_UUID                                 0xAAF1
 
-//Will advertise this name, appended with MAC below
-#define DEVICENAME                           "BL652"
+//Will advertise this name, appended with Bluetooth Address
+#define DEVICENAME                                    "BL652"
+
 //Version of this app in Device Info Service
-#define SWREV                               "1.0"
+#define SWREV                                         "1.0"
 
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //GPIO Defines
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-#define GPIO_BTN0               11
-#define GPIO_BTN1               15
-#define GPIO_LED0               17
-#define GPIO_LED1               19
+#define GPIO_BTN0                                     11
+#define GPIO_BTN1                                     15
+#define GPIO_LED0                                     17
+#define GPIO_LED1                                     19
 
 //BLE EVENT MSG IDs
-#define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2 // msgCtx = alert level
-#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3 // msgCtx = alert level
-#define BLE_EVBLEMSGID_SERVICE_ERROR                    4 // msgCtx = resultcode
-#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5 // msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6 // msgCtx = not used
-#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7 // msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8 // msgCtx = not used
-#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9 // msgCtx = passcode to display
-#define BLE_EVBLEMSGID_NEW_BOND                        10 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                11 // msgCtx = 1 for passkey, 2 for 16 byte OOB data
-#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE          12 // msgCtx = new notification state 0=off, 1=on
-#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE               14 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL          15 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER           16 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_UPDATED_BOND                    17 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_ENCRYPTED                       18 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING           19 // msgCtx = current supply voltage
-#define BLE_EVBLEMSGID_UNENCRYPTED                     20 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_DEVICENAME_WRITE                21 // msgCtx = connection handle 
+#define BLE_EVBLEMSGID_CONNECT                        0  //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                     1  //msgCtx = connection handle
 
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //Connection Defines
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#define DEVICENAME_WRITABLE                   1
+#define DEVICENAME_WRITABLE                           1
 //BLE_APPEARANCE_GENERIC_TAG
-#define APPEARANCE                           512 
+#define APPEARANCE                                    512 
 
-#define GPIO_TEMP_SENSOR                   3
+#define GPIO_TEMP_SENSOR                              3
 //DiscoverableMode (2==General)
-#define DISCOVERY_MODE                       2
+#define DISCOVERY_MODE                                2
 //Advertise type (0==Connectable, 2==Not Connectable)
-#define ADVERT_TYPE                          0
+#define ADVERT_TYPE                                   0
 //Advertising interval -- higher the number, lower the current consumption
 //Recommended range 50 to 10000 
-#define ADV_INTERVAL_MS                      250
+#define ADV_INTERVAL_MS                               250
 //Advertise timeout (0==forever)
-#define ADV_TIMEOUT_MS                       0
+#define ADV_TIMEOUT_MS                                0
 //Minimum acceptable connection interval (100 ms)
-#define MIN_CONN_INTERVAL                    100000
+#define MIN_CONN_INTERVAL                             100000
 //Maximum acceptable connection interval (150 ms).
-#define MAX_CONN_INTERVAL                    150000
+#define MAX_CONN_INTERVAL                             150000
 //Slave latency -- number of conn events that can be missed
 //Effective Conn interval will be (SLAVE_LATENCY+1)*ACTUAL_CONN_INTERVAL
-#define SLAVE_LATENCY                        0
+#define SLAVE_LATENCY                                 0
 //Connection supervisory timeout (4 seconds) - max 32 seconds
-#define CONN_SUP_TIMEOUT                     4000000
-//EvBleMsg ID for a BLE disconnection event
-#define BLE_DISCONNECTED                     1
+#define CONN_SUP_TIMEOUT                              4000000
 
 //******************************************************************************
 // Register Error Handler as early as possible
 //******************************************************************************
 sub HandlerOnErr()
-  if (ENABLE_DEBUG_PRINTS!=0) then
-    print "\n OnErr - ";GetLastError();"\n"
-  endif
+    if (ENABLE_DEBUG_PRINTS!=0) then
+        print "\n OnErr - ";GetLastError();"\n"
+    endif
 endsub
 onerror next HandlerOnErr
-
 
 //******************************************************************************
 // Global Variable Declarations
 //******************************************************************************
-dim stRsp$ as string        //Uart rx data is stored here
+dim stRsp$        //Uart rx data is stored here
 dim rc            //Resultcode
 dim dn$           //Device name
-dim prAddr$       //Peer mac address (not required for this app) hence empty
 dim hGpioSvc      //GPIO Service handle
 dim hRangeSvc     //Range Test Service handle
 dim hTempSvc      //Temperature Service handle
@@ -155,32 +144,39 @@ dim hTempSvcUuid  //Temperature Service UUID handle
 dim hVccSvcUuid   //Voltage Service UUID handle
 dim hRssi         //RSSI characteristic handle
 dim hPktId        //Packet ID characteristic handle
-dim RssiNotEn : RssiNotEn=0 //Set to 1 once CCCD for char is enabled
-dim PacketId : PacketId=0   //Set to 1 once CCCD for char is enabled
+dim PacketId      //Set to 1 once CCCD for char is enabled
 dim hTempData     //Temperature Data characteristic handle
 dim hVccData
-dim tsz           //txbuf size for VSP
-dim rsz           //rxbuf size for VSP
 dim uuhdl         //Service uuid handle for VSP
+dim tx$           //VSP write data stored here
 dim rx$           //VSP read data stored here
-
+dim bufAvail      //Flag indicating OTA tx buf is available
+dim BtnIndStat    //Status of Button indication descriptor
+dim RangeIndStat  //Status of range indication descriptor
+dim PktIDIndStat  //Status of packet ID indication descriptor
+dim TempIndStat   //Status of temperature indication descriptor
+dim VccIndStat    //Status of battery indication descriptor
 
 //******************************************************************************
 // Initialise Global Variable
 //******************************************************************************
-dn$=DEVICENAME
-prAddr$=""
-tsz=0
-rsz=0  
+dn$          = DEVICENAME
+bufAvail     = 1  //Assume available
+PacketId     = 0
+BtnIndStat   = 0
+RangeIndStat = 0
+PktIDIndStat = 0
+TempIndStat  = 0
+VccIndStat   = 0
 
 //******************************************************************************
 // Function and Subroutine definitions
 //******************************************************************************
 
 //------------------------------------------------------------------------------
-// For debugging        
+// For debugging
 //------------------------------------------------------------------------------
-Sub AssertRC(rc,ln)  
+Sub AssertRC(rc,ln)
     if rc!=0 then
         if (ENABLE_DEBUG_PRINTS!=0) then
             print "\nFail :";integer.h' rc;" at tag ";ln
@@ -189,21 +185,31 @@ Sub AssertRC(rc,ln)
 EndSub
 
 //------------------------------------------------------------------------------
+// Check if Ble buffer is full
+//------------------------------------------------------------------------------
+Sub CheckBleSend(rc)
+    if (rc == BleBufferSpaceError) then
+        //No space in buffer
+        bufAvail = 0
+    endif
+EndSub
+
+//------------------------------------------------------------------------------
 // Initialise service and characteristics
 //------------------------------------------------------------------------------
 Sub CreateSvc()
-    dim bseUuid$ : bseUuid$=LSR_BASE_UUID
     //Base UUID handle
+    dim bseUuid$ : bseUuid$=LSR_BASE_UUID
     dim hBseUuid : hBseUuid=BleHandleUuid128(bseUuid$)
 
     hGpioSvcUuid=BleHandleUuidSibling(hBseUuid,GPIO_SVC_UUID)
-  hRangeSvcUuid=BleHandleUuidSibling(hBseUuid,RANGE_SVC_UUID)
-  hTempSvcUuid=BleHandleUuidSibling(hBseUuid,TEMP_SVC_UUID)
-  hVccSvcUuid=BleHandleUuidSibling(hBseUuid,VCC_SVC_UUID)
+    hRangeSvcUuid=BleHandleUuidSibling(hBseUuid,RANGE_SVC_UUID)
+    hTempSvcUuid=BleHandleUuidSibling(hBseUuid,TEMP_SVC_UUID)
+    hVccSvcUuid=BleHandleUuidSibling(hBseUuid,VCC_SVC_UUID)
     dim dta$ : dta$="\00"
     dim rc2,rc3
-  dim hInputs
-  dim hOutputs
+    dim hInputs
+    dim hOutputs
 
     //***************************************************************************
     //Create Btn LED Service
@@ -211,106 +217,104 @@ Sub CreateSvc()
     rc=BleServiceNew(1,hGpioSvcUuid,hGpioSvc)
     AssertRC(rc,211)
 
-  //Initialise GATT Server Total Inputs Char - Read
+    //Initialise GATT Server Total Inputs Char - Read
     rc=BleCharNew(0x02, BleHandleUuidSibling(hBseUuid,(INPUTS_CHAR_UUID)), BleAttrMetaData(1,0,1,1,rc2),0,0)
     AssertRC(rc,215) : AssertRC(rc2,215) : AssertRC(rc3,215)
     rc=BleCharCommit(hGpioSvc,dta$,hInputs)
     AssertRC(rc,217)
-  
-  //Initialise GATT Server Total Outputs Char - Read
+
+    //Initialise GATT Server Total Outputs Char - Read
     rc=BleCharNew(0x02, BleHandleUuidSibling(hBseUuid,(OUTPUTS_CHAR_UUID)), BleAttrMetaData(1,0,1,1,rc2),0,0)
     AssertRC(rc,221) : AssertRC(rc2,221) : AssertRC(rc3,221)
     rc=BleCharCommit(hGpioSvc,dta$,hOutputs)
     AssertRC(rc,223)  
-  
+
     //Initialise GATT Server LEDs Characteristic - Read/Write
     rc=BleCharNew(0x0A, BleHandleUuidSibling(hBseUuid,(LEDS_CHAR_UUID)), BleAttrMetaData(1,1,1,1,rc2),0,0)
     AssertRC(rc,227) : AssertRC(rc2,227) : AssertRC(rc3,227)
     rc=BleCharCommit(hGpioSvc,dta$,hSerLeds)
     AssertRC(rc,229)
-  
-  //Initialise GATT Server Buttons Characteristic - Read/Notify
+
+    //Initialise GATT Server Buttons Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(BTNS_CHAR_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,233) : AssertRC(rc2,233) : AssertRC(rc3,233)
     rc=BleCharCommit(hGpioSvc,dta$,hSerBtns)
     AssertRC(rc,235)
-  
+
     rc=BleServiceCommit(hGpioSvc)
     AssertRC(rc,238)  
-  
+
     //***************************************************************************
-  //Create Range Test Service
+    //Create Range Test Service
     //***************************************************************************
     rc=BleServiceNew(1,hRangeSvcUuid,hRangeSvc)
     AssertRC(rc,244)
-  
-  //Initialise GATT Server RSSI Characteristic - Read/Notify
+
+    //Initialise GATT Server RSSI Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(RSSI_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,248) : AssertRC(rc2,248) : AssertRC(rc3,248)
     rc=BleCharCommit(hRangeSvc,dta$,hRssi)
-    AssertRC(rc,245)
+    AssertRC(rc,250)
 
-  //Initialise GATT Server Packet ID Characteristic - Read/Notify
+    //Initialise GATT Server Packet ID Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(PKT_ID_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,254) : AssertRC(rc2,254) : AssertRC(rc3,254)
     rc=BleCharCommit(hRangeSvc,dta$,hPktId)
     AssertRC(rc,256)
-  
+
     rc=BleServiceCommit(hRangeSvc)
     AssertRC(rc,259)
-    
+
     //***************************************************************************
-  //Create Temperature Service
+    //Create Temperature Service
     //***************************************************************************
     rc=BleServiceNew(1,hTempSvcUuid,hTempSvc)
     AssertRC(rc,265)
-  
-  //Initialise GATT Server Temperature Data Characteristic - Read/Notify
+
+    //Initialise GATT Server Temperature Data Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(TEMP_DATA_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
     AssertRC(rc,269) : AssertRC(rc2,269) : AssertRC(rc3,269)
-  rc=BleCharCommit(hTempSvc,dta$,hTempData)
+    rc=BleCharCommit(hTempSvc,dta$,hTempData)
     AssertRC(rc,271)
-  
+
     rc=BleServiceCommit(hTempSvc)
-    AssertRC(rc,274)  
-  
+    AssertRC(rc,274)
+
     //***************************************************************************
-  //Create Voltage Service
+    //Create Voltage Service
     //***************************************************************************
     rc=BleServiceNew(1,hVccSvcUuid,hVccSvc)
     AssertRC(rc,280)
-  
-  //Initialise GATT Server Temperature Data Characteristic - Read/Notify
+
+    //Initialise GATT Server Temperature Data Characteristic - Read/Notify
     rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(VCC_DATA_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
-    AssertRC(rc,284) : AssertRC(rc2,284) : AssertRC(rc3,284)  
+    AssertRC(rc,284) : AssertRC(rc2,284) : AssertRC(rc3,284)
     rc=BleCharCommit(hVccSvc,dta$,hVccData)
     AssertRC(rc,286)
 
     rc=BleServiceCommit(hVccSvc)
-    AssertRC(rc,289)     
-  
-  dim inputs$ : inputs$="\02"
-  dim outputs$ : outputs$="\02"
-  rc=BleCharValueWrite(hInputs,inputs$)
-  AssertRC(rc,294)
-  
-  rc=BleCharValueWrite(hOutputs,outputs$)   
-  AssertRC(rc,297)
-  
-  dim initialVcc$ : initialVcc$ = "\30\00"
-  rc=BleCharValueWrite(hVccData,initialVcc$)   
-  AssertRC(rc,301)
-  
-  dim intialZeroVal$ : intialZeroVal$ = "\00\00"
-  rc=BleCharValueWrite(hSerBtns,intialZeroVal$)   
-  AssertRC(rc,305)
-    rc=BleCharValueWrite(hPktId,intialZeroVal$)   
-  AssertRC(rc,307)
-    rc=BleCharValueWrite(hTempData,intialZeroVal$)   
-  AssertRC(rc,309)  
-  
-EndSub
+    AssertRC(rc,289)
 
+    dim inputs$ : inputs$="\02"
+    dim outputs$ : outputs$="\02"
+    rc=BleCharValueWrite(hInputs,inputs$)
+    AssertRC(rc,294)
+
+    rc=BleCharValueWrite(hOutputs,outputs$)
+    AssertRC(rc,297)
+
+    dim initialVcc$ : initialVcc$ = "\30\00"
+    rc=BleCharValueWrite(hVccData,initialVcc$)
+    AssertRC(rc,301)
+
+    dim intialZeroVal$ : intialZeroVal$ = "\00\00"
+    rc=BleCharValueWrite(hSerBtns,intialZeroVal$)
+    AssertRC(rc,305)
+    rc=BleCharValueWrite(hPktId,intialZeroVal$)
+    AssertRC(rc,307)
+    rc=BleCharValueWrite(hTempData,intialZeroVal$)
+    AssertRC(rc,309)
+EndSub
 
 //------------------------------------------------------------------------------
 // Initialise advert reports
@@ -320,46 +324,59 @@ Sub MakeAdvRpts()
 
     //Initialise the advert report
     rc = BleAdvRptInit(advRpt$, 2, 0, 0)
-    AssertRC(rc,322)   
+    AssertRC(rc,322)
 
     //Initialise scan report
     rc=BleScanRptInit(scnRpt$)
-  AssertRC(rc,326)
-    //Add local name to scan report; append BT MAC ADDR
-  dim mac$ : mac$=sysinfo$(4)
-  dim macAscci$ : macAscci$=STRHEXIZE$(mac$)
-  STRSHIFTLEFT(macAscci$,2)
-  dn$=dn$+"-"+macAscci$
-    rc=BleAdvRptAppendAD(scnRpt$,0x09,dn$)
+    AssertRC(rc,326)
+
+    //Add 128-bit UUID to advert report
+    rc = BLEADVRPTADDUUID128(advRpt$, uuhdl)
+    AssertRC(rc,324)
+    if (rc == BleAdvertSpaceError) then
+        //No advert space
+        print "There is insufficient space in the advert report to add a 128-bit UUID. This means that BLE devices will not detect the 128-bit service by scanning but the application is fully operational.\r\n"
+        print "If VSP is enabled then disabling it will free up additional advert report space (remove the jumper from J5)."
+    endif
+
+    //Add 16-bit UUIDs to scan report
+    rc = BleAdvRptAddUuid16(scnRpt$, GPIO_SVC_UUID, RANGE_SVC_UUID, TEMP_SVC_UUID, VCC_SVC_UUID, -1, -1)
+    AssertRC(rc,323)
+
+    //Add local name to scan report; append BT ADDR
+    dim BTAddr$ : BTAddr$ = sysinfo$(4)
+    BTAddr$ = strhexize$(BTAddr$)
+    STRSHIFTLEFT(BTAddr$, 2)
+    dn$ = dn$ + "-" + BTAddr$
+    rc = BleAdvRptAppendAD(scnRpt$,0x09,dn$)
     AssertRC(rc,333)
 
-    //Commit the reports to stack
-    rc = BleAdvRptsCommit(advRpt$,scnRpt$)
+    //Commit the advert and scan reports to the stack
+    rc = BleAdvRptsCommit(advRpt$, scnRpt$)
     AssertRC(rc,337)
 EndSub
 
-      
 //------------------------------------------------------------------------------
 // Start connectable advertising
 //------------------------------------------------------------------------------
 Sub StartAdvertising()
+    dim prAddr$ : prAddr$ = ""  //Peer BT address (not required for this app) hence empty
     rc = BleAdvertStart(ADVERT_TYPE, prAddr$, ADV_INTERVAL_MS, ADV_TIMEOUT_MS,0)
     AssertRC(rc,346)
 EndSub
-
 
 //------------------------------------------------------------------------------
 // Initialise GPIOS
 //------------------------------------------------------------------------------
 Sub InitGpios()
-    rc=gpiosetfunc(GPIO_BTN0,1,2)             //Button 0 digital input with weak pull up resistor
+    rc=gpiosetfunc(GPIO_BTN0,1,2)  //Button 0 digital input with weak pull up resistor
     AssertRC(rc,355)
-    rc=gpiosetfunc(GPIO_BTN1,1,2)             //Button 1 digital input with weak pull up resistor
+    rc=gpiosetfunc(GPIO_BTN1,1,2)  //Button 1 digital input with weak pull up resistor
     AssertRC(rc,357)
-    rc=GpioSetFunc(GPIO_LED0,2,0)             //Sets sio17 (LED0) as a digital out
+    rc=GpioSetFunc(GPIO_LED0,2,0)  //Sets LED0 as a digital out
     AssertRC(rc,359)
     GpioWrite(GPIO_LED0,0)
-    rc=GpioSetFunc(GPIO_LED1,2,0)             //Sets sio19 (LED1) as a digital out
+    rc=GpioSetFunc(GPIO_LED1,2,0)  //Sets LED1 as a digital out
     AssertRC(rc,362)
     GpioWrite(GPIO_LED1,0)
 EndSub
@@ -368,35 +385,55 @@ EndSub
 // Enable ADC input for temp sensor
 //------------------------------------------------------------------------------
 sub EnableTempSensor()
-  rc = GpioSetFunc(GPIO_TEMP_SENSOR,1,2)  //Remove the pull resistor
-  AssertRC(rc,371)
-
-  rc = GPIOSETFUNCEX(GPIO_TEMP_SENSOR, 3, "\00\0C\0A") //First byte selects the gain (default, 1/6 scaling), second byte selects the resolution (8, 10 or 12 bit) and the third byte selects the acquisition time (10us). See the BL652 extension manual for further details
-  AssertRC(rc,374)
+    rc = GPIOSETFUNCEX(GPIO_TEMP_SENSOR, 3, "\00\0C\0A") //First byte selects the gain (default, 1/6 scaling), second byte selects the resolution (8, 10 or 12 bit) and the third byte selects the acquisition time (10us). See the BL652 extension manual for further details
+    AssertRC(rc,374)
 endsub
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 Sub OnStartup()
-
-    CreateSvc()
+    //Open UART if it is not already open
+    if (UartInfo(0) == 0) then
+        rc = UartOpen(115200, 0, 0, "CN81H")
+        AssertRC(rc,385)
+    endif
 
     //Initialise the Gap Service
-    rc=BleGapSvcInit(dn$,DEVICENAME_WRITABLE,APPEARANCE,MIN_CONN_INTERVAL,MAX_CONN_INTERVAL,CONN_SUP_TIMEOUT,SLAVE_LATENCY)
+    rc=BleGapSvcInit(dn$, DEVICENAME_WRITABLE, APPEARANCE, MIN_CONN_INTERVAL, MAX_CONN_INTERVAL, CONN_SUP_TIMEOUT, SLAVE_LATENCY)
     AssertRC(rc,385)
 
+    //Create the services
+    CreateSvc()
+
+    //Configure the GPIOs
+    InitGpios()
+
+    //Enable the temperature sensor
+    EnableTempSensor()
+
+    //Start a VSP server
+    rc = BleVSpOpen(TSZ, RSZ, 0, uuhdl)
+    AssertRC(rc,394)
+
+    //Create the advert/scan reports
     MakeAdvRpts()
 
-    InitGpios()  
-  
-  EnableTempSensor()
-  
-  rc = BleVSpOpen(tsz,rsz,0,uuhdl)
-  AssertRC(rc,394)
+    //Start advertising
+    StartAdvertising()
 
-    StartAdvertising()   
+    //Enable events for when buttons are pressed
+    rc=GpioBindEvent(0, GPIO_BTN0, 2)  //Binds a gpio transition high or low on button 0 to event 0
+    AssertRC(rc,480)
+    rc=GpioBindEvent(1, GPIO_BTN1, 2)  //Binds a gpio transition high or low on button 1 to event 1
+    AssertRC(rc,482)
+
+    //Output a message to the UART indicating that the application is running
+    print "Welcome to the BL652 sample application!\r\nThis application can be tested with the X app available for:\r\n\t- Android: X\r\n\t- iOS: X\r\n\r\n"
+    print "You can return to command mode (whereby the autorun application will not run at startup or on reset) by either:\r\n"
+    print "\t- Unchecking DTR from UwTerminalX and pressing the reset button on the module or checking and unchecking the BREAK checkbox\r\n"
+    print "\t- Move the J12 Autorun jumper to the L position (pins 2-3) and pressing the reset button on the module\r\n\r\n"
+    print "You can reload this application any time from the BL652 Github repository: https://github.com/LairdCP/BL652-Applications by loading $autorun$.devkit.sample.app.sb\r\n"
 EndSub
-
 
 //******************************************************************************
 // Handler definitions
@@ -405,224 +442,254 @@ EndSub
 //------------------------------------------------------------------------------
 // New Characteristic value
 //------------------------------------------------------------------------------
-Function HndlrCharVal(charHndl, offset, len)  
-  dim i,s$
-  //Get characteristic value
-  rc=BleCharValueRead(charHndl, s$)
-  AssertRC(rc,411)
+Function HndlrCharVal(charHndl, offset, len)
+    dim i,s$
 
-  if charHndl==hSerLeds then
-    //Write values to LEDs
-    dim onOrOffVal
-    rc=BleDecodeU8(s$,onOrOffVal, 0)
-    
-    select(onOrOffVal)
-        case 0
-          GpioWrite(GPIO_LED0,0)
-        GpioWrite(GPIO_LED1,0)
-      case 1
-            GpioWrite(GPIO_LED1,1)
-        GpioWrite(GPIO_LED0,0)      
-      case 2
-            GpioWrite(GPIO_LED1,0)
-        GpioWrite(GPIO_LED0,1)        
-      case 3
-            GpioWrite(GPIO_LED0,1)
-        GpioWrite(GPIO_LED1,1)
-        case else
-    endselect
-  endif
+    //Get characteristic value
+    rc=BleCharValueRead(charHndl, s$)
+    AssertRC(rc,411)
+
+    if charHndl==hSerLeds then
+        //Write values to LEDs
+        dim onOrOffVal
+        rc=BleDecodeU8(s$, onOrOffVal, 0)
+        if ((onOrOffVal & 1) == 1) then
+            GpioWrite(GPIO_LED0, 1)
+        else
+            GpioWrite(GPIO_LED0, 0)
+        endif
+        if ((onOrOffVal & 2) == 2) then
+            GpioWrite(GPIO_LED1, 1)
+        else
+            GpioWrite(GPIO_LED1, 0)
+        endif
+    endif
+EndFunc 1
+
+//------------------------------------------------------------------------------
+// Button transition handler
+//------------------------------------------------------------------------------
+Function HndlrGpio()
+    dim val$
+
+    rc=StrSetChr(val$, !GpioRead(GPIO_BTN1), 1)
+    AssertRC(rc,460)
+    rc=StrSetChr(val$, !GpioRead(GPIO_BTN0), 0)
+    AssertRC(rc,462)
+
+    if (BtnIndStat == 0) then
+        //Update characteristic
+        rc=BleCharValueWrite(hSerBtns, val$)
+        AssertRC(rc,464)
+    else
+        //Notify
+        if bufAvail==1 then
+            rc=BleCharValueNotify(hSerBtns, val$)
+            CheckBleSend(rc)
+        endif
+    endif
 EndFunc 1
 
 //------------------------------------------------------------------------------
 // Ble event handler
 //------------------------------------------------------------------------------
 Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
-    
     select(nMsgId)
-    case BLE_EVBLEMSGID_CONNECT
-      rc=BleConnRssiStart(connHndl,4,10)
-      AssertRC(rc,444)
+        case BLE_EVBLEMSGID_CONNECT
+            //Enable RSSI signal strength monitoring
+            rc=BleConnRssiStart(connHndl,4,10)
+            AssertRC(rc,444)
+
+            //Restart packet ID value
+            PacketId = 0
+
+            //Start timers for checking status of temperature sensor and battery level
+            TimerStart(1, 1000, 1)
+            TimerStart(2, 1000, 1)
+
+            //Get current status of buttons
+            rc=HndlrGpio()
+        case BLE_EVBLEMSGID_DISCONNECT
+            //Device disconnected. Disable all indications
+            BtnIndStat = 0
+            RangeIndStat = 0
+            PktIDIndStat = 0
+            TempIndStat = 0
+            VccIndStat = 0
+
+            //Cancel timers for updating characteristics
+            TimerCancel(0)
+            TimerCancel(1)
+            TimerCancel(2)
+            StartAdvertising()
         case else
     endselect
 EndFunc 1
 
-
-//------------------------------------------------------------------------------
-// Button 0 transition handler
-//------------------------------------------------------------------------------
-Function HndlrGpio()
-    OnEvent EvGpioChan0 disable
-    OnEvent EvGpioChan1 disable
-
-    dim val$
-    
-  rc=StrSetChr(val$, !GpioRead(GPIO_BTN1), 1)
-    AssertRC(rc,460)
-    
-  rc=StrSetChr(val$, !GpioRead(GPIO_BTN0), 0)
-    AssertRC(rc,463)
-
-  rc=BleCharValueNotify(hSerBtns,val$)
-  AssertRC(rc,466)
-
-    OnEvent EvGpioChan0 call HndlrGpio
-    OnEvent EvGpioChan1 call HndlrGpio
-EndFunc 1 
-
-
 //------------------------------------------------------------------------------
 // CCCD written
 //------------------------------------------------------------------------------
-Function HndlrCccd(charHndl, val)  
-    if charHndl == hSerBtns then
+Function HndlrCccd(charHndl, val)
+    if charHndl == hPktId then
+        PktIDIndStat = val
         if val==1 then
-            rc=GpioBindEvent(0,GPIO_BTN0,2)         //Binds a gpio transition high or low on button 0 (SIO16) to event 0
-            AssertRC(rc,480)
-            rc=GpioBindEvent(1,GPIO_BTN1,2)         //Binds a gpio transition high or low on button 1 (SIO17) to event 1
-            AssertRC(rc,482)
+            PacketId=0
+            TimerStart(0, 500, 1)
         else
-            rc=GpioUnbindEvent(0)
-            rc=GpioUnbindEvent(1)
+            TimerCancel(0)
         endif
+    elseif charHndl == hSerBtns then
+        BtnIndStat = val
     elseif charHndl == hRssi then
-        if val==1 then
-      RssiNotEn=1
-        else
-      RssiNotEn=0
-        endif
-    elseif charHndl == hPktId then
-        if val==1 then
-      TimerStart(0,250,1) 
-        else
-      TimerCancel(0) 
-      PacketId=0
-        endif
+        RangeIndStat = val
     elseif charHndl == hTempData then
-        if val==1 then
-      TimerStart(1,1000,1) 
-        else
-      TimerCancel(1) 
-        endif
+        TempIndStat = val
     elseif charHndl == hVccData then
-        if val==1 then
-      TimerStart(2,5000,1) 
-        else
-      TimerCancel(2) 
-        endif
+        VccIndStat = val
   endif
-  
 EndFunc 1
 
+//-----------------------------------------------------------------------------
+// Converts the adc reading to mV
+//-----------------------------------------------------------------------------
 function Adc2Mv(adc)
-//    adc = (adc*1000)/263
-//    adc = (adc*3600)/1024
-//    adc = (adc*1800)/512
-//    adc = (adc*900)/256
-//    adc = (adc*450)/128
-//    adc = (adc*225)/64 //10 bit resolution
-
     //12-bit resolution
     adc = (adc*225)/256
 endfunc adc
 
 //-----------------------------------------------------------------------------
-//  ((1864-mV)*16)/1889 * 10 in 10th of mV
+// Returns temperature in celsius times by 10 (260 = 26.0c)
 //-----------------------------------------------------------------------------
 function Mv2Temperature(mv)
-    mv = ((mv*10 - 18663) / -117)*10
+    mv = ((mv*100 - 185830) / -117)
 endfunc mv
-
-//------------------------------------------------------------------------------
-// Disconnection 
-//------------------------------------------------------------------------------
-Function HndlrDiscon(hConn, rsn)
-  TimerCancel(0)
-  TimerCancel(1) 
-  TimerCancel(2)
-  PacketId=0
-  StartAdvertising()
-EndFunc 1
 
 //------------------------------------------------------------------------------
 // Connection RSSI updated
 //------------------------------------------------------------------------------
 Function HndlrConnRssi(BYVAL charHandle, BYVAL rssi) AS INTEGER
-  if RssiNotEn==1 then
     dim s$
-    rc=BleEncode16(s$,rssi,0)
-    AssertRC(rc,522)
-    rc=BleCharValueNotify(hRssi,s$)
-    AssertRC(rc,555)
-  endif
+    rc=BleEncode16(s$, rssi, 0)
+    AssertRC(rc,546)
+
+    if (RangeIndStat == 0) then
+        rc=BleCharValuewrite(hRssi, s$)
+    else
+        if bufAvail==1 then
+            rc=BleCharValueNotify(hRssi, s$)
+            CheckBleSend(rc)
+        endif
+    endif
 Endfunc 1
 
 //------------------------------------------------------------------------------
 // Timer 0 Expired
 //------------------------------------------------------------------------------
 Function HndlrTimer0()
-  PacketId=PacketId+1
-  dim s$
-  rc=BleEncode16(s$,PacketId,0)
-  AssertRC(rc,566)
-  rc=BleCharValueNotify(hPktId,s$)
-  AssertRC(rc,568)
-Endfunc 1 //remain blocked in WAITEVENT
+    PacketId=PacketId+1
+    dim s$
+    rc=BleEncode16(s$, PacketId, 0)
+    AssertRC(rc,562)
+    rc=BleCharValueNotify(hPktId, s$)
+    AssertRC(rc,568)
+Endfunc 1 //Remain blocked in WAITEVENT
 
 //------------------------------------------------------------------------------
 // Timer 1 Expired
 //------------------------------------------------------------------------------
 Function HndlrTimer1()
-  dim mv: mv= Adc2Mv(GpioRead(GPIO_TEMP_SENSOR))
-  dim tmp: tmp= Mv2Temperature(mv)
-  dim s$
-  rc=BleEncode16(s$, tmp, 0)
-  AssertRC(rc,579)
-  rc=BleCharValueNotify(hTempData,s$)
-  AssertRC(rc,581)
-Endfunc 1 //remain blocked in WAITEVENT
+    dim mv: mv= Adc2Mv(GpioRead(GPIO_TEMP_SENSOR))
+    dim tmp: tmp= Mv2Temperature(mv)
+    dim s$
+    rc=BleEncode16(s$, tmp, 0)
+    AssertRC(rc,575)
+
+    if (TempIndStat == 0) then
+        //Save to characteristic
+        rc=BleCharValuewrite (hTempData, s$)
+    else
+        //Notify
+        if bufAvail==1 then
+            rc=BleCharValueNotify(hTempData, s$)
+            CheckBleSend(rc)
+        endif
+    endif
+Endfunc 1 //Remain blocked in WAITEVENT
 
 //------------------------------------------------------------------------------
 // Timer 2 Expired
 //------------------------------------------------------------------------------
 Function HndlrTimer2()
-  dim mv: mv=READPWRSUPPLYMV()
-  dim s$
-  rc=BleEncode16(s$, mv, 0)
-  AssertRC(rc,591)
-  rc=BleCharValueNotify(hVccData,s$)
-  AssertRC(rc,593)
-Endfunc 1 //remain blocked in WAITEVENT
+    dim mv: mv=READPWRSUPPLYMV()
+    dim s$
+    rc=BleEncode16(s$, mv, 0)
+    AssertRC(rc,591)
+
+    if (VccIndStat == 0) then
+        //Save to characteristic
+        rc=BleCharValuewrite(hVccData, s$)
+    else
+        //Notify
+        if (bufAvail == 1) then
+            rc=BleCharValueNotify(hVccData, s$)
+            CheckBleSend(rc)
+        endif
+    endif
+Endfunc 1 //Remain blocked in WAITEVENT
 
 //==============================================================================
 // This handler is called when data has arrived at the serial port
 //==============================================================================
 function HandlerUartRx() as integer
-  dim nMatch
-  dim stData$
+    if (bufAvail == 1) then
+        //Buffer space is available
+        dim n
 
-  nMatch=UartReadMatch(stRsp$,13)
-  if nMatch!=0 then
-    //-1 so we don't send the CR
-    stData$ = strsplitleft$(stRsp$,nMatch-1)
-  dim n
-  n = BleVSpWrite(stData$)
-  endif
+        //Read up to 20 bytes from the UART if string is empty
+        if (strlen(tx$) == 0) then
+            n = UartReadN(tx$, 20)
+        endif
+
+        //Check if there is any data to send
+        if (n > 0 || strlen(tx$) > 0) then
+            //Write the data out over VSP and remove characters from the buffer that were sent
+            n = BleVSpWrite(tx$)
+            strshiftleft(tx$, n)
+
+            if (n != strlen(tx$)) then
+                //Not all bytes were sent, pause sending until next TxBufAvail event
+                bufavail = 0
+            endif
+        endif
+    endif
 endfunc 1
 
 //==============================================================================
 // This handler is called when data has arrived at the virtual serial port
 //==============================================================================
-function HandlerVspDataRxd() as integer
-  dim rxn
+function HndlrVspDataRxd() as integer
+    dim rxn
+
     //Reaching here means there could be at least 1 byte space in tx buffer
-    rxn = BleVSpRead(rx$,20)
+    rxn = BleVSpRead(rx$, 20)
     if rxn == 0 then
-      //The rx buffer was empty
-      exitfunc 1
+        //The rx buffer was empty
+        exitfunc 1
     endif
-  //If we get here data is available to print
-  print rx$
+
+    //If we get here data is available to print
+    print rx$
+endfunc 1
+
+//==============================================================================
+// This handler is called when OTA Tx buffer is available
+//==============================================================================
+function HndlrTxBufAvail() as integer
+    //Buffer now has free space
+    bufAvail=1
+
+    //Check if there is any additional UART data to send
+    rc = HandlerUartRx()
 endfunc 1
 
 //******************************************************************************
@@ -636,14 +703,14 @@ OnEvent EvBleMsg     call HndlrBleMsg
 OnEvent EvCharCccd   call HndlrCccd
 OnEvent EvGpioChan0  call HndlrGpio
 OnEvent EvGpioChan1  call HndlrGpio
-OnEvent EvDiscon     call HndlrDiscon
 OnEvent EvConnRssi   call HndlrConnRssi
-OnEvent EvTmr0     call HndlrTimer0
-OnEvent EvTmr1     call HndlrTimer1
-OnEvent EvTmr2     call HndlrTimer2
-//Both events have the same handler
-OnEvent EVVSPRX      call HandlerVspDataRxd
-OnEvent EVVSPTXEMPTY call HandlerVspDataRxd
+OnEvent EvTmr0       call HndlrTimer0
+OnEvent EvTmr1       call HndlrTimer1
+OnEvent EvTmr2       call HndlrTimer2
+OnEvent EVVSPRX      call HndlrVspDataRxd
+OnEvent EVVSPTXEMPTY call HndlrVspDataRxd
+OnEvent EVNOTIFYBUF  call HndlrTxBufAvail
+
 //------------------------------------------------------------------------------
 // Wait for a synchronous event.
 // An application can have multiple <WaitEvent> statements
