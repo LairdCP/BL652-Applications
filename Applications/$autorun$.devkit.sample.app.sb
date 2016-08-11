@@ -27,7 +27,7 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //  
 // $autorun$.devkit.sample.app.sb
-// (Version 1.0)
+// (Version 1.1)
 //  -- Created to demonstrating the following:
 //     - Range Test Service (Packet ID and RSSI)
 //     - Voltage Service
@@ -56,8 +56,9 @@
 //   0x00000001 : Asserts
 //   0x00000002 : Print welcome message
 //   0x00000004 : OnErr print message with last error
+//   0x00000008 : Connection messages
 //   =====================================================
-#set $cmpif, 0x00000007
+#set $cmpif, 0x0000000F
 
 //******************************************************************************
 // Definitions
@@ -110,6 +111,8 @@
 //BLE EVENT MSG IDs
 #define BLE_EVBLEMSGID_CONNECT                        0  //msgCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT                     1  //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE              14 //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL         15 //msgCtx = connection handle
 
 //Connection Defines
 #define DEVICENAME_WRITABLE                           1
@@ -126,10 +129,10 @@
 #define ADV_INTERVAL_MS                               250
 //Advertise timeout (0==forever)
 #define ADV_TIMEOUT_MS                                0
-//Minimum acceptable connection interval (100 ms)
-#define MIN_CONN_INTERVALus                           100000
-//Maximum acceptable connection interval (150 ms).
-#define MAX_CONN_INTERVALus                           150000
+//Minimum acceptable connection interval (7.5 ms)
+#define MIN_CONN_INTERVALus                           7500
+//Maximum acceptable connection interval (100 ms).
+#define MAX_CONN_INTERVALus                           100000
 //Slave latency -- number of conn events that can be missed
 //Effective Conn interval will be (SLAVE_LATENCY+1)*ACTUAL_CONN_INTERVAL
 #define SLAVE_LATENCY                                 0
@@ -233,85 +236,85 @@ Sub CreateServices()
     //Create Button/LED Service
     //***************************************************************************
     rc=BleServiceNew(1,hGpioSvcUuid,hGpioSvc)
-    #cmpif 0x00000001 : DbgAssertRC(rc,2400)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 239)
 
         //Create Button/LED Service::Total Inputs Characteristic - Read
         rc=BleCharNew(0x02, BleHandleUuidSibling(hBseUuid,(INPUTS_CHAR_UUID)), BleAttrMetaData(1,0,1,1,rc2),0,0)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2440) : DbgAssertRC(rc2,2442)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 243) : DbgAssertRC(rc2,2442)
         rc=BleCharCommit(hGpioSvc,dta$,hInputs)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2460)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 245)
 
         //Create Button/LED Service::Total Outputs Characteristic - Read
         rc=BleCharNew(0x02, BleHandleUuidSibling(hBseUuid,(OUTPUTS_CHAR_UUID)), BleAttrMetaData(1,0,1,1,rc2),0,0)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2500) : DbgAssertRC(rc2,2502)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 249) : DbgAssertRC(rc2,2502)
         rc=BleCharCommit(hGpioSvc,dta$,hOutputs)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2520)  
+        #cmpif 0x00000001 : DbgAssertRC(rc, 251)  
 
         //Create Button/LED Service::LEDs Characteristic - Read/Write
         rc=BleCharNew(0x0A, BleHandleUuidSibling(hBseUuid,(LEDS_CHAR_UUID)), BleAttrMetaData(1,1,1,1,rc2),0,0)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2560) : DbgAssertRC(rc2,2562)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 255) : DbgAssertRC(rc2,2562)
         rc=BleCharCommit(hGpioSvc,dta$,hSerLeds)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2580)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 257)
 
         //Create Button/LED Service::Buttons Characteristic - Read/Notify
         rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(BTNS_CHAR_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2620) : DbgAssertRC(rc2,2622)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 261) : DbgAssertRC(rc2,2622)
         rc=BleCharCommit(hGpioSvc,dta$,hSerBtns)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2640)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 263)
 
     rc=BleServiceCommit(hGpioSvc)
-    #cmpif 0x00000001 : DbgAssertRC(rc,2670)  
+    #cmpif 0x00000001 : DbgAssertRC(rc, 266)  
 
     //***************************************************************************
     //Create Range Test Service
     //***************************************************************************
     rc=BleServiceNew(1,hRangeSvcUuid,hRangeSvc)
-    #cmpif 0x00000001 : DbgAssertRC(rc,2730)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 272)
 
         //Create Range Test Service::RSSI Characteristic - Read/Notify
         rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(RSSI_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2770) : DbgAssertRC(rc2,2772)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 276) : DbgAssertRC(rc2,2772)
         rc=BleCharCommit(hRangeSvc,dta$,hRssi)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2790)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 278)
 
         //Create Range Test Service::Packet ID Characteristic - Read/Notify
         rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(PKT_ID_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2830) : DbgAssertRC(rc2,2832)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 282) : DbgAssertRC(rc2,2832)
         rc=BleCharCommit(hRangeSvc,dta$,hPktId)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2850)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 284)
 
     rc=BleServiceCommit(hRangeSvc)
-    #cmpif 0x00000001 : DbgAssertRC(rc,2880)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 287)
 
     //***************************************************************************
     //Create Temperature Service
     //***************************************************************************
     rc=BleServiceNew(1,hTempSvcUuid,hTempSvc)
-    #cmpif 0x00000001 : DbgAssertRC(rc,2940)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 293)
 
         //Create Temperature Service::Data Characteristic - Read/Notify
         rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(TEMP_DATA_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
-        #cmpif 0x00000001 : DbgAssertRC(rc,2980) : DbgAssertRC(rc2,2982)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 297) : DbgAssertRC(rc2,2982)
         rc=BleCharCommit(hTempSvc,dta$,hTempData)
-        #cmpif 0x00000001 : DbgAssertRC(rc,3000)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 299)
 
     rc=BleServiceCommit(hTempSvc)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3030)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 302)
 
     //***************************************************************************
     //Create Voltage Service
     //***************************************************************************
     rc=BleServiceNew(1,hVccSvcUuid,hVccSvc)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3090)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 308)
 
         //Create Voltage Service::Data Characteristic - Read/Notify
         rc=BleCharNew(0x12, BleHandleUuidSibling(hBseUuid,(VCC_DATA_UUID)), BleAttrMetaData(1,0,2,1,rc2),0,0)
-        #cmpif 0x00000001 : DbgAssertRC(rc,3130) : DbgAssertRC(rc2,3132)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 312) : DbgAssertRC(rc2,3132)
         rc=BleCharCommit(hVccSvc,dta$,hVccData)
-        #cmpif 0x00000001 : DbgAssertRC(rc,3150)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 314)
 
     rc=BleServiceCommit(hVccSvc)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3180)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 317)
 
 EndSub
 
@@ -324,32 +327,32 @@ Sub InitialiseServices()
     //Initialise Button/LED Service::Total Inputs Characteristic
     charVal$="\02"
     rc=BleCharValueWrite(hInputs,charVal$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3310)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 330)
     
     //Initialise Button/LED Service::Total Outputs Characteristic
     charVal$="\02"
     rc=BleCharValueWrite(hOutputs,charVal$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3360)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 335)
 
     //Initialise Voltage Service::Data Characteristic
     charVal$ = "\30\00"
     rc=BleCharValueWrite(hVccData,charVal$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3410)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 340)
 
     //Initialise Button/LED Service::Buttons Characteristic
     charVal$ = "\00\00"
     rc=BleCharValueWrite(hSerBtns,charVal$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3460)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 345)
 
     //Initialise Range Test Service::Packet ID Characteristic
     charVal$ = "\00\00"
     rc=BleCharValueWrite(hPktId,charVal$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3510)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 350)
 
     //Initialise Temperature Service::Data Characteristic
     charVal$ = "\00\00"
     rc=BleCharValueWrite(hTempData,charVal$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3560)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 355)
     
 EndSub
 
@@ -361,15 +364,15 @@ Sub MakeAdvertReports()
 
     //Initialise the advert report
     rc = BleAdvRptInit(advRpt$, 2, 0, 0)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3680)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 367)
 
     //Initialise scan report
     rc=BleScanRptInit(scnRpt$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3720)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 371)
 
     //Add 128-bit VSP UUID to advert report
     rc = BLEADVRPTADDUUID128(advRpt$, hVspUuid)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3760)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 375)
     if (rc == BLEADVERTSPACEERROR) then
         //No advert space
         print "There is insufficient space in the advert report to add a 128-bit UUID. This means that BLE devices will not detect the 128-bit service by scanning but the application is fully operational.\r\n"
@@ -378,7 +381,7 @@ Sub MakeAdvertReports()
 
     //Add 16-bit UUIDs to scan report
     rc = BleAdvRptAddUuid16(scnRpt$, GPIO_SVC_UUID, RANGE_SVC_UUID, TEMP_SVC_UUID, VCC_SVC_UUID, -1, -1)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3850)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 384)
 
     //Add local name to scan report; append BT ADDR
     dim BTAddr$ : BTAddr$ = sysinfo$(4)
@@ -386,11 +389,11 @@ Sub MakeAdvertReports()
     STRSHIFTLEFT(BTAddr$, 2)
     dn$ = dn$ + "-" + BTAddr$
     rc = BleAdvRptAppendAD(scnRpt$,0x09,dn$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3930)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 392)
 
     //Commit the advert and scan reports to the stack
     rc = BleAdvRptsCommit(advRpt$, scnRpt$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,3970)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 396)
 EndSub
 
 //------------------------------------------------------------------------------
@@ -399,7 +402,7 @@ EndSub
 Sub StartAdvertising()
     dim prAddr$ : prAddr$ = ""  //Peer BT address (not required for this app) hence empty
     rc = BleAdvertStart(ADVERT_TYPE, prAddr$, ADV_INTERVAL_MS, ADV_TIMEOUT_MS,0)
-    #cmpif 0x00000001 : DbgAssertRC(rc,4060)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 405)
 EndSub
 
 //------------------------------------------------------------------------------
@@ -407,14 +410,14 @@ EndSub
 //------------------------------------------------------------------------------
 Sub InitGpios()
     rc=gpiosetfunc(GPIO_BUTTON0,1,2)  //Button 0 digital input with weak pull up resistor
-    #cmpif 0x00000001 : DbgAssertRC(rc,4140)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 413)
     rc=gpiosetfunc(GPIO_BUTTON1,1,2)  //Button 1 digital input with weak pull up resistor
-    #cmpif 0x00000001 : DbgAssertRC(rc,4160)
-    rc=GpioSetFunc(GPIO_LED0,2,0)  //Sets LED0 as a digital out
-    #cmpif 0x00000001 : DbgAssertRC(rc,4180)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 415)
+    rc=GpioSetFunc(GPIO_LED0,2,0)     //Sets LED0 as a digital out
+    #cmpif 0x00000001 : DbgAssertRC(rc, 417)
     GpioWrite(GPIO_LED0,0)
-    rc=GpioSetFunc(GPIO_LED1,2,0)  //Sets LED1 as a digital out
-    #cmpif 0x00000001 : DbgAssertRC(rc,4210)
+    rc=GpioSetFunc(GPIO_LED1,2,0)     //Sets LED1 as a digital out
+    #cmpif 0x00000001 : DbgAssertRC(rc, 420)
     GpioWrite(GPIO_LED1,0)
 EndSub
 
@@ -423,7 +426,7 @@ EndSub
 //------------------------------------------------------------------------------
 sub EnableTempSensor()
     rc = GPIOSETFUNCEX(GPIO_TEMP_SENSOR, 3, "\00\0C\0A") //First byte selects the gain (default, 1/6 scaling), second byte selects the resolution (8, 10 or 12 bit) and the third byte selects the acquisition time (10us). See the BL652 extension manual for further details
-    #cmpif 0x00000001 : DbgAssertRC(rc,4300)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 429)
 endsub
 
 //-----------------------------------------------------------------------------
@@ -441,18 +444,43 @@ function Mv2Temperature(mv)
     mv = ((mv*100 - 185830) / -117)
 endfunc mv
 
+//-----------------------------------------------------------------------------
+// Shows the BLE connection parameters
+//-----------------------------------------------------------------------------
+sub ShowConnParms(nCtx)
+  dim intrvl,sprvto,slat
+  rc = BleGetCurConnParms(nCtx, intrvl, sprvto, slat)
+  #cmpif 0x00000001 : DbgAssertRC(rc, 453)
+  if rc==0 then
+    #cmpif 0x00000008 : print " ConnectionParms: Interval=";intrvl;" LinkTimeout=";sprvto;" SlaveLatency=";slat;"\r\n"
+    #cmpif 0x00000004 : print "=====================================================================\r\n\r\n"
+  endif
+endsub
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 Sub OnStartup()
     //Open UART if it is not already open
     if (UartInfo(0) == 0) then
         rc = UartOpen(115200, 0, 0, "CN81H")
-        #cmpif 0x00000001 : DbgAssertRC(rc,4540)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 466)
     endif
+
+    //Set the device information service up. Any empty strings will omit them from the listing
+    dim manfNme$ : manfNme$ = "Laird Technologies"
+    dim mdlNum$ : mdlNum$ = "BL652"
+    dim srlNum$ : srlNum$ = ""
+    dim hwRev$ : hwRev$ = "1.0"
+    dim swRev$ : swRev$ = SWREV
+    dim sysId$ : sysId$ = ""
+    dim regDtaLst$ : regDtaLst$ = ""
+    dim pnpId$ : pnpId$ = ""
+    rc=BleSvcRegDevInfo(manfNme$, mdlNum$, srlNum$, hwRev$, swRev$, sysId$, regDtaLst$, pnpId$)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 479)
 
     //Initialise the Gap Service
     rc=BleGapSvcInit(dn$, DEVICENAME_WRITABLE, APPEARANCE, MIN_CONN_INTERVALus, MAX_CONN_INTERVALus, CONN_SUP_TIMEOUTus, SLAVE_LATENCY)
-    #cmpif 0x00000001 : DbgAssertRC(rc,4590)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 483)
 
     //Create the services
     CreateServices()
@@ -468,7 +496,7 @@ Sub OnStartup()
 
     //Start a VSP server and get the handle of the custom uuid that will be used 
     rc = BleVspOpen(VSP_TX_BUFLEN, VSP_RX_BUFLEN, 0, hVspUuid)
-    #cmpif 0x00000001 : DbgAssertRC(rc,4740)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 499)
 
     //Create the advert/scan reports
     MakeAdvertReports()
@@ -478,15 +506,15 @@ Sub OnStartup()
 
     //Enable events for when buttons are pressed
     rc=GpioBindEvent(0, GPIO_BUTTON0, 2)  //Binds a gpio transition high or low on button 0 to event 0
-    #cmpif 0x00000001 : DbgAssertRC(rc,4840)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 509)
     rc=GpioBindEvent(1, GPIO_BUTTON1, 2)  //Binds a gpio transition high or low on button 1 to event 1
-    #cmpif 0x00000001 : DbgAssertRC(rc,4860)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 511)
 
     //Output a message to the UART indicating that the application is running
     #cmpif 0x00000002 : print "Welcome to the DVK-BL652 sample smartBASIC application!\r\n"
     #cmpif 0x00000002 : print "You will need to utilise either of the following mobile applications in your smartphone/tablet which are available from Google Play or the App Store:\r\n"
     #cmpif 0x00000002 : print "\t- Android	: ModuleLink for BLE\r\n"
-    #cmpif 0x00000002 : print "\t- iOS		: ModuleLink for BLE \r\n"
+    #cmpif 0x00000002 : print "\t- iOS		: ModuleLink for BLE\r\n"
     #cmpif 0x00000002 : print "Full details and an application walkthrough are available at www.lairdtech.com/BL652-Quick-Start and this sample application, plus many more, can be found on Github https://github.com/LairdCP/BL652-Applications\r\n"
     #cmpif 0x00000002 : print "----------------\r\n"
     #cmpif 0x00000002 : print "When you have finished with this initial application, you can return to command mode / interactive mode:-\r\n"
@@ -508,7 +536,7 @@ Function HndlrCharVal(charHndl, offset, len)
 
     //Get characteristic value
     rc=BleCharValueRead(charHndl, s$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,5080)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 539)
 
     if charHndl==hSerLeds then
         //Write values to LEDs
@@ -534,14 +562,14 @@ Function HndlrGpio()
     dim val$
 
     rc=StrSetChr(val$, !GpioRead(GPIO_BUTTON1), 1)
-    #cmpif 0x00000001 : DbgAssertRC(rc,5340)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 565)
     rc=StrSetChr(val$, !GpioRead(GPIO_BUTTON0), 0)
-    #cmpif 0x00000001 : DbgAssertRC(rc,5360)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 567)
 
     if (BtnIndStat == 0) then
         //Update characteristic
         rc=BleCharValueWrite(hSerBtns, val$)
-        #cmpif 0x00000001 : DbgAssertRC(rc,5410)
+        #cmpif 0x00000001 : DbgAssertRC(rc, 572)
     else
         //Notify
         if notifyBufAvail==1 then
@@ -559,7 +587,7 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
         case BLE_EVBLEMSGID_CONNECT
             //Enable RSSI signal strength monitoring
             rc=BleConnRssiStart(connHndl,4,10)
-            #cmpif 0x00000001 : DbgAssertRC(rc,5590)
+            #cmpif 0x00000001 : DbgAssertRC(rc, 590)
 
             //Restart packet ID value
             PacketId = 0
@@ -570,6 +598,10 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
 
             //Get current status of buttons
             rc=HndlrGpio()
+
+            //Output connection parameters
+            #cmpif 0x00000004 : print "======================== BLE Device connected =======================\r\n"
+            ShowConnParms(connHndl)
         case BLE_EVBLEMSGID_DISCONNECT
             //Device disconnected. Disable all indications
             BtnIndStat = 0
@@ -583,6 +615,16 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
             TimerCancel(1)
             TimerCancel(2)
             StartAdvertising()
+
+            //Show disconnect message
+            #cmpif 0x00000004 : print "====================== BLE Device disconnected ======================\r\n\r\n"
+        case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+            //Connection parameters updated successfully
+            #cmpif 0x00000004 : print "==================== Connection Parameters Update ===================\r\n"
+            ShowConnParms(connHndl)
+        case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
+            //Connection parameters failed to update successfully
+            #cmpif 0x00000004 : print "============= Connection Parameters Negotiation FAILED ==============\r\n\r\n"
         case else
     endselect
 EndFunc 1 //Remain blocked in WAITEVENT
@@ -605,7 +647,7 @@ Function HndlrCccd(charHndl, val)
         BtnIndStat = val
     elseif charHndl == hRssi then
         //Range Test Service::RSSI Characteristic CCCD has been written
-        RangeIndStat = val        
+        RangeIndStat = val
     elseif charHndl == hTempData then
         //Temperature Service::Data Characteristic CCCD has been written
         TempIndStat = val
@@ -621,7 +663,7 @@ EndFunc 1 //Remain blocked in WAITEVENT
 Function HndlrConnRssi(BYVAL charHandle, BYVAL rssi) AS INTEGER
     dim s$
     rc=BleEncode16(s$, rssi, 0)
-    #cmpif 0x00000001 : DbgAssertRC(rc,6210)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 666)
 
     if (RangeIndStat == 0) then
         rc=BleCharValuewrite(hRssi, s$)
@@ -640,9 +682,9 @@ Function HndlrTimer0()
     PacketId=PacketId+1
     dim s$
     rc=BleEncode16(s$, PacketId, 0)
-    #cmpif 0x00000001 : DbgAssertRC(rc,6400)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 685)
     rc=BleCharValueNotify(hPktId, s$)
-    #cmpif 0x00000001 : DbgAssertRC(rc,6420)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 687)
 Endfunc 1 //Remain blocked in WAITEVENT
 
 //------------------------------------------------------------------------------
@@ -653,7 +695,7 @@ Function HndlrTimer1()
     dim tmp: tmp= Mv2Temperature(mv)
     dim s$
     rc=BleEncode16(s$, tmp, 0)
-    #cmpif 0x00000001 : DbgAssertRC(rc,6530)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 698)
 
     if (TempIndStat == 0) then
         //Save to characteristic
@@ -674,7 +716,7 @@ Function HndlrTimer2()
     dim mv: mv=READPWRSUPPLYMV()
     dim s$
     rc=BleEncode16(s$, mv, 0)
-    #cmpif 0x00000001 : DbgAssertRC(rc,6740)
+    #cmpif 0x00000001 : DbgAssertRC(rc, 719)
 
     if (VccIndStat == 0) then
         //Save to characteristic
