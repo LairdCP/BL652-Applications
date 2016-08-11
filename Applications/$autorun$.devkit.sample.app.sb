@@ -452,7 +452,7 @@ sub ShowConnParms(nCtx)
   rc = BleGetCurConnParms(nCtx, intrvl, sprvto, slat)
   #cmpif 0x00000001 : DbgAssertRC(rc, 453)
   if rc==0 then
-    #cmpif 0x00000008 : print " ConnectionParms: Interval=";intrvl;" LinkTimeout=";sprvto;" SlaveLatency=";slat;"\r\n"
+    #cmpif 0x00000008 : print " Connection: Interval=";intrvl;"us LinkTimeout=";sprvto;"us SlaveLatency=";slat;"\r\n"
     #cmpif 0x00000004 : print "=====================================================================\r\n\r\n"
   endif
 endsub
