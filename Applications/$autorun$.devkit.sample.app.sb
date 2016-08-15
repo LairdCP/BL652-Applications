@@ -574,28 +574,15 @@ Sub OnStartup()
     #cmpif 0x00000100 : DbgAssertRC(rc, 511)
 
     //Output a message to the UART indicating that the application is running
-    #cmpif 0x00000200 : sprint #prn$, "Welcome to the DVK-BL652 sample smartBASIC application!\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "\nWelcome to the DVK-BL652 sample smartBASIC application!\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "You will need to utilise either of the following mobile applications in your smartphone/tablet which are available from Google Play or the App Store:\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "Full details and an application walkthrough are available at www.lairdtech.com/BL652-Quick-Start and this sample application, plus many more, can be found on Github https://github.com/LairdCP/BL652-Applications\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "\t- Android  : ModuleLink for BLE\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "----------------\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "\t- iOS    : ModuleLink for BLE\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "When you have finished with this initial application, you can return to command mode / interactive mode by moving the J12 Autorun jumper to the H position (pins 2-3), unchecking DTR from UwTerminalX and pressing the reset button on the module (or checking and unchecking the BREAK checkbox which results in a reset of the module)\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "Full details and an application walkthrough are available at www.lairdtech.com/BL652-Quick-Start and this sample application, plus many more, can be found on Github https://github.com/LairdCP/BL652-Applications\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "----------------\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "When you have finished with this initial application, you can return to command mode / interactive mode:-\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "Either\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "\tUnchecking DTR from UwTerminalX and pressing the reset button on the module (or checking and unchecking the BREAK checkbox which results in a reset of the module)\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "Or\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "\tMove the J12 Autorun jumper to the L position (pins 2-3) and pressing the reset button on the DVK board\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
+
 EndSub
 
 //******************************************************************************
@@ -667,7 +654,7 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
             ProcessGpio()
 
             //Output connection parameters
-            #cmpif 0x00000800 : sprint #prn$, "======================== BLE Device connected =======================\r\n"
+            #cmpif 0x00000800 : sprint #prn$, "\n======================== BLE Device connected =======================\r\n"
             #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
             ShowConnParms(connHndl)
             
@@ -686,17 +673,17 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
             StartAdvertising()
 
             //Show disconnect message
-            #cmpif 0x00000800 : sprint #prn$,  "====================== BLE Device disconnected ======================\r\n\r\n"
+            #cmpif 0x00000800 : sprint #prn$,  "\n====================== BLE Device disconnected ======================\r\n\r\n"
             #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
             //Connection parameters updated successfully
-            #cmpif 0x00000800 : sprint #prn$,  "==================== Connection Parameters Update ===================\r\n"
+            #cmpif 0x00000800 : sprint #prn$,  "\n==================== Connection Parameters Update ===================\r\n"
             #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
             ShowConnParms(connHndl)
             
         case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
             //Connection parameters failed to update successfully
-            #cmpif 0x00000800 : sprint #prn$,  "============= Connection Parameters Negotiation FAILED ==============\r\n\r\n"
+            #cmpif 0x00000800 : sprint #prn$,  "\n============= Connection Parameters Negotiation FAILED ==============\r\n\r\n"
             #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
             
         case BLE_EVBLEMSGID_DEVICENAME_WRITE
@@ -704,12 +691,12 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
             dim NewName$ : NewName$ = BleGetDeviceName$()
             if (strcmp(NewName$, ERASEDEVICENAME) == 0) then
                 //Name matches expected name for erasing filesystem - attempt to erase filesystem
-                #cmpif 0x00000800 : sprint #prn$,  "======================== Erasing Filesystem =========================\r\n"
+                #cmpif 0x00000800 : sprint #prn$,  "\n======================== Erasing Filesystem =========================\r\n"
                 #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
                 rc = EraseFilesystem(1)
                 #cmpif 0x00000800 : if (rc != 0) then
                                     //Failed to erase
-                #cmpif 0x00000800 :     sprint #prn$,  "======= Erase failed. Ensure J5 (VSP) has a jumper and retry ========\r\n"
+                #cmpif 0x00000800 :     sprint #prn$,  "\n======= Erase failed. Ensure J5 (VSP) has a jumper and retry ========\r\n"
                 #cmpif 0x00000800 :     PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
                 #cmpif 0x00000800 : endif
             endif
