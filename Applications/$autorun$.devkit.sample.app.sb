@@ -578,7 +578,7 @@ Sub OnStartup()
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
     #cmpif 0x00000200 : sprint #prn$, "Full details and an application walkthrough are available at www.lairdtech.com/BL652-Quick-Start and this sample application, plus many more, can be found on Github https://github.com/LairdCP/BL652-Applications\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "When you have finished with this initial application, you can return to command mode / interactive mode by moving the J12 Autorun jumper to the H position (pins 2-3), unchecking DTR from UwTerminalX and pressing the reset button on the module (or checking and unchecking the BREAK checkbox which results in a reset of the module)\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "When you have finished with this initial application, you can return to command mode / interactive mode by moving the J12 Autorun jumper to the H position (pins 2-1), unchecking DTR from UwTerminalX and pressing the reset button on the module (or checking and unchecking the BREAK checkbox which results in a reset of the module)\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
     #cmpif 0x00000200 : sprint #prn$, "----------------\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
@@ -764,6 +764,9 @@ Function HndlrConnRssi(BYVAL charHandle, BYVAL rssi) AS INTEGER
             #cmpif 0x00000001 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
             rc=BleCharValueNotify(hRssi, s$)
             CheckNotifyBufsStat(rc)
+        else
+            #cmpif 0x00000001 : sprint #prn$, "\n"
+            #cmpif 0x00000001 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         endif
     endif
 Endfunc 1 //Remain blocked in WAITEVENT
