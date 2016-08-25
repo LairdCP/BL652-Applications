@@ -22,7 +22,7 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 // NFC manager for BL652
-//   Version 0.90
+//   Version 0.91
 //
 // This app provides for a command interface over the uart and the protocol is
 // as follows:-
@@ -563,7 +563,7 @@ endfunc NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, Text$)
 //-------------------------------------------------------------------------
 function HandlerNfc(msgID) as integer
     //This handler is called when an NFC related event occurs
-    print "\nEVNFC msgID=";msgID
+    print "\nEVNFC msgID=";msgID;": "
     if (msgID == 2) then
         //NFC field off
         print "NFC field off"
@@ -704,10 +704,10 @@ function _NFC()
         if (i[1] != 0 && i[1] != 1) then
             //Invalid parameter provided
             exitfunc 5
-        elseif (i[0] == 0) then
+        elseif (i[1] == 0) then
             //Disable NFC events
             OnEvent  EVNFC  disable
-        elseif (i[0] == 1) then
+        elseif (i[1] == 1) then
             //Enable NFC events
             OnEvent  EVNFC  call HandlerNfc
         endif
