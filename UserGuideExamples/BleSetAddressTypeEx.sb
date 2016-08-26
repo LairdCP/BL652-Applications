@@ -1,0 +1,21 @@
+DIM rc, addr$
+
+// Set the address to pulic, nPeriodMS is ignored
+rc = BleSetAddressTypeEx(0,0)
+addr$ = SysInfo$(4)
+PRINT "\nBluetooth Address - "; StrHexize$(addr$)
+
+// Set the address to random static, nPeriodMS is ignored
+rc = BleSetAddressTypeEx(1,0)
+addr$ = SysInfo$(4)
+PRINT "\nBluetooth Address - "; StrHexize$(addr$)
+
+// Set the address to be random resolvable that changes every 30 seconds
+rc = BleSetAddressTypeEx(2,30000)
+addr$ = SysInfo$(4)
+PRINT "\nBluetooth Address - "; StrHexize$(addr$)
+
+// Set the address to be random non-resolvable that changes every 1 seconds
+rc = BleSetAddressTypeEx(3,1000)
+addr$ = SysInfo$(4)
+PRINT "\nBluetooth Address - "; StrHexize$(addr$)
