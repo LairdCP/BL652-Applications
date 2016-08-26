@@ -19,7 +19,7 @@
 //                                                                            ++
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // +++++                                                                      ++
-// +++++  When UwTerminal downloads the app it to the module it will be saved ++
+// +++++  When UwTerminal downloads the app to the module it will be saved    ++
 // +++++  as a file with filename $autorun$ which means it will run           ++
 // +++++  automatically on reset.                                             ++
 // +++++  The File System can be queried using the command AT+DIR             ++
@@ -38,11 +38,6 @@
 // When the application runs on reset, it will print a message that provides
 // more details about which smartphone/tablet application to use to interact
 // with the module loaded with this smartBASIC application.
-//
-// This application expects a host to be attached to the serial port so that
-// the CTS input line is asserted. If the host is not connected, then the 
-// welcome message on startup which is very long will block and the application
-// will not behave as expected.
 //
 //******************************************************************************
 
