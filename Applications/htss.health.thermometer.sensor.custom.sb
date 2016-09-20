@@ -1098,7 +1098,7 @@ function HandlerTimer0() as integer
       //Update the variables in the library
       tempMant = tmp
       tempExp  = -1
-print "tmp = ";tmp;"\r\n"
+
       //DbgMsg("\nTemperature=") : DbgVal(tmp)
       if indwait == 0 then
         if SendThermData() == 0 then
