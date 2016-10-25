@@ -1,0 +1,179 @@
+//Example :: BleSecMngrLescKeypressNotify
+
+// BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9 // msgCtx = passcode to display
+#define BLE_EVBLEMSGID_NEW_BOND                        10 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                11 // msgCtx = 1 for passkey, 2 for 16 byte OOB data
+#define BLE_EVBLEMSGID_ENCRYPTED                       18 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTHENTICATION_FAILED           26 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_LESC_PAIRING                    27 // msgCtx = connection handle
+
+// Keypress Types
+#define BLE_GAP_KP_NOT_TYPE_PASSKEY_START       0x00   // Passkey entry started.
+#define BLE_GAP_KP_NOT_TYPE_PASSKEY_DIGIT_IN    0x01   // Passkey digit entered.
+#define BLE_GAP_KP_NOT_TYPE_PASSKEY_DIGIT_OUT   0x02   // Passkey digit erased.
+#define BLE_GAP_KP_NOT_TYPE_PASSKEY_CLEAR       0x03   // Passkey cleared.
+#define BLE_GAP_KP_NOT_TYPE_PASSKEY_END         0x04   // Passkey entry completed.
+
+'//******************************************************************************
+'// Global Variable Declarations
+'//******************************************************************************
+dim rc                               // Result Code
+dim ghConn                           // Global connection handle
+dim nKeyEntered : nKeyEntered = 0    // 1 if we're entering a key, 0 if passkey is empty
+dim passkey$    : passkey$ = ""      // Global string variable where passkey is saved
+dim Adr$
+
+//==============================================================================
+//==============================================================================
+sub AssertResCode(byval rc as integer,byval tag as integer)
+    if rc!=0 then
+        print "\nFailed with ";integer.h' rc;" at tag ";tag
+    endif
+endsub
+
+//==============================================================================
+// This handler is called when there is a BLE message
+//==============================================================================
+function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as integer
+
+  select nMsgId
+  case BLE_EVBLEMSGID_CONNECT
+    print "\n --- Connect: (";integer.h' nCtx;")"
+    // Set the global connection handle to be equal to the handle we just got
+    ghConn = nCtx
+
+  case BLE_EVBLEMSGID_DISCONNECT
+    print "\n --- Disonnect: (";integer.h' nCtx;")"
+
+  case BLE_EVBLEMSGID_DISPLAY_PASSKEY
+    print "\nDisplay Pairing Passkey ";nCtx
+
+  case BLE_EVBLEMSGID_NEW_BOND
+    print "\n +++ New Bond"
+
+  case BLE_EVBLEMSGID_ENCRYPTED
+    print "\n +++ Encrypted Connection"
+
+  case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
+    print "\n +++ Auth Key Request, type=",nCtx
+
+  case BLE_EVBLEMSGID_LESC_PAIRING
+    print "\n +++ LESC pairing", nCtx
+
+  case   BLE_EVBLEMSGID_AUTHENTICATION_FAILED
+    print "\n +++ Auth Failed ", nCtx
+
+  case else
+
+  endselect
+endfunc 1
+
+//==============================================================================
+// This handler is called when keypress notifications are received
+//==============================================================================
+function HandlerLescKeypress(BYVAL hConn AS INTEGER, BYVAL keytype AS INTEGER)
+
+    print "\n+++ Keypress notification: "
+    if keytype == 0 THEN
+        print "PASSKEY_START"
+    elseif keytype == 1 THEN
+        print "PASSKEY_DIGIT_IN"
+    elseif keytype == 2 THEN
+        print "PASSKEY_DIGIT_OUT"
+    elseif keytype == 3 THEN
+        print "PASSKEY_CLEAR"
+    elseif keytype == 4 THEN
+        print "PASSKEY_PASSKEY_END"
+    ELSE
+        print "UNKNOWN_KEY"
+    ENDIF
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+//==============================================================================
+function HandlerUartRxCmd() as integer
+
+    dim type        // The value of the keypress
+    dim nPasskey    // The passkey integer that will be sent during pairing
+    dim StrKey$     // key entered
+
+    if nKeyEntered == 0 THEN
+        // Send notifications that we are beginning the key entry process
+        rc = BleSecMngrLescKeypressNotify(ghConn,BLE_GAP_KP_NOT_TYPE_PASSKEY_START)
+        AssertResCode(rc, 900)
+        nKeyEntered = 1
+    endif
+
+    // Now read a single character from the UART buffer
+    rc = UartReadN(StrKey$, 1)
+
+    if (strcmp(StrKey$,"\r")==0) THEN
+        // Let the user know that we are done with keypresses, then send passkey
+        rc = BleSecMngrLescKeypressNotify(ghConn,BLE_GAP_KP_NOT_TYPE_PASSKEY_END)
+        AssertResCode(rc, 910)
+        // Now extract the integer value and send it over
+        rc = ExtractIntToken(passkey$, nPasskey)
+        rc = BLESECMNGRPASSKEY(ghConn, nPasskey)
+        AssertResCode(rc, 920)
+        // clear the passkey
+        passkey$ = ""
+        nKeyEntered = 0
+
+    elseif (strcmp(StrKey$,"\08")==0) then
+        // Got backspace, notify the remote then erase one key
+        rc = BleSecMngrLescKeypressNotify(ghConn,BLE_GAP_KP_NOT_TYPE_PASSKEY_DIGIT_OUT)
+        AssertResCode(rc, 930)
+        passkey$ = left$(passkey$, (STRLEN(passkey$)-1))
+        // check if passkey has been fully cleared
+        if (strcmp(passkey$, "")==0) THEN
+            nKeyEntered = 0
+            rc = BleSecMngrLescKeypressNotify(ghConn,BLE_GAP_KP_NOT_TYPE_PASSKEY_CLEAR)
+            AssertResCode(rc, 950)
+        endif
+
+    ELSE
+        // It is not carriage return or backspace, so it is an actual entry
+        passkey$ = passkey$ + StrKey$
+        rc = BleSecMngrLescKeypressNotify(ghConn,BLE_GAP_KP_NOT_TYPE_PASSKEY_DIGIT_IN)
+        AssertResCode(rc, 960)
+    endif
+
+endfunc 1
+
+'//******************************************************************************
+'// Equivalent to main() in C
+'//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVUARTRX                 call HandlerUartRxCmd
+OnEvent  EVBLEMSG                 call HandlerBleMsg
+OnEvent  EVLESCKEYPRESS           call HandlerLescKeypress
+'//------------------------------------------------------------------------------
+'// Wait for a synchronous event.
+'// An application can have multiple <WaitEvent> statements
+'//------------------------------------------------------------------------------
+
+// Start Adverts
+rc = BleAdvertStart(0,prAdr$,25,0,0)
+PRINT "\nAdverts start"
+// Enable keypress notifications
+rc = BLESECMNGRLESCKEYPRESSENABLE(1)
+if rc == 0 THEN
+    PRINT "\nKeypress notifications enabled\n"
+endif
+
+// Set LE Secure Connections to be the preffered pairing model
+rc = BLESECMNGRLESCPAIRINGPREF(1)
+// Set IO capability to 2: Keyboard only
+rc = BLESECMNGRIOCAP(2)
+
+WaitEvent
+
+

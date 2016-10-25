@@ -1,0 +1,502 @@
+//******************************************************************************
+// Laird Technologies (c) 2016
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// **Accelerometer Notifications Server (Peripheral)**
+//   This application notifies accelerometer values when the CCCD is enabled.
+//   Requires a modified Arduino 9-Axis Motion Shield
+//
+//   Please refer to the 'Using Arduino Shield boards on BL652' app note
+//     available from the Laird BL652 module website for instructions on using
+//     this application
+//
+//******************************************************************************
+
+//   =====================================================
+//   Conditional Compile Masks (they can be additive)
+//   -----------------------------------------------------
+//   0x00000100 : Asserts and output errors to UART
+//   =====================================================
+#set $cmpif, 0x0000000 //Normal mode
+//#set $cmpif, 0x0000100 //With asserts to UART
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+//Laird Base UUID:                            569a0000-b87f-490c-92cb-11ba5ea5167c
+#define LT_BASE_UUID                          "\56\9a\00\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"
+
+#define BLE_APPEARANCE_UNKNOWN                0
+#define BLE_SERVICE_PRIMARY                   1
+#define BLE_CHAR_METADATA_ATTR_NOT_PRESENT    0
+#define BLE_ATTR_ACCESS_NONE                  0
+#define BLE_ATTR_ACCESS_OPEN                  1
+#define BLE_CHAR_PROPERTIES_READ              0x02
+#define BLE_CHAR_PROPERTIES_NOTIFY            0x10
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_DISCONNECT             1 //msgCtx = connection handle
+
+//BLE settings
+#define nmeWrtble                             0        //Device name will not be writable by peer
+#define MinConnInt                            20000    //Minimum acceptable connection interval is 20ms
+#define MaxConnInt                            150000   //Maximum acceptable connection interval is 150ms
+#define ConnSupTO                             4000000  //Connection supervisory timeout is 4 seconds
+#define sL                                    0        //Slave latency
+
+//Pin Definitions
+#DEFINE RESET_PIN                             14        //(ARD D3) GPIO to reset the BNO055 (RESET pin has to be HIGH for the BNO055 to operate)
+#DEFINE INT_PIN                               13        //(ARD D2) GPIO used as input from the BNO055 interrupt pin
+
+//*****************************************//
+// ******* I2C ADDRESSES/REGISTERS ******* //
+//*****************************************//
+//I2C Address
+#DEFINE BNO055_ADDRESS                        0x28
+
+//Configuration Register Addresses
+#DEFINE PWR_MODE_ADDRESS                      0x3E
+#DEFINE OPR_MODE_ADDRESS                      0x3D
+#DEFINE UNIT_SEL_ADDRESS                      0x3B
+#DEFINE TEMP_ADDRESS                          0x34
+#DEFINE SYS_TRIGGER_SOURCE_ADDRESS            0x3F
+#DEFINE CALIB_STAT_ADDRESS                    0x35
+#DEFINE AXIS_MAP_CONFIG_ADDRESS               0x41
+#DEFINE AXIS_MAP_SIGN_ADDRESS                 0x42
+#DEFINE ACC_CONFIG                            0x08
+#DEFINE MAG_CONFIG                            0x09
+#DEFINE GYR_CONFIG_0                          0x0A
+#DEFINE GYR_CONFIG_1                          0x0B
+#DEFINE CHIP_ID_ADDRESS                       0x00
+
+//Output Data Register Addresses
+#DEFINE ACC_DATA_X_LSB                        0x08
+#DEFINE ACC_DATA_X_MSB                        0x09
+#DEFINE ACC_DATA_Y_LSB                        0x0A
+#DEFINE ACC_DATA_Y_MSB                        0x0B
+#DEFINE ACC_DATA_Z_LSB                        0x0C
+#DEFINE ACC_DATA_Z_MSB                        0x0D
+#DEFINE MAG_DATA_X_LSB                        0x0E
+#DEFINE MAG_DATA_X_MSB                        0x0F
+#DEFINE MAG_DATA_Y_LSB                        0x10
+#DEFINE MAG_DATA_Y_MSB                        0x11
+#DEFINE MAG_DATA_Z_LSB                        0x12
+#DEFINE MAG_DATA_Z_MSB                        0x13
+#DEFINE GYR_DATA_X_LSB                        0x14
+#DEFINE GYR_DATA_X_MSB                        0x15
+#DEFINE GYR_DATA_Y_LSB                        0x16
+#DEFINE GYR_DATA_Y_MSB                        0x17
+#DEFINE GYR_DATA_Z_LSB                        0x18
+#DEFINE GYR_DATA_Z_MSB                        0x19
+#DEFINE EUL_DATA_X_LSB                        0x1A
+#DEFINE EUL_DATA_X_MSB                        0x1B
+#DEFINE EUL_DATA_Y_LSB                        0x1C
+#DEFINE EUL_DATA_Y_MSB                        0x1D
+#DEFINE EUL_DATA_Z_LSB                        0x1E
+#DEFINE EUL_DATA_Z_MSB                        0x1F
+#DEFINE QUA_DATA_W_LSB                        0x20
+#DEFINE QUA_DATA_W_MSB                        0x21
+#DEFINE QUA_DATA_X_LSB                        0x22
+#DEFINE QUA_DATA_X_MSB                        0x23
+#DEFINE QUA_DATA_Y_LSB                        0x24
+#DEFINE QUA_DATA_Y_MSB                        0x25
+#DEFINE QUA_DATA_Z_LSB                        0x26
+#DEFINE QUA_DATA_Z_MSB                        0x27
+#DEFINE LIA_DATA_X_LSB                        0x28
+#DEFINE LIA_DATA_X_MSB                        0x29
+#DEFINE LIA_DATA_Y_LSB                        0x2A
+#DEFINE LIA_DATA_Y_MSB                        0x2B
+#DEFINE LIA_DATA_Z_LSB                        0x2C
+#DEFINE LIA_DATA_Z_MSB                        0x2D
+#DEFINE GRV_DATA_X_LSB                        0x2E
+#DEFINE GRV_DATA_X_MSB                        0x2F
+#DEFINE GRV_DATA_Y_LSB                        0x30
+#DEFINE GRV_DATA_Y_MSB                        0x31
+#DEFINE GRV_DATA_Z_LSB                        0x32
+#DEFINE GRV_DATA_Z_MSB                        0x33
+
+//*****************************************//
+// *********** REGISTER VALUES *********** //
+//*****************************************//
+//Operation Modes
+#DEFINE OPERATION_MODE_CONFIG                 0x00    //Configuration mode (Transient Mode. Default on power up)
+#DEFINE OPERATION_MODE_ACCONLY                0x01    //Accelerometer only
+#DEFINE OPERATION_MODE_MAGONLY                0x02    //Magnetometer only
+#DEFINE OPERATION_MODE_GYRONLY                0x03    //Gyroscope only
+#DEFINE OPERATION_MODE_ACCMAG                 0x04    //Accelerometer and Magnetometer only
+#DEFINE OPERATION_MODE_ACCGYRO                0x05    //Accelerometer and Gyroscope only
+#DEFINE OPERATION_MODE_MAGGYRO                0x06    //Magnetometer and Gyroscope only
+#DEFINE OPERATION_MODE_AMG                    0x07    //Accelerometer, Magnetometer and Gyroscope (without fusion)
+#DEFINE OPERATION_MODE_IMUPLUS                0x08    //Inertial Measurement Unit (Accelerometer and Gyroscope Sensor Fusion Mode)
+#DEFINE OPERATION_MODE_COMPASS                0x09    //Tilt Compensated Compass (Accelerometer and Magnetometer Sensor Fusion Mode)
+#DEFINE OPERATION_MODE_M4G                    0x0A    //Magnetometer and Accelerometer Sensor Fusion Mode
+#DEFINE OPERATION_MODE_NDOF_FMC_OFF           0x0B    //9 Degrees of Freedom Sensor Fusion with Fast Magnetometer Calibration Off
+#DEFINE OPERATION_MODE_NDOF                   0x0C    //9 Degrees of Freedom Sensor Fusion
+
+//Axis Map
+#DEFINE X_AXIS                                0x00
+#DEFINE Y_AXIS                                0X01
+#DEFINE Z_AXIS                                0x02
+#DEFINE POSITIVE                              0x00
+#DEFINE NEGATIVE                              0x01
+
+//Power Mode
+#DEFINE POWER_MODE_NORMAL                     0x00    //Default power mode
+#DEFINE POWER_MODE_LOWPOWER                   0x01
+#DEFINE POWER_MODE_SUSPEND                    0x02
+
+//Accelerometer Configurations
+//Range: to assign the range of the accelerometer
+#DEFINE ACCEL_RANGE_2G                        0x00
+#DEFINE ACCEL_RANGE_4G                        0x01
+#DEFINE ACCEL_RANGE_8G                        0x02
+#DEFINE ACCEL_RANGE_16G                       0x03
+    
+//Bandwidth: to assign the filter bandwidth to the accelerometer
+#DEFINE ACCEL_BW_7_81HZ                       0x00
+#DEFINE ACCEL_BW_15_63HZ                      0x01
+#DEFINE ACCEL_BW_31_25HZ                      0x02
+#DEFINE ACCEL_BW_62_5HZ                       0x03
+#DEFINE ACCEL_BW_125HZ                        0x04
+#DEFINE ACCEL_BW_250HZ                        0x05
+#DEFINE ACCEL_BW_500HZ                        0x06
+#DEFINE ACCEL_BW_1000HZ                       0x07
+    
+//Powermode: to assign the power mode of the accelerometer
+#DEFINE ACCEL_NORMAL                          0x00
+#DEFINE ACCEL_SUSPEND                         0x01
+#DEFINE ACCEL_LOWPOWER_1                      0x02
+#DEFINE ACCEL_STANDBY                         0x03
+#DEFINE ACCEL_LOWPOWER_2                      0x04
+#DEFINE ACCEL_DEEPSUSPEND                     0x05
+
+//Interrupt Type
+#DEFINE NO_MOTION                             1
+#DEFINE SLOW_MOTION                           0
+    
+//Interrupt Status
+#DEFINE INTRPT_ENABLE                         1
+#DEFINE INTRPT_DISABLE                        0
+
+//Time Delays
+#DEFINE INIT_PERIOD                           600      //Initialisation period set to 600ms
+#DEFINE RESET_PERIOD                          300      //Reset period set to 300ms
+#DEFINE POST_INIT_PERIOD                      50       //Post initialisation delay of 50ms
+#DEFINE TO_CONFIG                             20       //Time delay when switching from any operation mode to CONFIGMODE
+#DEFINE FROM_CONFIG                           8        //Time delay when switching from CONFIGMODE to any other operation mode
+
+//Update Data Function Calls
+#DEFINE MANUAL                                1        //To manually call the update data functions
+#DEFINE AUTO                                  0        //To automatically call the update data functions
+
+//******************************************************************************
+// Debugging resource
+//******************************************************************************
+#cmpif 0x00000100 : SUB AssertRC(byval rc as integer, byval tag as integer)
+#cmpif 0x00000100 :     IF rc!=0 THEN
+#cmpif 0x00000100 :         PRINT "\nFailed with ";integer.h' rc;" at tag ";tag
+#cmpif 0x00000100 :     ENDIF
+#cmpif 0x00000100 : ENDSUB
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim rc           //Result code
+dim nHandle      //I2C Handle
+dim x            //Value of X-axis
+dim y            //Value of Y-axis
+dim z            //Value of Z-axis
+dim i            //Which sensor value to read (0 = x, 1 = y, 2 = z), automatically increments and resets
+dim addr$        //Address to advertise to
+dim hSvc         //Service handle
+dim attrX$       //String value of X-axis reading
+dim attrY$       //String value of Y-axis reading
+dim attrZ$       //String value of Z-axis reading
+dim hUuidS1      //Handle for UUID of Service 1
+dim hUuidC1      //Handle for UUID of characteristic 1 in Service 1
+dim dvcNme$      //Device name
+dim measIntvl    //Measurement interval in ms
+dim ntfyEnabled  //If notifications are enabled or disabled
+
+//Set variables
+i = 0
+addr$ = ""
+dvcNme$ = "Laird Accel"
+measIntvl = 200
+ntfyEnabled = 0
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+SUB Delay(ms)
+    //Delay for ms (milliseconds)
+    dim startTick
+    startTick = GetTickCount()
+    WHILE GetTickSince(startTick) < ms
+        //Do nothing
+    ENDWHILE
+ENDSUB
+
+//===============================================================================
+//===============================================================================
+SUB conv_16_32Int(byref num)
+    //Converts a signed 16-bit number into a sign 32-bit number
+    dim count, checkBit
+    checkBit = 0
+    count = -1
+    IF num & H'8000 THEN        //If negative
+        num = num | H'FFFF0000    
+    ELSE                        //If positive
+        num = num & H'00007FFF
+    ENDIF
+ENDSUB
+
+//===============================================================================
+//===============================================================================
+SUB resetSensor()
+    //Reset the BNO055 (with delays)
+    GpioWrite(RESET_PIN, 0)     //Set the Reset pin LOW
+    Delay(RESET_PERIOD)         //Hold it for a while
+    GpioWrite(RESET_PIN, 1)     //Set the Reset pin HIGH
+    Delay(INIT_PERIOD)          //Pause for a while to let the sensor initialise completely (Anything >500ms should be fine)
+ENDSUB
+
+//===============================================================================
+//===============================================================================
+SUB initSensor()
+    dim chip_ID
+    //Initialise the interrupt pin as an input with a weak pull-up resistor
+    rc = GpioSetFunc(INT_PIN, 1, 0x02)
+#cmpif 0x00000100 :     AssertRC(rc, 273)
+    //Initialise the reset pin as an output with initial output set to HIGH
+    rc = GpioSetFunc(RESET_PIN, 2, 1)
+#cmpif 0x00000100 :     AssertRC(rc, 276)
+    Delay(500)
+    //Reset the sensor for initial use
+    resetSensor()
+    Delay(2000)
+    rc = I2COpen(100000,0,nHandle)
+#cmpif 0x00000100 :     AssertRC(rc, 282)
+    rc = I2CReadReg8(BNO055_ADDRESS,CHIP_ID_ADDRESS,chip_ID)
+//    PRINT "Chip ID: 0x"; INTEGER.H'chip_ID ;"\n"
+ENDSUB
+
+//===============================================================================
+//===============================================================================
+FUNCTION setPowMode(Mode)
+    //Sets the operating mode of the BNO055
+    rc = I2CWriteReg8(PWR_MODE_ADDRESS, OPR_MODE_ADDRESS, Mode)
+#cmpif 0x00000100 :     AssertRC(rc, 292)
+    Delay(FROM_CONFIG)
+ENDFUNC 1
+
+//===============================================================================
+//===============================================================================
+FUNCTION setOprMode(Mode)
+    //Sets the operating mode of the BNO055
+    rc = I2CWriteReg8(BNO055_ADDRESS, OPR_MODE_ADDRESS, Mode)
+#cmpif 0x00000100 :     AssertRC(rc, 301)
+    Delay(FROM_CONFIG)
+ENDFUNC 1
+
+//===============================================================================
+//===============================================================================
+SUB setUnits(temp, euler, angular, accel)
+    //Set output units for a particular mode Set any unused units to 0
+    dim units
+    units = (temp << 4) | (euler << 2) | (angular << 1) | (accel)
+    rc = I2CWriteReg8(BNO055_ADDRESS, UNIT_SEL_ADDRESS, units)
+#cmpif 0x00000100 :     AssertRC(rc, 312)
+ENDSUB
+
+//===============================================================================
+//===============================================================================
+FUNCTION configAccel(op_mode, bandwidth, range)
+    //Configure the range bandwidth and operation mode of the accelerometer
+    //Standard setup is configAccel(ACCEL_NORMAL, ACCEL_BW_62_5HZ, ACCEL_RANGE_4G)
+    dim config
+    config = (op_mode << 5) | (bandwidth << 2) | range
+    rc = I2CWriteReg8(BNO055_ADDRESS, ACC_CONFIG, config)
+#cmpif 0x00000100 :     AssertRC(rc, 323)    
+ENDFUNC 1
+//===============================================================================
+//===============================================================================
+SUB getAccelData(byref x, byref y, byref z)
+    //Retrieve the current accelerometer sensor data
+    dim xUpBit, xLowBit, yUpBit, yLowBit, zUpBit, zLowBit, tempx, tempy, tempz
+    rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_X_MSB, xUpBit)
+#cmpif 0x00000100 :     AssertRC(rc, 331)
+    rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_X_LSB, xLowBit)
+#cmpif 0x00000100 :     AssertRC(rc, 333)
+    tempx = (xUpBit << 8) | xLowBit
+    conv_16_32Int(tempx)
+    x = tempx
+    
+    rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_Y_MSB, yUpBit)
+#cmpif 0x00000100 :     AssertRC(rc, 339)
+    rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_Y_LSB, yLowBit)
+#cmpif 0x00000100 :     AssertRC(rc, 341)
+    tempy = (yUpBit << 8) | yLowBit
+    conv_16_32Int(tempy)
+    y = tempy
+    
+    rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_Z_MSB, zUpBit)
+#cmpif 0x00000100 :     AssertRC(rc, 347)
+    rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_Z_LSB, zLowBit)
+#cmpif 0x00000100 :     AssertRC(rc, 349)
+    tempz = (zUpBit << 8) | zLowBit
+    conv_16_32Int(tempz)
+    z = tempz
+ENDSUB
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+sub GattInit()
+    //Converts the Laird base UUID into a new service handle and initialise that service
+    dim uuid$
+    uuid$ = LT_BASE_UUID
+    hUuidS1 = BleHandleUuid128(uuid$)
+    rc = BleServiceNew(BLE_SERVICE_PRIMARY, hUuidS1, hSvc)
+#cmpif 0x00000100 :     AssertRC(rc, 364)
+
+    //Creates the first characteristic, which is used to send the accelerometer value
+    dim mdAttr, mdCccd, mdSccd, chProp
+    mdAttr = BleAttrMetadataEx(BLE_ATTR_ACCESS_OPEN,BLE_ATTR_ACCESS_NONE,10,0,rc)
+#cmpif 0x00000100 :     AssertRC(rc, 369)
+    mdCccd = BleAttrMetadataEx(BLE_ATTR_ACCESS_OPEN,BLE_ATTR_ACCESS_OPEN,2,0,rc)
+#cmpif 0x00000100 :     AssertRC(rc, 371)
+    mdSccd = BLE_CHAR_METADATA_ATTR_NOT_PRESENT
+    chProp = BLE_CHAR_PROPERTIES_NOTIFY + BLE_CHAR_PROPERTIES_READ
+    hUuidC1 = BleHandleUuidSibling(hUuidS1, 0x2A6E)
+    rc = BleCharNew(chProp, hUuidC1, mdAttr, mdCccd, mdSccd)
+#cmpif 0x00000100 :     AssertRC(rc, 376)
+    attrX$ = "\00\00\00\00"
+    rc = BleCharCommit(hSvc, attrX$, hUuidC1)
+endsub
+
+//*******************************************************************************
+//*******************************************************************************
+sub InitMotionSensor()
+    //Initialises the accelerometer sensor
+    Delay(400)
+    initSensor()
+    rc = setOprMode(OPERATION_MODE_ACCONLY)
+    rc = configAccel(ACCEL_NORMAL, ACCEL_BW_62_5HZ, ACCEL_RANGE_4G)
+    setUnits(0, 0, 0, 1)
+endsub
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+FUNCTION HndlrBlrAdvTimOut() 
+    rc = BleAdvertStart(0, addr$, 500, 0, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 397)
+ENDFUNC 1
+
+//*******************************************************************************
+//*******************************************************************************
+FUNCTION HndlrBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) 
+    IF (nMsgID == BLE_EVBLEMSGID_DISCONNECT) THEN
+        //Disconnected, restart advertising
+        ntfyEnabled=0
+        TimerCancel(0)
+        rc = BleAdvertStart(0, addr$, 500, 0, 0)
+#cmpif 0x00000100 :         AssertRC(rc, 408)
+    ENDIF
+ENDFUNC 1
+
+//*******************************************************************************
+//*******************************************************************************
+function HndlrTimer0() as integer
+    //Prints and notifies the temperature value after the timer triggers
+    getAccelData(x, y, z)
+
+    //Checks the status charVal to see if notifications have been requested and continues/stops
+    IF ntfyEnabled == 1 THEN
+        if i == 0 then
+            sprint #attrX$, x
+            attrX$ = "x:" + attrX$
+            rc=BleCharValueNotify(hUuidC1,attrX$)
+#cmpif 0x00000100 :             AssertRC(rc, 424)
+'            TimerStart(0,measIntvl,0)
+            i = 1
+        elseif i == 1 then
+            sprint #attrY$, y
+            attrY$ = "y:" + attrY$
+            rc=BleCharValueNotify(hUuidC1,attrY$)
+#cmpif 0x00000100 :             AssertRC(rc, 431)
+'            TimerStart(0,measIntvl,0)
+            i = 2
+        elseif i == 2 then
+            sprint #attrZ$, z
+            attrZ$ = "z:" + attrZ$
+            rc=BleCharValueNotify(hUuidC1,attrZ$)
+#cmpif 0x00000100 :             AssertRC(rc, 438)
+'            TimerStart(0, measIntvl,0)
+            i = 0
+        endif
+    ENDIF
+endfunc 1
+
+//*******************************************************************************
+// CCCD descriptor written handler
+//*******************************************************************************
+FUNCTION HndlrCharCccd(BYVAL charHandle, BYVAL nVal) AS INTEGER
+    dim value$
+    IF charHandle == hUuidC1 THEN
+        IF nVal == 1 THEN
+            //Enable notifications
+            ntfyEnabled=1
+            TimerStart(0, measIntvl, 1)
+        ELSEIF nVal == 0 THEN
+            //Disable notifications
+            ntfyEnabled=0
+            TimerCancel(0)
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//===============================================================================
+//===============================================================================
+sub AppInit()
+    //Create the advert and scan reports
+    dim advRpt$, scnRpt$, uuid$
+    uuid$ = LT_BASE_UUID
+    rc = BleGapSvcInit(dvcNme$, nmeWrtble, BLE_APPEARANCE_UNKNOWN, MinConnInt, MaxConnInt, ConnSupTO, sL)
+#cmpif 0x00000100 :     AssertRC(rc, 470)
+    rc = BleAdvRptInit(advRpt$, 0, 512, 12)
+#cmpif 0x00000100 :     AssertRC(rc, 472)
+    rc = BleScanRptInit(scnRpt$)
+#cmpif 0x00000100 :     AssertRC(rc, 474)
+    rc = BleAdvRptAddUuid128(scnRpt$, BleHandleUuid128(uuid$))
+#cmpif 0x00000100 :     AssertRC(rc, 476)
+    rc = BleAdvRptsCommit(advRpt$,scnRpt$)
+#cmpif 0x00000100 :     AssertRC(rc, 478)
+    rc = BleAdvertStart(0, addr$, 500, 0, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 480)
+endsub
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+GattInit()
+AppInit()
+InitMotionSensor()
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+ONEVENT EVBLEMSG          CALL HndlrBleMsg
+ONEVENT EVBLE_ADV_TIMEOUT CALL HndlrBlrAdvTimOut
+ONEVENT EVTMR0            CALL HndlrTimer0
+ONEVENT EVCHARCCCD        CALL HndlrCharCccd
+
+WAITEVENT

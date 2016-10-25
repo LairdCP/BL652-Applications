@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Laird
+// Copyright (c) 2015-2016, Laird
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -35,7 +35,7 @@
 #define MOUUID   "\56\9a\20\02\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Modem out UUID
 #define RXUUID   "\56\9a\20\01\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Receive VSP UUID
 #define TXUUID   "\56\9a\20\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Transmit VSP UUID
-#define Version  "1.02"                                              //Version
+#define Version  "1.03"                                              //Version
 
 //******************************************************************************
 // Global Variable Declarations
@@ -177,25 +177,34 @@ ENDFUNC 1
 //==============================================================================
 FUNCTION HndlrCharVal(charHandle, offset, len)
     //Characteristic written
-    dim Rd$, arc
+    dim Rd$, arc, SLen, SWritten
     arc = BleCharValueRead(charHandle, Rd$)
     AssertRC(arc, 182)
 
         IF charHandle == RXchar THEN
             //RX
-            dim SLen, SWritten
-            SLen = strlen(Rd$)
-            SWritten = uartwrite(Rd$)
-            IF (SLen != SWritten) then
-                //Not enough buffer space - tell client to stop sending data
-                dim Rd2$
-                Rd2$ = "\00"
-                rc = BLECHARVALUENOTIFY(MOchar, Rd2$)
-                BufferFull = 1
+            if BufferFull == 0 then
+                SLen = strlen(Rd$)
+                SWritten = uartwrite(Rd$)
+                IF (SLen != SWritten) then
+                    //Not enough buffer space - tell client to stop sending data
+                    dim Rd2$
+                    Rd2$ = "\00"
+                    rc = BLECHARVALUENOTIFY(MOchar, Rd2$)
+                    BufferFull = 1
 
-                //Shift left
-                STRSHIFTLEFT(Rd$, SWritten)
-                RecBuf$ = Rd$
+                    //Shift left
+                    STRSHIFTLEFT(Rd$, SWritten)
+                    RecBuf$ = Rd$
+                ENDIF
+            ELSE
+                //Buffer is full
+                SLen = strlen(Rd$)
+                SWritten = strlen(RecBuf$)
+                if (SLen + SWritten < 500) then
+                    //There is space in the buffer, append
+                    RecBuf$ = RecBuf$ + Rd$
+                ENDIF
             ENDIF
         ELSEIF charHandle == MIchar THEN
             rc = BleCharValueRead(MIchar, Rd$)
@@ -247,6 +256,7 @@ FUNCTION HndlrUartTxEmpty()
         SWritten = uartwrite(RecBuf$)
         IF (SLen == SWritten) then
             //All written
+            RecBuf$ = ""
             BufferFull = 0
             Rd$ = "\01"
             rc = BLECHARVALUENOTIFY(MOchar, Rd$)

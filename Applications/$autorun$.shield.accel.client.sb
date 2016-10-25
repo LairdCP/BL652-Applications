@@ -1,0 +1,663 @@
+//******************************************************************************
+// Laird Technologies (c) 2016
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// **Accelerometer Notifications Client (Central)**
+//   This application reads notifications from an accelerometer BLE server.
+//   Requires an Arduino 1602 LCD Shield.
+//
+//   Please refer to the 'Using Arduino Shield boards on BL652' app note
+//     available from the Laird BL652 module website for instructions on using
+//     this application
+//
+//******************************************************************************
+
+//   =====================================================
+//   Conditional Compile Masks (they can be additive)
+//   -----------------------------------------------------
+//   0x00000001 : Output to 1602 LCD shield
+//   0x00000002 : Output to UART
+//   0x00000004 : Respond to DVK-BL652 buttons (Cannot use when LCD is active)
+//   0x00000008 : Respond to 1602 LCD shield buttons
+//   0x00000100 : Asserts
+//   =====================================================
+//#set $cmpif, 0x0000009  //Output to LCD using LCD shield buttons
+#set $cmpif, 0x0000109  //Output to LCD using LCD shield buttons (with asserts)
+//#set $cmpif, 0x000000B  //Output to LCD & UART using LCD shield buttons
+//#set $cmpif, 0x000010B  //Output to LCD & UART using LCD shield buttons (with asserts)
+//#set $cmpif, 0x0000006  //Output to UART using DVK buttons
+//#set $cmpif, 0x0000106  //Output to UART using DVK buttons (with asserts)
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+//Laird Base UUID:                 569a0000-b87f-490c-92cb-11ba5ea5167c
+#define LT_BASE_UUID               "\56\9a\00\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT     0  //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT  1  //msgCtx = connection handle
+
+//BLE tags
+#define ADTAG_SERVICE_FULL_NAME    0x09
+
+//Pin definitions for the push buttons
+#define BUTTON_01                  11
+#define BUTTON_02                  15
+
+//Pin definitions for the LCD
+#define RS_PIN                     19
+#define ENABLE_PIN                 20
+#define D0_PIN                     15
+#define D1_PIN                     16
+#define D2_PIN                     17
+#define D3_PIN                     18
+
+//LCD Commands
+#define LCD_CLEARDISPLAY           0x01
+#define LCD_RETURNHOME             0x02
+#define LCD_ENTRYMODESET           0x04
+#define LCD_DISPLAYCONTROL         0x08
+#define LCD_CURSORSHIFT            0x10
+#define LCD_FUNCTIONSET            0x20
+#define LCD_SETCGRAMADDR           0x40
+#define LCD_SETDDRAMADDR           0x80
+
+//LCD flags for display entry mode
+#define LCD_ENTRYRIGHT             0x00
+#define LCD_ENTRYLEFT              0x02
+#define LCD_ENTRYSHIFTINCREMENT    0x01
+#define LCD_ENTRYSHIFTDECREMENT    0x00
+
+//LCD flags for display on/off control
+#define LCD_DISPLAYON              0x04
+#define LCD_DISPLAYOFF             0x00
+#define LCD_CURSORON               0x02
+#define LCD_CURSOROFF              0x00
+#define LCD_BLINKON                0x01
+#define LCD_BLINKOFF               0x00
+
+//LCD flags for display/cursor shift
+#define LCD_DISPLAYMOVE            0x08
+#define LCD_CURSORMOVE             0x00
+#define LCD_MOVERIGHT              0x04
+#define LCD_MOVELEFT               0x00
+
+//LCD flags for function set
+#define LCD_8BITMODE               0x10
+#define LCD_4BITMODE               0x00
+#define LCD_2LINE                  0x08
+#define LCD_1LINE                  0x00
+#define LCD_5x10DOTS               0x04
+#define LCD_5x8DOTS                0x00
+
+//Pin assignments
+#define DIGITAL_IN                 1
+#define DIGITAL_OUT                2
+#define ANALOG_IN                  3
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim rc              //Result code
+#cmpif 0x00000001 : dim displayControl  //Current LCD control
+#cmpif 0x00000001 : dim displayMode     //Current LCD mode
+dim s$              //String used for LCD/UART data output
+dim conHndl         //Holds the BLE connection handle
+dim lastBttn        //Last pressed button
+dim ntfyEnbl        //If notifications have been enabled or not
+dim devName$        //Name of device to connect to (if found when scanning)
+#cmpif 0x00000008 : dim UpperMatch[5]   //Holds upper voltage match values for shield button press
+#cmpif 0x00000008 : dim LowerMatch[5]   //Holds lower voltage match values for shield button press
+dim DescHandle      //Handle to the accel service descriptor
+
+//Set variables
+lastBttn = 10
+devName$ = "Laird Accel"
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+//Sleep for ms (milliseconds)
+sub Sleep(ms)
+    dim startTick
+    startTick = GetTickCount()
+    while GetTickSince(startTick) < ms
+        //Do nothing
+    endwhile
+endsub
+
+//******************************************************************************
+// Debugging resource
+//******************************************************************************
+#cmpif 0x00000100 : sub AssertRC(byval rc as integer, byval tag as integer)
+#cmpif 0x00000100 :     if rc != 0 then
+#cmpif 0x00000100 :         //Error has occured
+#cmpif 0x00000100 :         rc = SendMsgApp(rc, tag)
+#cmpif 0x00000100 :     endif
+#cmpif 0x00000100 : endsub
+
+//==============================================================================
+//==============================================================================
+//Initialises all of the output pins used for controlling the LCD
+#cmpif 0x00000001 : function InitPins()
+#cmpif 0x00000001 :     //Set all of the LCD pins as digital outputs
+#cmpif 0x00000001 :     rc=GpioSetFunc(RS_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 150)
+#cmpif 0x00000001 :     rc=GpioSetFunc(ENABLE_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 152)
+#cmpif 0x00000001 :     rc=GpioSetFunc(D0_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 154)
+#cmpif 0x00000001 :     rc=GpioSetFunc(D1_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 156)
+#cmpif 0x00000001 :     rc=GpioSetFunc(D2_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 158)
+#cmpif 0x00000001 :     rc=GpioSetFunc(D3_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 160)
+#cmpif 0x00000001 : endfunc rc
+
+//==============================================================================
+//==============================================================================
+//Toggles the enable pin
+#cmpif 0x00000001 : sub PulseEnable()
+#cmpif 0x00000001 :     GpioWrite(ENABLE_PIN, 0)
+#cmpif 0x00000001 :     Sleep(1)
+#cmpif 0x00000001 :     GpioWrite(ENABLE_PIN, 1)
+#cmpif 0x00000001 :     Sleep(1) //Enable pulse must be >450ns
+#cmpif 0x00000001 :     GpioWrite(ENABLE_PIN, 0)
+#cmpif 0x00000001 :     Sleep(1) //Commands need > 37us to settle
+#cmpif 0x00000001 : endsub
+
+//==============================================================================
+//==============================================================================
+//Writes the first 4 bits of a value to pins D0 to D3
+#cmpif 0x00000001 : sub Write4Bits(value)
+#cmpif 0x00000001 :     dim val
+#cmpif 0x00000001 :     val = ((value >> 0) & 0x01)
+#cmpif 0x00000001 :     GpioWrite(D0_PIN, ((value >> 0) & 0x01))
+#cmpif 0x00000001 :     val = ((value >> 1) & 0x01)
+#cmpif 0x00000001 :     GpioWrite(D1_PIN, ((value >> 1) & 0x01))
+#cmpif 0x00000001 :     val = ((value >> 2) & 0x01)
+#cmpif 0x00000001 :     GpioWrite(D2_PIN, ((value >> 2) & 0x01))
+#cmpif 0x00000001 :     val = ((value >> 3) & 0x01)
+#cmpif 0x00000001 :     GpioWrite(D3_PIN, ((value >> 3) & 0x01))    
+#cmpif 0x00000001 :     PulseEnable()
+#cmpif 0x00000001 : endsub
+
+//==============================================================================
+//==============================================================================
+//Enters commands to the LCD
+#cmpif 0x00000001 : sub lcdCommand(value)
+#cmpif 0x00000001 :     GpioWrite(RS_PIN, 0)
+#cmpif 0x00000001 :     //Send an 8-bit command to the LCD
+#cmpif 0x00000001 :     Write4Bits(value>>4)
+#cmpif 0x00000001 :     Write4Bits(value)
+#cmpif 0x00000001 : endsub
+
+//==============================================================================
+//==============================================================================
+//Writes characters to the LCD
+#cmpif 0x00000001 : sub lcdWrite(char)
+#cmpif 0x00000001 :     GpioWrite(RS_PIN, 1)
+#cmpif 0x00000001 :     //Send an 8-bit command to the LCD
+#cmpif 0x00000001 :     Write4Bits(char>>4)
+#cmpif 0x00000001 :     Write4Bits(char)
+#cmpif 0x00000001 : endsub   
+
+//==============================================================================
+//==============================================================================
+//Prints a string to the LCD
+sub lcdPrint(string$)
+//LCD
+#cmpif 0x00000001 :     dim index
+#cmpif 0x00000001 :     index = 0
+#cmpif 0x00000001 :     while index < strlen(string$)
+#cmpif 0x00000001 :         lcdWrite(STRGETCHR(string$, index))
+#cmpif 0x00000001 :         index = index + 1
+#cmpif 0x00000001 :     endwhile
+
+//UART
+#cmpif 0x00000002 :     print string$;"\r\n"
+endsub
+
+//==============================================================================
+//==============================================================================
+//Clears the LCD display, set cursor position to 0
+sub lcdClear()
+#cmpif 0x00000001 :     lcdCommand(LCD_CLEARDISPLAY)
+#cmpif 0x00000001 :     Sleep(2)
+endsub
+
+//==============================================================================
+//==============================================================================
+//Sets Display Data RAM Address 0 in Address Counter and the
+//display returns to its original position. The cursor or blink goes to
+//the most-left side of the display (to the 1st line if 2 lines are
+//displayed). The contents of the Display Data RAM do not
+//change.
+#cmpif 0x00000001 : sub lcdHome()
+#cmpif 0x00000001 :     lcdCommand(LCD_RETURNHOME)
+#cmpif 0x00000001 :     Sleep(2)
+#cmpif 0x00000001 : endsub
+
+//==============================================================================
+//==============================================================================
+//Sets cursor to specific row/column
+sub lcdSetCursor(col, row)
+#cmpif 0x00000001 :     lcdCommand(LCD_SETDDRAMADDR | (col + (row*0x40)))
+endsub
+
+//==============================================================================
+//==============================================================================
+// Turn the display on (quickly)
+#cmpif 0x00000001 : sub lcdDisplay()
+#cmpif 0x00000001 :   displayControl = (displayControl | LCD_DISPLAYON)
+#cmpif 0x00000001 :   lcdCommand(LCD_DISPLAYCONTROL | displayControl)
+#cmpif 0x00000001 : endsub
+
+//==============================================================================
+//==============================================================================
+//Initialises pins and the LCD
+#cmpif 0x00000001 : sub lcdBegin()
+#cmpif 0x00000001 :     rc=InitPins()
+#cmpif 0x00000001 :     if (rc != 0) then
+#cmpif 0x00000001 :         print "error initializing GPIO pins\n"
+#cmpif 0x00000001 :     endif
+#cmpif 0x00000001 :     Sleep(15) //Wait 15ms
+#cmpif 0x00000001 :     //Put the LCD into 4 bit or 8 bit mode
+#cmpif 0x00000001 :     Write4Bits(0x03)
+#cmpif 0x00000001 :     Sleep(5) //Wait min 4.1ms
+#cmpif 0x00000001 :     //Second try
+#cmpif 0x00000001 :     Write4Bits(0x03)
+#cmpif 0x00000001 :     Sleep(5) //Wait min 4.1ms
+#cmpif 0x00000001 :     //Third go!
+#cmpif 0x00000001 :     Write4Bits(0x03)
+#cmpif 0x00000001 :     Sleep(1)
+#cmpif 0x00000001 :     //Finally, set to 4-bit interface
+#cmpif 0x00000001 :     Write4Bits(0x02) 
+#cmpif 0x00000001 :     //Turn the display on with no cursor or blinking default
+#cmpif 0x00000001 :     displayControl = (LCD_CURSOROFF | LCD_BLINKOFF)
+#cmpif 0x00000001 :     lcdDisplay()
+#cmpif 0x00000001 :     //Initialize to default text direction (for romance languages)
+#cmpif 0x00000001 :     displayMode = (LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT)
+#cmpif 0x00000001 :     //Set the entry mode
+#cmpif 0x00000001 :     lcdCommand(LCD_ENTRYMODESET | displayMode)
+#cmpif 0x00000001 : endsub
+
+//==============================================================================
+// Initialise and instantiate service, characteristic, start adverts
+//==============================================================================
+FUNCTION OnStartup()
+#cmpif 0x00000001 :     //Init LCD
+#cmpif 0x00000001 :     lcdBegin()
+#cmpif 0x00000001 :     lcdClear()
+
+    //Set LCD message
+    s$ = "Scanning..."
+    lcdPrint(s$)
+
+    //Scan for devices
+    rc = BleScanStart(0,0)
+#cmpif 0x00000100 :     AssertRC(rc, 338)
+ENDFUNC 1
+
+//==============================================================================
+// Close connections so that we can run another app without problems
+//==============================================================================
+SUB CloseConnections()
+    rc = BleDisconnect(conHndl)
+#cmpif 0x00000100 :     AssertRC(rc, 346)
+ENDSUB
+
+//==============================================================================
+// Ble event handler
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
+    //BLE event callback
+    conHndl=nCtx
+    dim uHndS, uHndC
+    IF (nMsgID == BLE_EVBLEMSGID_CONNECT) THEN
+        //Connected
+#cmpif 0x00000001 :        LcdClear()
+        s$ = "Connected"
+        LcdPrint(s$)
+
+        //Search for descriptor in accel service
+        dim UUID$ : UUID$ = LT_BASE_UUID
+        rc = BleGattCFindDesc(nCtx, BleHandleUuid128(UUID$), 0, BleHandleUuidSibling(BleHandleUuid128(UUID$), 0x2A6E), 0, BleHandleUuid16(0x2902), 0)        
+    ELSEIF (nMsgID == BLE_EVBLEMSGID_DISCONNECT) THEN
+        //Disconnected
+#cmpif 0x00000001 :        LcdClear()
+        s$ = "Disconnected"
+        LcdPrint(s$)
+        EXITFUNC 0
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//==============================================================================
+function HndlrAttrWrite(cHndl, aHndl, nSts) as integer
+#cmpif 0x00000100 :     if nSts != 0 then
+#cmpif 0x00000100 :         //Failed to write attribute
+#cmpif 0x00000100 :         AssertRC(rc, 379)
+#cmpif 0x00000100 :     endif
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HndlrAttrNotify() as integer
+  dim chndl,aHndl,att$,dscd
+  rc=BleGattcNotifyRead(cHndl,aHndl,att$,dscd)
+  if rc==0 then
+    //************************************************************
+    //**********Below is the value from the notification**********
+    //************************************************************
+    if ntfyEnbl then
+        if StrGetChr(att$,0) == 0x78 then
+#cmpif 0x00000001 :             LcdSetCursor(0,0)
+            if StrLen(att$) == 7 then
+                LcdPrint(att$)
+            else
+                rc = StrSetBlock(att$,0x20,(StrLen(att$)+1),(7-StrLen(att$)))
+                LcdPrint(att$)
+            endif
+        elseif StrGetChr(att$,0) == 0x79 then
+#cmpif 0x00000001 :             LcdSetCursor(8,0)
+            if StrLen(att$) == 7 then
+                LcdPrint(att$)
+            else
+                rc = StrSetBlock(att$,0x20,(StrLen(att$)+1),(7-StrLen(att$)))
+                LcdPrint(att$)
+            endif
+        elseif StrGetChr(att$,0) == 0x7A then
+#cmpif 0x00000001 :             LcdSetCursor(0,1)
+            if StrLen(att$) == 7 then
+                LcdPrint(att$)
+            else
+                rc = StrSetBlock(att$,0x20,(StrLen(att$)+1),(7-StrLen(att$)))
+                LcdPrint(att$)
+            endif
+        endif
+    endif
+  endif
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HndlrTimer0()
+dim at$
+#cmpif 0x00000008 : dim adc
+#cmpif 0x00000008 :    adc = (gpioread(3)*225)/64
+#cmpif 0x00000008 :    if (adc <= UpperMatch[0] && adc >= LowerMatch[0] && lastBttn != 0) then
+#cmpif 0x00000008 :        //RIGHT button pressed
+#cmpif 0x00000008 :        lcdClear()
+#cmpif 0x00000008 :        s$ = "Right button"
+#cmpif 0x00000008 :        lcdPrint(s$)
+#cmpif 0x00000008 :        s$ = "is pressed!"
+#cmpif 0x00000008 :        lcdSetCursor(0,1)
+#cmpif 0x00000008 :        lcdPrint(s$)
+#cmpif 0x00000008 :        lastBttn = 0
+#cmpif 0x00000008 :    elseif (adc <= UpperMatch[1] && adc >= LowerMatch[1] && lastBttn != 1) then
+#cmpif 0x00000008 :        //UP button pressed
+#cmpif 0x00000008 :        lcdClear()
+#cmpif 0x00000008 :        s$ = "Up button"
+#cmpif 0x00000008 :        lcdPrint(s$)
+#cmpif 0x00000008 :        s$ = "is pressed!"
+#cmpif 0x00000008 :        lcdSetCursor(0,1)
+#cmpif 0x00000008 :        lcdPrint(s$)
+#cmpif 0x00000008 :        lastBttn = 1
+#cmpif 0x00000008 :    elseif (adc <= UpperMatch[2] && adc > LowerMatch[2] && lastBttn != 2) then
+#cmpif 0x00000008 :        //DOWN button pressed
+#cmpif 0x00000008 :        lcdClear()
+#cmpif 0x00000008 :        s$ = "Down button"
+#cmpif 0x00000008 :        lcdPrint(s$)
+#cmpif 0x00000008 :        s$ = "is pressed!"
+#cmpif 0x00000008 :        lcdSetCursor(0,1)
+#cmpif 0x00000008 :        lcdPrint(s$)
+#cmpif 0x00000008 :        lastBttn = 2
+#cmpif 0x00000008 :    elseif (adc <= UpperMatch[3] && adc > LowerMatch[3] && lastBttn != 3) then
+#cmpif 0x00000008 :        //LEFT button pressed    
+#cmpif 0x00000008 :        lastBttn = 3
+#cmpif 0x00000008 :        at$="\00\00" //Write this value to disable notifications
+#cmpif 0x00000008 :        //***********************************************************************
+#cmpif 0x00000008 :        //******************This write disables notifications********************
+#cmpif 0x00000008 :        //***********************************************************************
+#cmpif 0x00000008 :        rc=BleGattcWrite(conHndl,DescHandle,at$)
+#cmpif 0x00000008 :        IF rc==0 THEN
+#cmpif 0x00000008 :            ntfyEnbl = 0
+#cmpif 0x00000008 :            LcdClear()
+#cmpif 0x00000008 :            s$ = "Notifications"
+#cmpif 0x00000008 :            LcdPrint(s$)
+#cmpif 0x00000008 :            lcdSetCursor(0,1)
+#cmpif 0x00000008 :            s$ = "Disabled"
+#cmpif 0x00000008 :            LcdPrint(s$)
+#cmpif 0x00000008 :            WAITEVENT
+#cmpif 0x00000008 :        ENDIF
+#cmpif 0x00000008 :    elseif (adc <= UpperMatch[4] && adc > LowerMatch[4] && lastBttn != 4) then
+#cmpif 0x00000008 :        //SELECT button pressed
+#cmpif 0x00000008 :        lastBttn = 4
+#cmpif 0x00000008 :        at$="\01\00" //Write this value to enable notifications
+#cmpif 0x00000008 :        //***********************************************************************
+#cmpif 0x00000008 :        //******************This write enables notifications*********************
+#cmpif 0x00000008 :        //***********************************************************************
+#cmpif 0x00000008 :        rc=BleGattcWrite(conHndl,DescHandle,at$)
+#cmpif 0x00000008 :        IF rc==0 THEN
+#cmpif 0x00000008 :            ntfyEnbl = 1
+#cmpif 0x00000008 :            LcdClear()
+#cmpif 0x00000008 :            s$ = "Notifications"
+#cmpif 0x00000008 :            LcdPrint(s$)
+#cmpif 0x00000009 :            lcdSetCursor(0,1)
+#cmpif 0x00000008 :            s$ = "Enabled"
+#cmpif 0x00000008 :            LcdPrint(s$)
+#cmpif 0x00000008 :            sleep(1500)
+#cmpif 0x00000008 :            LcdClear()
+#cmpif 0x00000008 :            WAITEVENT
+#cmpif 0x00000008 :        ENDIF
+#cmpif 0x00000008 :    endif
+
+#cmpif 0x00000004 : dim btn1, btn2
+#cmpif 0x00000004 :    btn1 = gpioread(BUTTON_01)
+#cmpif 0x00000004 :    btn2 = gpioread(BUTTON_02)
+#cmpif 0x00000004 :    if (btn1 == 0 && btn2 == 1 && lastBttn != 3) then
+#cmpif 0x00000004 :        //Button 1 pressed    
+#cmpif 0x00000004 :        lastBttn = 3
+#cmpif 0x00000004 :        at$="\00\00" //Write this value to disable notifications
+#cmpif 0x00000004 :        //***********************************************************************
+#cmpif 0x00000004 :        //******************This write disables notifications*********************
+#cmpif 0x00000004 :        //***********************************************************************
+#cmpif 0x00000004 :        rc=BleGattcWrite(conHndl,DescHandle,at$)
+#cmpif 0x00000004 :        IF rc==0 THEN
+#cmpif 0x00000004 :            ntfyEnbl = 0
+#cmpif 0x00000004 :            LcdClear()
+#cmpif 0x00000004 :            s$ = "Notifications"
+#cmpif 0x00000004 :            LcdPrint(s$)
+#cmpif 0x00000004 :            lcdSetCursor(0,1)
+#cmpif 0x00000004 :            s$ = "Disabled"
+#cmpif 0x00000004 :            LcdPrint(s$)
+#cmpif 0x00000004 :            WAITEVENT
+#cmpif 0x00000004 :        ENDIF
+#cmpif 0x00000004 :    elseif (btn1 == 1 && btn2 == 0 && lastBttn != 4) then
+#cmpif 0x00000004 :        //Button 2 pressed
+#cmpif 0x00000004 :        lastBttn = 4
+#cmpif 0x00000004 :        at$="\01\00" //Write this value to enable notifications
+#cmpif 0x00000004 :        //***********************************************************************
+#cmpif 0x00000004 :        //******************This write enables notifications*********************
+#cmpif 0x00000004 :        //***********************************************************************
+#cmpif 0x00000004 :        rc=BleGattcWrite(conHndl,DescHandle,at$)
+#cmpif 0x00000004 :        IF rc==0 THEN
+#cmpif 0x00000004 :            ntfyEnbl = 1
+#cmpif 0x00000004 :            LcdClear()
+#cmpif 0x00000004 :            s$ = "Notifications"
+#cmpif 0x00000004 :            LcdPrint(s$)
+#cmpif 0x00000004 :            lcdSetCursor(0,1)
+#cmpif 0x00000004 :            s$ = "Enabled"
+#cmpif 0x00000004 :            LcdPrint(s$)
+#cmpif 0x00000004 :            sleep(1500)
+#cmpif 0x00000004 :            LcdClear()
+#cmpif 0x00000004 :            WAITEVENT
+#cmpif 0x00000004 :        ENDIF
+#cmpif 0x00000004 :    endif
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HndlrAdvRpt() as integer
+    //Advert received callback
+    dim addr$, dta$, ndisc, rsi, name$
+  
+    //Read the oldest advert
+    rc = BleScanGetAdvReport(addr$,dta$,ndisc,rsi)  
+    while (rc==0)
+        //Extract the name
+        rc=BleGetADbyTag(dta$,ADTAG_SERVICE_FULL_NAME,name$)
+        if rc==0 then
+            if strcmp(name$,devName$)==0 then
+#cmpif 0x00000001 :                LcdClear()
+                s$ = "Connecting to ..."
+                LcdPrint(s$)
+#cmpif 0x00000001 :                 lcdSetCursor(0,1)
+                s$ = strhexize$(addr$)
+                LcdPrint(s$)
+                rc=BleScanStop()
+#cmpif 0x00000100 :                 AssertRC(rc, 559)
+                rc=BleConnect(addr$,5000, 20000, 75000, 5000000)
+#cmpif 0x00000100 :                 AssertRC(rc, 561)
+                rc = BleGattcOpen(0, 0)
+            endif
+        endif
+        rc = BleScanGetAdvReport(addr$,dta$,ndisc,rsi)
+    endwhile
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HndlrFindDesc(cHndl,hndl) as integer
+    //Find descriptor callback
+    DescHandle = hndl
+    if (hndl == 0) then
+        //Failed to find descriptor handle
+#cmpif 0x00000001 :        LcdClear()
+        s$ = "Descriptor N/A"
+        LcdPrint(s$)
+#cmpif 0x00000001 :         lcdSetCursor(0,1)
+        s$ = "Disconnecting."
+        LcdPrint(s$)
+        CloseConnections()
+    else
+        //Found descriptor handle
+#cmpif 0x00000001 :        LcdClear()
+        s$ = "Descriptor Found"
+        LcdPrint(s$)
+        s$ = "Ready!"
+        LcdPrint(s$)
+    endif
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+#cmpif 0x00000008 : function PotDiv(Mv, Res)
+#cmpif 0x00000008 :     //Potential Divider calculation. Resistor from Vcc is 2k
+#cmpif 0x00000008 :     dim TotalRes : TotalRes = 2000 + res
+#cmpif 0x00000008 : endfunc Res*Mv/TotalRes
+
+//==============================================================================
+//==============================================================================
+sub GpioSetup()
+rc = 0
+#cmpif 0x00000008 :    //Set SIO_3 to 10-bit, 1/6 scaling analog in
+#cmpif 0x00000008 :    rc = gpiosetfunc(3, ANALOG_IN, 0x16)
+#cmpif 0x00000100 :    AssertRC(rc, 606)
+
+#cmpif 0x00000008 :    //Work out the floating input (no buttons pressed) and the step between each button voltage
+#cmpif 0x00000008 :    dim VDist, FloatingV
+#cmpif 0x00000008 :    FloatingV = gpioread(3)
+#cmpif 0x00000008 :    FloatingV = (FloatingV*225)/64
+#cmpif 0x00000008 :    VDist = FloatingV/11
+
+#cmpif 0x00000008 :    //First button
+#cmpif 0x00000008 :    rc = PotDiv(FloatingV, 330)
+#cmpif 0x00000008 :    UpperMatch[1] = rc + VDist
+#cmpif 0x00000008 :    LowerMatch[1] = rc - VDist
+
+#cmpif 0x00000008 :    //Second button
+#cmpif 0x00000008 :    rc = PotDiv(FloatingV, 950)
+#cmpif 0x00000008 :    UpperMatch[2] = rc + VDist
+#cmpif 0x00000008 :    LowerMatch[2] = rc - VDist
+
+#cmpif 0x00000008 :    //Third button
+#cmpif 0x00000008 :    rc = PotDiv(FloatingV, 1950)
+#cmpif 0x00000008 :    UpperMatch[3] = rc + VDist
+#cmpif 0x00000008 :    LowerMatch[3] = rc - VDist
+
+#cmpif 0x00000008 :    //Forth button
+#cmpif 0x00000008 :    rc = PotDiv(FloatingV, 5250)
+#cmpif 0x00000008 :    UpperMatch[4] = rc + VDist
+#cmpif 0x00000008 :    LowerMatch[4] = rc - VDist
+
+#cmpif 0x00000008 :    //Fifth button
+#cmpif 0x00000008 :    UpperMatch[0] = LowerMatch[1] - 4
+#cmpif 0x00000008 :    LowerMatch[0] = 0
+
+rc = 0
+#cmpif 0x00000004 :    //DVK button 1 (weak pull up)
+#cmpif 0x00000004 :    rc = gpiosetfunc(BUTTON_01, DIGITAL_IN, 0x02)
+#cmpif 0x00000100 :    AssertRC(rc, 641)
+
+#cmpif 0x00000004 :    //DVK button 2 (weak pull up)
+#cmpif 0x00000004 :    rc = gpiosetfunc(BUTTON_02, DIGITAL_IN, 0x02)
+#cmpif 0x00000100 :    AssertRC(rc, 645)
+endsub
+
+//==============================================================================
+//==============================================================================
+function HndlrErr(rc, tag) as integer
+#cmpif 0x00000100 :     //Error handler, outputs messages to UART/LCD
+#cmpif 0x00000100 :     sprint #s$, INTEGER.H'rc
+#cmpif 0x00000100 :     s$ = "Err: " + RIGHT$(s$, 4)
+#cmpif 0x00000001 :     LcdClear()
+#cmpif 0x00000100 :     LcdPrint(s$)
+#cmpif 0x00000001 :     LcdSetCursor(0,1)
+#cmpif 0x00000100 :     sprint #s$, tag
+#cmpif 0x00000100 :     s$ = "Line: " + s$
+#cmpif 0x00000100 :     LcdPrint(s$)
+#cmpif 0x00000100 :     //Wait 2 seconds before finishing
+#cmpif 0x00000100 :     Sleep(2000)
+endfunc 1
+
+//==============================================================================
+// Main() equivalent
+//==============================================================================
+//Set the GPIOs up
+GpioSetup()
+
+//Output help message to UART if UART is enabled
+#cmpif 0x00000002 : print "Welcome to the accel client notify demo for Laird BL652!\r\n\r\n"
+#cmpif 0x00000002 : print "Controls (see the '#set $cmpif' line in the application source to see what functionality is enabled):\r\n"
+#cmpif 0x00000002 : print "\tHold shield Left Button:   Disable notifications\r\n"
+#cmpif 0x00000002 : print "\tHold shield Select Button: Enable notifications\r\n\r\n"
+#cmpif 0x00000002 : print "\tHold DVK Left Button (button2):  Disable notifications\r\n"
+#cmpif 0x00000002 : print "\tHold DVK Right Button (button1): Enable notifications\r\n\r\n"
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+ONEVENT EVBLEMSG          CALL HndlrBleMsg
+ONEVENT EVATTRWRITE       CALL HndlrAttrWrite
+ONEVENT EVATTRNOTIFY      CALL HndlrAttrNotify
+ONEVENT EVTMR0            CALL HndlrTimer0
+ONEVENT EvBLE_ADV_REPORT  CALL HndlrAdvRpt
+ONEVENT EVFINDDESC        CALL HndlrFindDesc
+#cmpif 0x00000100 : ONEVENT EVMSGAPP          CALL HndlrErr
+
+//Run startup function and enable timer for checking button status
+rc = OnStartup()
+timerstart(0, 750, 1)
+
+WAITEVENT

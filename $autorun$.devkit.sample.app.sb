@@ -19,7 +19,7 @@
 //                                                                            ++
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // +++++                                                                      ++
-// +++++  When UwTerminal downloads the app it to the module it will be saved ++
+// +++++  When UwTerminal downloads the app to the module it will be saved    ++
 // +++++  as a file with filename $autorun$ which means it will run           ++
 // +++++  automatically on reset.                                             ++
 // +++++  The File System can be queried using the command AT+DIR             ++
@@ -38,11 +38,6 @@
 // When the application runs on reset, it will print a message that provides
 // more details about which smartphone/tablet application to use to interact
 // with the module loaded with this smartBASIC application.
-//
-// This application expects a host to be attached to the serial port so that
-// the CTS input line is asserted. If the host is not connected, then the 
-// welcome message on startup which is very long will block and the application
-// will not behave as expected.
 //
 //******************************************************************************
 
@@ -235,7 +230,7 @@ onerror next HandlerOnErr
 //------------------------------------------------------------------------------
 #cmpif 0x00000100 : Sub DbgAssertRC(rc as integer,ln as integer)
 #cmpif 0x00000100 :     if rc!=0 then
-#cmpif 0x00000100 :         sprint #prn$, "\n# Fail :";integer.h' rc;" at tag ";ln
+#cmpif 0x00000100 :         sprint #prn$, "# Fail :";integer.h' rc;" at tag ";ln;"\n"
 #cmpif 0x00000100 :         PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
 #cmpif 0x00000100 :     endif
 #cmpif 0x00000100 : EndSub
@@ -574,28 +569,15 @@ Sub OnStartup()
     #cmpif 0x00000100 : DbgAssertRC(rc, 511)
 
     //Output a message to the UART indicating that the application is running
-    #cmpif 0x00000200 : sprint #prn$, "Welcome to the DVK-BL652 sample smartBASIC application!\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "\r\nWelcome to the DVK-BL652 sample smartBASIC application!\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "You will need to utilise either of the following mobile applications in your smartphone/tablet which are available from Google Play or the App Store:\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "Full details and an application walkthrough are available at www.lairdtech.com/BL652-Quick-Start and this sample application, plus many more, can be found on Github https://github.com/LairdCP/BL652-Applications\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "\t- Android  : ModuleLink for BLE\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "When you have finished with this initial application, you can return to command mode / interactive mode by moving the J12 Autorun jumper to the H position (pins 2-1), unchecking DTR from UwTerminalX and pressing the reset button on the module (or checking and unchecking the BREAK checkbox which results in a reset of the module)\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "\t- iOS    : ModuleLink for BLE\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "----------------\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "Full details and an application walkthrough are available at www.lairdtech.com/BL652-Quick-Start and this sample application, plus many more, can be found on Github https://github.com/LairdCP/BL652-Applications\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "----------------\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "When you have finished with this initial application, you can return to command mode / interactive mode:-\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "Either\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "\tUnchecking DTR from UwTerminalX and pressing the reset button on the module (or checking and unchecking the BREAK checkbox which results in a reset of the module)\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "Or\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "\tMove the J12 Autorun jumper to the L position (pins 2-3) and pressing the reset button on the DVK board\r\n"
-    #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
+
 EndSub
 
 //******************************************************************************
@@ -612,11 +594,11 @@ Function HndlrCharVal(charHndl, offset, len)
     rc=BleCharValueRead(charHndl, s$)
     #cmpif 0x00000100 : DbgAssertRC(rc, 539)
 
-    #cmpif 0x00000004 : sprint #prn$, "\n# CharVal(), ";integer.h' charHndl;", ";strhexize$(s$)
+    #cmpif 0x00000004 : sprint #prn$, "# CharVal(), ";integer.h' charHndl;", ";strhexize$(s$);"\n"
     #cmpif 0x00000004 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
 
     if charHndl==hSerLeds then
-      #cmpif 0x00000004 : sprint #prn$, "\n# LED update"
+      #cmpif 0x00000004 : sprint #prn$, "# LED update\n"
       #cmpif 0x00000004 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
 
         //Write values to LEDs
@@ -640,7 +622,7 @@ EndFunc 1 //Remain blocked in WAITEVENT
 //------------------------------------------------------------------------------
 Function HndlrGpio()
 
-    #cmpif 0x00000008 : sprint #prn$, "\n# Button Press"
+    #cmpif 0x00000008 : sprint #prn$, "# Button Press\n"
     #cmpif 0x00000008 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         
     ProcessGpio()
@@ -667,7 +649,7 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
             ProcessGpio()
 
             //Output connection parameters
-            #cmpif 0x00000800 : sprint #prn$, "======================== BLE Device connected =======================\r\n"
+            #cmpif 0x00000800 : sprint #prn$, "\n======================== BLE Device connected =======================\r\n"
             #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
             ShowConnParms(connHndl)
             
@@ -686,17 +668,17 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
             StartAdvertising()
 
             //Show disconnect message
-            #cmpif 0x00000800 : sprint #prn$,  "====================== BLE Device disconnected ======================\r\n\r\n"
+            #cmpif 0x00000800 : sprint #prn$,  "\n====================== BLE Device disconnected ======================\r\n\r\n"
             #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
             //Connection parameters updated successfully
-            #cmpif 0x00000800 : sprint #prn$,  "==================== Connection Parameters Update ===================\r\n"
+            #cmpif 0x00000800 : sprint #prn$,  "\n==================== Connection Parameters Update ===================\r\n"
             #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
             ShowConnParms(connHndl)
             
         case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
             //Connection parameters failed to update successfully
-            #cmpif 0x00000800 : sprint #prn$,  "============= Connection Parameters Negotiation FAILED ==============\r\n\r\n"
+            #cmpif 0x00000800 : sprint #prn$,  "\n============= Connection Parameters Negotiation FAILED ==============\r\n\r\n"
             #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
             
         case BLE_EVBLEMSGID_DEVICENAME_WRITE
@@ -704,12 +686,12 @@ Function HndlrBleMsg(ByVal nMsgId, ByVal connHndl)
             dim NewName$ : NewName$ = BleGetDeviceName$()
             if (strcmp(NewName$, ERASEDEVICENAME) == 0) then
                 //Name matches expected name for erasing filesystem - attempt to erase filesystem
-                #cmpif 0x00000800 : sprint #prn$,  "======================== Erasing Filesystem =========================\r\n"
+                #cmpif 0x00000800 : sprint #prn$,  "\n======================== Erasing Filesystem =========================\r\n"
                 #cmpif 0x00000800 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
                 rc = EraseFilesystem(1)
                 #cmpif 0x00000800 : if (rc != 0) then
                                     //Failed to erase
-                #cmpif 0x00000800 :     sprint #prn$,  "======= Erase failed. Ensure J5 (VSP) has a jumper and retry ========\r\n"
+                #cmpif 0x00000800 :     sprint #prn$,  "\n======= Erase failed. Ensure J5 (VSP) has a jumper and retry ========\r\n"
                 #cmpif 0x00000800 :     PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
                 #cmpif 0x00000800 : endif
             endif
@@ -724,7 +706,7 @@ EndFunc 1 //Remain blocked in WAITEVENT
 Function HndlrCccd(charHndl, val)
     if charHndl == hPktId then
         //Range Test Service::Packet ID Characteristic CCCD has been written
-        #cmpif 0x00000002 : sprint #prn$, "\n# CCCD() Packet ID, ";val
+        #cmpif 0x00000002 : sprint #prn$, "# CCCD() Packet ID, ";val;"\n"
         #cmpif 0x00000002 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         PktIDIndStat = val
         if val==1 then
@@ -735,22 +717,22 @@ Function HndlrCccd(charHndl, val)
         endif
     elseif charHndl == hSerBtns then
         //Button/LED Service::Buttons Characteristic CCCD has been written
-        #cmpif 0x00000002 : sprint #prn$, "\n# CCCD() Buttons, ";val
+        #cmpif 0x00000002 : sprint #prn$, "# CCCD() Buttons, ";val;"\n"
         #cmpif 0x00000002 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         BtnIndStat = val
     elseif charHndl == hRssi then
         //Range Test Service::RSSI Characteristic CCCD has been written
-        #cmpif 0x00000002 : sprint #prn$, "\n# CCCD() Rssi, ";val
+        #cmpif 0x00000002 : sprint #prn$, "# CCCD() Rssi, ";val;"\n"
         #cmpif 0x00000002 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         RangeIndStat = val
     elseif charHndl == hTempData then
         //Temperature Service::Data Characteristic CCCD has been written
-        #cmpif 0x00000002 : sprint #prn$, "\n# CCCD() Temperature, ";val
+        #cmpif 0x00000002 : sprint #prn$, "# CCCD() Temperature, ";val;"\n"
         #cmpif 0x00000002 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         TempIndStat = val
     elseif charHndl == hVccData then
         //Voltage Service::Data Characteristic CCCD has been written
-        #cmpif 0x00000002 : sprint #prn$, "\n# CCCD() Vcc, ";val
+        #cmpif 0x00000002 : sprint #prn$, "# CCCD() Vcc, ";val;"\n"
         #cmpif 0x00000002 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         VccIndStat = val
   endif
@@ -764,19 +746,22 @@ Function HndlrConnRssi(BYVAL charHandle, BYVAL rssi) AS INTEGER
     rc=BleEncode16(s$, rssi, 0)
     #cmpif 0x00000100 : DbgAssertRC(rc, 666)
     
-    #cmpif 0x00000001 : sprint #prn$, "\n# RSSI()- "
+    #cmpif 0x00000001 : sprint #prn$, "# RSSI()- "
     #cmpif 0x00000001 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
 
     if (RangeIndStat == 0) then
-        #cmpif 0x00000001 : sprint #prn$, "W"
+        #cmpif 0x00000001 : sprint #prn$, "W\n"
         #cmpif 0x00000001 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         rc=BleCharValuewrite(hRssi, s$)
     else
         if notifyBufAvail==1 then
-            #cmpif 0x00000001 : sprint #prn$, "N"
+            #cmpif 0x00000001 : sprint #prn$, "N\n"
             #cmpif 0x00000001 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
             rc=BleCharValueNotify(hRssi, s$)
             CheckNotifyBufsStat(rc)
+        else
+            #cmpif 0x00000001 : sprint #prn$, "\n"
+            #cmpif 0x00000001 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
         endif
     endif
 Endfunc 1 //Remain blocked in WAITEVENT

@@ -1,0 +1,113 @@
+
+// Example :: BleSecMngrLescPeerOobDataSet.sb
+
+// In this example, the OOB data is exchanged over the UART in the form
+// OOB_ADDRESS OOB_HASH OOB_RAND\r
+// e.g. 000016A4B75201 63F6E834009C368612724FBC3253DDE2 8311CD946F30C785DD7EA83038A5221D\r
+
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle                              13
+#define BLE_EVBLEMSGID_ENCRYPTED                       18 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTHENTICATION_FAILED           26 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_LESC_PAIRING                    27 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_LESC_OOB_REQUEST                28 // msgCtx = connection handle
+
+DIM rc, stRsp$
+
+sub HandleOobReq()
+
+    DIM OobData$, OobAddr$, OobHash$, OobRand$
+    // Get our local OOB data
+    rc = BleSecMngrLescOwnOobDataGet(OobAddr$, OobHash$, OobRand$)
+    // Hexize the data
+    OobAddr$ = StrHexize$(OobAddr$)
+    OobHash$ = StrHexize$(OobHash$)
+    OobRand$ = StrHexize$(OobRand$)
+    // Construct a string of the retreived data
+    OobData$ = OobAddr$ + " " + OobHash$ + " " + OobRand$ + "\r"
+    // Finally send the OOB data over UART
+    rc = UartWrite(OobData$)
+    print "Local OOB data sent over UART\n"
+
+endsub
+
+//==============================================================================
+// This handler is called when there is a BLE message
+//==============================================================================
+function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as integer
+  dim hz
+
+  select nMsgId
+  case BLE_EVBLEMSGID_CONNECT
+    print " --- Connect: (";integer.h' nCtx;")\n"
+
+  case BLE_EVBLEMSGID_DISCONNECT
+    print " --- Disconnect: (";integer.h' nCtx;")\n"
+
+  case BLE_EVBLEMSGID_ENCRYPTED
+    print " +++ Encrypted Connection: (";integer.h' nCtx;")\n"
+
+  case BLE_EVBLEMSGID_LESC_PAIRING
+    print " +++ LESC pairing: (";integer.h' nCtx;")\n"
+
+  case BLE_EVBLEMSGID_LESC_OOB_REQUEST
+    print " +++ LESC OOB Request: (";integer.h' nCtx;")\n"
+    HandleOobReq()
+
+  case   BLE_EVBLEMSGID_AUTHENTICATION_FAILED
+    print " +++ Auth Failed: (";integer.h' nCtx;"\n"
+
+  case else
+
+  endselect
+endfunc 1
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+//==============================================================================
+function HandlerUartRx() as integer
+
+    dim nMatch
+    dim OobData$, OobAddr$, OobHash$, OobRand$
+    // read UART data until carriage return and save it into stRsp$
+    nMatch=UartReadMatch(stRsp$,13)
+    if nMatch!=0 then
+        // Get the hash and randomiser from the input string
+        OobData$ = strsplitleft$(stRsp$, nMatch)
+        rc = ExtractStrToken(OobData$,OobAddr$)
+        rc = ExtractStrToken(OobData$,OobHash$)
+        rc = ExtractStrToken(OobData$,OobRand$)
+
+        // Dehexize the data first
+        OobAddr$ = StrDeHexize$(OobAddr$)
+        OobHash$ = StrDeHexize$(OobHash$)
+        OobRand$ = StrDeHexize$(OobRand$)
+        // Now Send the remote OOB data over the BLE link
+        rc = BleSecMngrLescPeerOobDataSet(OobAddr$, OobHash$, OobRand$)
+        if rc==0 THEN
+            print "Remote OOB data received from UART and sent over the BLE link\n"
+        endif
+    endif
+
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVBLEMSG                 call HandlerBleMsg
+OnEvent  EVUARTRX                 call HandlerUartRx
+
+
+// Initialise LE adverts
+dim addr$
+rc = BleAdvertStart(0,addr$,100,30000,0)
+// Enable LESC pairing
+rc = BleSecMngrLescPairingPref(1)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WaitEvent
