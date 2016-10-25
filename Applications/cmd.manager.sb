@@ -90,31 +90,27 @@
 // -----------------------------------------------------------------------------
 // advert undirected #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
 //   - Use this to start adverts of type ADV_IND using the parameters specified
-//   - #INTfilterpolicy# is 0=Any, 1=Filter Scans, 2= Filer Conns, 3 = Filter both
-//   -   basically if #INTfilterpolicy# != 0 then filter is enabled and the whitelist
-//   -   is created from the trusted device database.
+//   - #INTfilterpolicy# is 0=no filtering, otherwise set 1 to 4 which is the
+//   -        whitelist handle created using the 'whitelist' command
 //
 // -----------------------------------------------------------------------------
 // advert scan #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
 //   - Use this to start adverts of type ADV_SCAN_IND using the parameters specified
-//   - #INTfilterpolicy# is 0=Any, 1=Filter Scans, 2= Filer Conns, 3 = Filter both
-//   -   basically if #INTfilterpolicy# != 0 then filter is enabled and the whitelist
-//   -   is created from the trusted device database.
+//   - #INTfilterpolicy# is 0=no filtering, otherwise set 1 to 4 which is the
+//   -        whitelist handle created using the 'whitelist' command
 //
 // -----------------------------------------------------------------------------
 // advert nonconn #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
 //   - Use this to start adverts of type ADV_NONCONN_IND using the parameters specified
-//   - #INTfilterpolicy# is 0=Any, 1=Filter Scans, 2= Filer Conns, 3 = Filter both
-//   -   basically if #INTfilterpolicy# != 0 then filter is enabled and the whitelist
-//   -   is created from the trusted device database.
+//   - #INTfilterpolicy# is 0=no filtering, otherwise set 1 to 4 which is the
+//   -        whitelist handle created using the 'whitelist' command
 //
 // -----------------------------------------------------------------------------
 // advert directed         #INTintervalms# #INTtimeoutms# #INTfilterpolicy# #HEXaddr7Bytes#
 //   - Use this to start adverts of type ADV_DIRECT_IND using the parameters specified
 //   - and will be directed to the mac address #HEXaddr7Bytes#
-//   - #INTfilterpolicy# is 0=Any, 1=Filter Scans, 2= Filer Conns, 3 = Filter both
-//   -   basically if #INTfilterpolicy# != 0 then filter is enabled and the whitelist
-//   -   is created from the trusted device database.
+//   - #INTfilterpolicy# is 0=no filtering, otherwise set 1 to 4 which is the
+//   -        whitelist handle created using the 'whitelist' command
 //
 // -----------------------------------------------------------------------------
 // advert stop
@@ -357,6 +353,14 @@
 //    - in hSvc[#INTstoreIndex#] which is then subsequently used in char devclerations
 //
 // -----------------------------------------------------------------------------
+// misc sysinfo #INTformat# #INTid#    //INTformat: 0=dex, 1=Oct, 2=binary, 3=hex
+//    - get sysinfo integer value for id specified
+//
+// -----------------------------------------------------------------------------
+// misc sysinfo$ #INTid#
+//    - get sysinfo string value for id specified
+//
+// -----------------------------------------------------------------------------
 // misc i  clearall
 //    - make all elements of the entire i[] array equal to 0
 //
@@ -496,8 +500,8 @@
 //
 // -----------------------------------------------------------------------------
 // scan start #INTscantimeoutms# #INThandlefilter#
-//   - Start a scan for adverts using the timeout #INTscantimeoutms#
-//   - set #INThandlefilter# to not use a whitelist
+//   - Start a whitelist filtered scan for adverts using the timeout #INTscantimeoutms#
+//   - set #INThandlefilter# to a value 0 to 4
 //
 // -----------------------------------------------------------------------------
 // scan stop
@@ -528,6 +532,51 @@
 //    - "uuid custom hhhhhh..hhhhhh" or a previous call of "uuid sibling ..."
 //    - i[0] will contain the uuid handle as well
 //
+// -----------------------------------------------------------------------------
+// whitelist print   #INTwlHndlIdx#
+//    - print the value of the whitelist handle specified
+//
+// -----------------------------------------------------------------------------
+// whitelist create  #INTwlHndlIdx# #INTmaxaddr# #INTmaxIrks# #INTfiltermask#
+//    - create a whitelist specified by INTwlHndlIdx
+//    - Max values for maxaddr is obatined using the command 'whitelist into 1 1'
+//    - Max values for maxirks is obatined using the command 'whitelist into 1 2'
+//    - for FilterMask - set to 0 for default which is to filter all types of packets
+//         See function BleWhitelistCreate() in user manual for more details
+//
+//    - typically send 'whitelist create 1 4 4 0'
+// -----------------------------------------------------------------------------
+// whitelist destroy #INTwlHndlIdx#
+//    - Destroy the whitelist specified
+//
+// -----------------------------------------------------------------------------
+// whitelist clear   #INTwlHndlIdx#
+//    - Clear the whitelist so that it is empty
+//
+// -----------------------------------------------------------------------------
+// whitelist AddAddr #INTwlHndlIdx# #HEXaddr14Bytes#
+//    - Add an address which is exactly 14 hex digits into the whitelist specified
+//
+// -----------------------------------------------------------------------------
+// whitelist AddIdx  #INTwlHndlIdx# #INTdBIndex#
+//    - Add an address and IRK from the trusted device database and identify
+//      the device via an index into the database
+//
+// -----------------------------------------------------------------------------
+// whitelist info    #INTwlHndlIdx# #INTinfoId#
+//    - Provide information about the whitelist where ..
+//    - InfoId   Description
+//        0      maximum number of whitelists (Indx is ignored)
+//        1      maximum number of addresses (Indx is ignored)
+//        2      maximum number of IRKS (Indx is ignored)
+//        101    current number of addresses added
+//        102    current number of IRKS added
+//
+// -----------------------------------------------------------------------------
+// whitelist filter  #INTwlHndlIdx# #INTfiltermask#
+//    - Change the filter mask for whitelist specified
+//       See user guide and function BleWhitelistSetFilter() for more details
+//
 //******************************************************************************
 
 //******************************************************************************
@@ -554,6 +603,8 @@
 #define NUM_OF_I_PARAMS                                 (8)
         //Size of s$[] and must be at least 8 elements for BleSvcRegDevInfo()
 #define NUM_OF_S_PARAMS                                 (8)
+        //Number of whitelist handles we can manage
+#define NUM_OF_WHITELIST                                (4)
 
 #define VSP_MAX_CHARDATA_LEN                            (20)
 #define VSP_RX_CHAR_HANDLE                              (17)
@@ -661,6 +712,7 @@ dim hSvc[NUM_OF_SVCS]       //gatts : handle for new service being created is in
 dim amd[NUM_OF_METADATA]    //gatts : attribute meta data
 dim hchar[NUM_OF_CHARS]     //gatts : handles for characteristics
 dim hc[NUM_OF_CONNS+1]      //Contains connection handles
+dim hWlist[NUM_OF_WHITELIST+1]      //contains whitelist handles
 dim conns                   //Number of connections
 dim gcState                 //gatt client state, 0=IDLE, 1=TableMapping
 dim urts                    //Will be <0 if uart parser suspended
@@ -909,6 +961,7 @@ endfunc rc
 //#CMD#// advert scan             #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
 //#CMD#// advert nonconn          #INTintervalms# #INTtimeoutms# #INTfilterpolicy#
 //#CMD#// advert directed         #INTintervalms# #INTtimeoutms# #INTfilterpolicy# #HEXaddr7Bytes#
+//                                    for the 4 above, INTfilterpolicy is 0 to NUM_OF_WHITELIST
 //#CMD#// advert stop
 //#CMD#// advert config           #INTcfgidx# #INTcfgval#
 //-------------------------------------------------------------------------
@@ -993,7 +1046,10 @@ function _Advert()
     if rc != 0 then
       exitfunc rc
     endif
-    exitfunc BleAdvertStart(0,prAdr$,i[1],i[2],i[3])
+    if (i[3]<=0)||(i[3]>NUM_OF_WHITELIST) then
+      i[3]=0
+    endif
+    exitfunc BleAdvertStart(0,prAdr$,i[1],i[2],hWlist[i[3]])
   endif
   //=================================================
   if strcmp(tkn$,"scan")==0 then
@@ -1002,7 +1058,10 @@ function _Advert()
     if rc != 0 then
       exitfunc rc
     endif
-    exitfunc BleAdvertStart(2,prAdr$,i[1],i[2],i[3])
+    if (i[3]<=0)||(i[3]>NUM_OF_WHITELIST) then
+      i[3]=0
+    endif
+    exitfunc BleAdvertStart(2,prAdr$,i[1],i[2],hWlist[i[3]])
   endif
   //=================================================
   if strcmp(tkn$,"nonconn")==0 then
@@ -1011,7 +1070,10 @@ function _Advert()
     if rc != 0 then
       exitfunc rc
     endif
-    exitfunc BleAdvertStart(3,prAdr$,i[1],i[2],i[3])
+    if (i[3]<=0)||(i[3]>NUM_OF_WHITELIST) then
+      i[3]=0
+    endif
+    exitfunc BleAdvertStart(3,prAdr$,i[1],i[2],hWlist[i[3]])
   endif
   //=================================================
   if strcmp(tkn$,"directed")==0 then
@@ -1029,7 +1091,10 @@ function _Advert()
     if strlen(prAdr$) != 7 then
       exitfunc 5
     endif
-    exitfunc BleAdvertStart(1,prAdr$,i[1],i[2],i[3])
+    if (i[3]<=0)||(i[3]>NUM_OF_WHITELIST) then
+      i[3]=0
+    endif
+    exitfunc BleAdvertStart(1,prAdr$,i[1],i[2],hWlist[i[3]])
   endif
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"config")==0 then
@@ -1051,6 +1116,7 @@ endfunc 5
 //#CMD#//  scan stop
 //#CMD#//  scan config #INTcfgID# #INTvalue#
 //#CMD#//  scan start #INTscantimeoutms# #INThandlefilter#
+//                                          INThandlefilter is 0 to NUM_OF_WHITELIST
 //-------------------------------------------------------------------------
 function _Scan()
   tlen = ExtractStrToken(urtcmd$,tkn$)
@@ -1079,7 +1145,10 @@ function _Scan()
     if rc != 0 then
       exitfunc rc
     endif
-    exitfunc BleScanStart(i[1],i[2])
+    if (i[2]<=0)||(i[2]>NUM_OF_WHITELIST) then
+      i[2]=0
+    endif
+    exitfunc BleScanStart(i[1],hWlist[i[2]])
   endif
   endfunc 5
 
@@ -1864,6 +1933,8 @@ endfunc 5
 
 
 //-------------------------------------------------------------------------
+//#CMD#//  misc sysinfo #INTformat# #INTid#    //INTformat: 0=dex, 1=Oct, 2=binary, 3=hex
+//#CMD#//  misc sysinfo$ #INTid#
 //#CMD#//  misc s$ clearall
 //#CMD#//  misc s$ set #INTidx# #STRescapedvalue#
 //#CMD#//  misc i  clearall
@@ -1903,6 +1974,37 @@ function _Misc()
       StrDeEscape(s$[i[1]])
       exitfunc 0
     endif
+  endif
+  //=================================================
+  if strcmp(tkn$,"sysinfo")==0 then
+    //extract 2 (#INTformat# #INTid#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=sysinfo(i[2])
+    print "\n"
+    select i[1]
+    case 1 //octal
+      print integer.o' rc
+    case 2 //binary
+      print integer.b' rc
+    case 3 //hex
+      print integer.h' rc
+    case else  //decimal
+      print rc
+    endselect
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"sysinfo$")==0 then
+    //extract 1 (#INTid#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    print "\n";sysinfo$(i[1])
+    exitfunc 0
   endif
   //=================================================
   if strcmp(tkn$,"i")==0 then
@@ -1989,6 +2091,109 @@ function _bridge()
     endif
 endfunc 5
 
+//-------------------------------------------------------------------------
+//#CMD#//  whitelist print   #INTwlHndlIdx#
+//#CMD#//  whitelist create  #INTwlHndlIdx# #INTmaxaddr# #INTmaxIrks# #INTfiltermask#
+//#CMD#//  whitelist destroy #INTwlHndlIdx#
+//#CMD#//  whitelist clear   #INTwlHndlIdx#
+//#CMD#//  whitelist AddAddr #INTwlHndlIdx# #HEXaddr14Bytes#
+//#CMD#//  whitelist AddIdx  #INTwlHndlIdx# #INTdBIndex#
+//#CMD#//  whitelist info    #INTwlHndlIdx# #INTinfoId#
+//#CMD#//  whitelist filter  #INTwlHndlIdx# #INTfiltermask#
+//-------------------------------------------------------------------------
+function _whitelist()  
+  dim ad$
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"print")==0 then
+    //extract 1 (#INTwlHndlIdx#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    print "\n";integer.h'  hWlist[i[1]]
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"create")==0 then
+    //extract 4 (#INTwlHndlIdx# #INTmaxaddr# #INTmaxIrks# #INTfiltermask#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,4)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleWhitelistCreate(hWlist[i[1]],i[2],i[3],i[4])
+  endif
+  //=================================================
+  if strcmp(tkn$,"destroy")==0 then
+    //extract 1 (#INTwlHndlIdx#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    BleWhitelistDestroy(hWlist[i[1]])
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"clear")==0 then
+    //extract 1 (#INTwlHndlIdx#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleWhitelistClear(hWlist[i[1]])
+  endif
+  //=================================================
+  if strcmp(tkn$,"AddAddr")==0 then
+    //extract 1 (#INTwlHndlIdx#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    s$[1]=StrDehexize$(tkn$)
+    if strlen(s$[1]) != 7 then
+      exitfunc 5
+    endif    
+    exitfunc BleWhitelistAddAddr(hWlist[i[1]], s$[1])
+  endif
+  //=================================================
+  if strcmp(tkn$,"AddIdx")==0 then
+    //extract 2 (#INTwlHndlIdx# #INTdBIndex#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleWhitelistAddIndex(hWlist[i[1]],i[2])
+  endif
+  //=================================================
+  if strcmp(tkn$,"info")==0 then
+    //extract 2 (#INTwlHndlIdx# #INTinfoId#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=BleWhitelistInfo(hWlist[i[1]],i[2],i[0])
+    print "\n";integer.h' i[0]
+    exitfunc rc    
+  endif
+  //=================================================
+  if strcmp(tkn$,"filter")==0 then
+    //extract 2 (#INTwlHndlIdx# #INTfiltermask#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc BleWhitelistSetFilter(hWlist[i[1]],i[2])
+  endif
+
+endfunc 5
+
 
 //==============================================================================
 //==============================================================================
@@ -2045,6 +2250,9 @@ function OnUartCmd() as integer
     elseif strcmp(tkn$,"bridge")==0 then
       rc = _bridge()
 
+    elseif strcmp(tkn$,"whitelist")==0 then
+      rc = _whitelist()    
+    
     elseif strcmp(tkn$,"exit")==0 || strcmp(tkn$,"quit")==0  then
       exitfunc 0
 
