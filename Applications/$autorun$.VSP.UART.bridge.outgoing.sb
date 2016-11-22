@@ -166,6 +166,8 @@
 #define CARET_TIMER                     1
 #define CARET_TIMER_DUR_MS              100
 
+#define ENCRYPT_MITM_REQUIREMENT        0 // when encrypting, 0 for MITM not required, 1 for required
+
 //APP RUN MODES
 #define CMD_MODE                        0
 #define BRIDGE_VSP_MODE                 1
@@ -178,6 +180,30 @@
 #define TXUUID        "\56\9a\20\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Transmit VSP UUID
 #define BT900_DEV_ID  0x42370900
 #define BL620_DEV_ID  0x424C0620
+
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2    //msgCtx = alert level
+#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3    //msgCtx = alert level
+#define BLE_EVBLEMSGID_SERVICE_ERROR                    4    //msgCtx = resultcode
+#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5    //msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6    //msgCtx = not used
+#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7    //msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8    //msgCtx = not used
+#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9    //msgCtx = passcode to display
+#define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                 11   //msgCtx = 1 for passkey, 2 for 16 byte OOB data
+#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE           12   //msgCtx = new notification state 0=off, 1=on
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE                14   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL           15   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER            16   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_UPDATED_BOND                     17   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                        18   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING            19   //msgCtx = current supply voltage
+#define BLE_EVBLEMSGID_UNENCRYPTED                      20   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE                 21   //msgCtx = connection handle
 
 //******************************************************************************
 // Global Variable Declarations
@@ -557,7 +583,7 @@ FUNCTION HndlrBleMsg(nMsgId, nCtx)
     //Clear the caret count
     carCnt = 0
 
-    IF (nMsgId == 0) then
+    IF (nMsgId == BLE_EVBLEMSGID_CONNECT) then
         //Connected!
 
         //Opening the GATT client only when connected to save memory
@@ -578,18 +604,22 @@ FUNCTION HndlrBleMsg(nMsgId, nCtx)
         rc = BleGetAddrFromConnHandle(nCtx, addr$)
         if (rc==0) then
             if (BleBondingIsTrusted(addr$,fAsCentral,info,rollingAge,rollingCount)>0) then
-                rc = BleEncryptConnection(nCtx, 7, 1)   //Might not need this
+                rc = BleEncryptConnection(nCtx, 7, ENCRYPT_MITM_REQUIREMENT)   //Might not need this
+            else
+                //not trusted so try to talk unencrypted
+                Mode = 6
+                exitfunc HndlrFindDesc(0, TXCCCDHandle)
             endif
         endif
 
-    ELSEIF (nMsgId == 1) then
+    ELSEIF (nMsgId == BLE_EVBLEMSGID_DISCONNECT) then
         //Disconnected!
         PRINT "\nDisconnected!\n"
         InConnection = 0
         BleGattcClose()
         rc = SendMsgApp(0,CMD_MODE)
 
-    elseif (nMsgId == 10) then
+    elseif (nMsgId == BLE_EVBLEMSGID_NEW_BOND) then
         //Start process of writing characteristics and descriptors from the beginning
         Mode = 6
         exitfunc HndlrFindDesc(0, TXCCCDHandle)
@@ -932,7 +962,7 @@ function HndlrScanResp()
     rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
     WHILE (rc == 0)
         rc = BLEGETADBYTAG(advData$, 0x09, nme$)
-        print "\nSCAN: "; StrHexize$(periphAddr$), nRssi, nme$
+        print "\nSCAN: "; StrHexize$(periphAddr$);" ";nRssi;" \22"; nme$ ; "\22";
         rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
     ENDWHILE
 endfunc 1
