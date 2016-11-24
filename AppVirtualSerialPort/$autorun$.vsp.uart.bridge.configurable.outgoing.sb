@@ -1,0 +1,1144 @@
+// Copyright (c) 2015, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// BL652 custom VSP service: This application will connect to a VSP service and
+//                           allow communication to that server from the UART.
+//
+//******************************************************************************
+// This app provides for a command interface over the uart for testing VSP and
+// the protocol is as follows:-
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Convention : (1) Case sensitive, and commands are presented in alphabetic order
+//              (2) If line ends with \ then it continues on next line. That does
+//                  not mean that it should be sent as multiple lines
+//              (3) Replace anything between ##
+//              (4) #INTaaaa# means a number in decimal, hex, octal or binary
+//                      format -> 23 == 0x17 == h'17 == o'23 == b'10111
+//                      aaaa is just a description
+//              (5) #HEXaaaa# means a string without delimitors consisting of hex
+//                      characters only aaaa is just a description
+//              (6) #STRaaaa# means a string without delimitors
+//                      aaaa is just a description
+//              (7) "STRaaaa" means a string which must have the " delimitor
+//                      aaaa is just a description
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//******************************************************************************
+// Compiler/Debug options
+//******************************************************************************
+
+//   ======================================================
+//   Conditional Compile Masks (they can be additive)
+//   ------------------------------------------------------
+//
+// Lower 16 bits used for feature set
+//   0x00000001 : Print Asserts to UART
+//
+// Upper 16 bits used for debugging
+//   0x80000000 : Enable debugging messages
+//   ======================================================
+#set $cmpif, 0x0000FFFF  //All Features + NO debug messages
+//#set $cmpif, 0xFFFFFFFF  //All Features + all debug messages
+
+//******************************************************************************
+// Documentation
+//******************************************************************************
+//
+// -----------------------------------------------------------------------------
+// at+bls OR scan
+//   - Start a scan using the timeout #SCAN_TMT#
+//
+// -----------------------------------------------------------------------------
+// atd #HEXbdAddr7bytes# OR
+// connect #HEXbdAddr7bytes# OR
+//    - Connect to device with given BT address
+//
+//    -> if an invalid or null BT address is given, the default mac address
+//      (see #define BTAddr) will be used.
+//
+//    -> Upon successful connection the application enters bridge mode. Any data
+//       arriving at the UART is sent over the VSP connection.
+//
+//    -> Note: The device you are connecting to must be running a VSP server.
+//
+// ::Note::
+//    - Upon connection, the module will automatically switch to bridge mode.
+//      Any data arriving at the VSP port will be sent to the UART and vice versa.
+//
+//      -> To switch back to command mode so the module can accept commands again, assert the
+//         nAutorun pin. This can be done by unticking DTR in UwTerminal. Switch back to bridge mode
+//         by deasserting the nAutorun pin - ticking DTR in UwTerminal.
+//
+//      -> Make sure DIP Switch 2 on CON12 is in the ON position if using a DVK kit.
+// -----------------------------------------------------------------------------
+// at+btd #HEXbdaddr7bytes#
+//    - Deletes corresponding link key from the database
+//
+// -----------------------------------------------------------------------------
+// ath OR disconnect
+//    - Disconnect from peer device.
+//
+// -----------------------------------------------------------------------------
+// bdaddr
+//    - Prints the module's 7 byte BT address
+//
+// -----------------------------------------------------------------------------
+// stop
+//    - Stop scanning
+//
+// -----------------------------------------------------------------------------
+// ato OR bridge
+//    - enter bridge mode. Any data arriving at the UART is sent over the BLE
+//      connection.
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// misc i  clearall
+//    - Make all elements of the entire i[] array equal to 0
+//
+// -----------------------------------------------------------------------------
+// misc i  set #INTidx# #INTval#
+//    - i[#INTidx#] = #INTval#
+//    - #INTidx# will be checked for valid index
+//
+// -----------------------------------------------------------------------------
+// misc s$ clearall
+//    - make all elements of the entire s$[] array empty
+//
+// -----------------------------------------------------------------------------
+// misc s$ set #INTidx# #STRescapedvalue#
+//    - s$[#INTidx#] = #STRescapedvalue#
+//    - #INTidx# will be checked for valid index
+//
+// -----------------------------------------------------------------------------
+// misc s$ sethex #INTidx# #HEXdigitsvalue#
+//    - s$[#INTidx#] = #HEXdigitsvalue#
+//    - #INTidx# will be checked for valid index
+//
+// -----------------------------------------------------------------------------
+// quit OR exit
+//    - Exit to command mode
+//
+//******************************************************************************
+//
+// *Instructions*
+//      1. Set BTAddr to the BT Address of the peer device you want to connect to by default
+//      2. Set CONNECT_ON_STARTUP to 1 to automatically connect
+//      3. Start a VSP server on a BT900/BL600/BL652 with the other VSP application (on github) or by bridging SIO_19 to GND to enable command VSP mode (bridge SIO_7 to VCC on a BL600 development kit)
+//      4. Download and run this application to a BT900/BL652 and it will automatically connect to the VSP server
+//
+//
+// ::Note::
+//      - Upon connection, the module will automatically switch to bridge mode. Any data arriving
+//        at the VSP port will be sent to the UART and vice versa.
+//
+//        -> To switch back to command mode so the module can accept commands again, assert the
+//           nAutorun pin. This can be done by unticking DTR in UwTerminal. Switch back to bridge mode
+//           by deasserting the nAutorun pin - ticking DTR in UwTerminal. This can also be done by
+//           pressing the caret "^" key 3 times with LineMode disabled.
+//
+//        -> Make sure the jumper on J12 is on pins 1-2 if using a DVK kit.
+//
+//******************************************************************************
+
+//This is the target Bluetooth device to connect to, 7 bytes in hex
+#define BTAddr "000016A4093D8A"
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+        //if set to 1, on startup the module will connect to device BTAddr for VSP
+#define CONNECT_ON_STARTUP              0
+
+        //BLE Scan config parameters
+#define SCAN_TMT                        20000   //Scan timeout in mS
+
+        //Set this to 0 to disable all debugging messages
+#define ENABLE_DEBUG_PRINTS             1
+#define APP_VERSION                     "1.0"
+        //Size of i[]
+#define NUM_OF_I_PARAMS                 (5)
+        //Size of s$[]
+#define NUM_OF_S_PARAMS                 (5)
+
+#define DISCON_TIMER                    0       //If this is changed, make sure to change the EvTmrX statement
+#define DISCON_TIMER_DUR_MS             500
+
+#define CARET_TIMER                     1
+#define CARET_TIMER_DUR_MS              100
+
+#define ENCRYPT_MITM_REQUIREMENT        0 // when encrypting, 0 for MITM not required, 1 for required
+
+//APP RUN MODES
+#define CMD_MODE                        0
+#define BRIDGE_VSP_MODE                 1
+
+//UUIDs
+#define BASEUUID      "\56\9a\11\01\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //VSP base UUID
+#define MIUUID        "\56\9a\20\03\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Modem in UUID
+#define MOUUID        "\56\9a\20\02\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Modem out UUID
+#define RXUUID        "\56\9a\20\01\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Receive VSP UUID
+#define TXUUID        "\56\9a\20\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c"  //Transmit VSP UUID
+#define BT900_DEV_ID  0x42370900
+#define BL620_DEV_ID  0x424C0620
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2    //msgCtx = alert level
+#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3    //msgCtx = alert level
+#define BLE_EVBLEMSGID_SERVICE_ERROR                    4    //msgCtx = resultcode
+#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5    //msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6    //msgCtx = not used
+#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7    //msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8    //msgCtx = not used
+#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9    //msgCtx = passcode to display
+#define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                 11   //msgCtx = 1 for passkey, 2 for 16 byte OOB data
+#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE           12   //msgCtx = new notification state 0=off, 1=on
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE                14   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL           15   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER            16   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_UPDATED_BOND                     17   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                        18   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING            19   //msgCtx = current supply voltage
+#define BLE_EVBLEMSGID_UNENCRYPTED                      20   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE                 21   //msgCtx = connection handle
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim rc                                       //Result code
+dim BleHandle                                //Ble Connection Handle
+dim Mode : Mode = 0                          //Current program mode: 0 = connecting, 1 = connected, find modem in characteristic, 2 = find modem out characteristic, 3 = find RX characteristic, 4 = find TX characteristic, 5 = find modem out descriptor, 6 = find TX descriptor, 7 = enable modem out notIFications, 8 = enable TX, 9 = enable modem in status
+dim MIHandle                                 //Modem In handle (IF one exists)
+dim MOHandle                                 //Modem Out handle (IF one exists)
+dim RXHandle                                 //RX handle
+dim TXHandle                                 //TX handle
+dim MOCCCDHandle                             //Modem Out CCCD handle (IF one exists)
+dim TXCCCDHandle                             //TX CCCD handle (IF one exists)
+dim UUID1$, UUID2$                           //UUID and temporary string variables
+dim BufferState : BufferState = 0            //Buffer state
+dim BufferFull : BufferFull = 0              //Buffer full
+dim u$ : u$ = ""                             //UART read buffer
+dim RecBuf$ : RecBuf$ = ""                   //VSP read buffer
+dim ModemStat : ModemStat = 1                //Modem in status
+dim ModemInOutExists : ModemInOutExists = 1  //If modem in/out exists on the server
+dim BTAddr$                                  //Bluetooth address to connect to
+dim ok$ : ok$ = "\nOK"                       //OK command response
+dim er$ : er$ = "\nERROR "                   //Error command response
+dim pr$ : pr$ = "\r\n>"                      //
+dim nc$ : nc$ = "\nNO CARRIER"               //No carrier response
+dim uc$ : uc$ = "\nUNKNOWN COMMAND"          //Unknown command response
+dim carCnt : carCnt = 0                      //Count variable for number of times '^' entered
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+sub HandlerOnErr()
+  if (ENABLE_DEBUG_PRINTS!=0) then
+    print "\n OnErr - ";GetLastError();"\n"
+  endif
+endsub
+onerror next HandlerOnErr
+
+dim stRsp$ as string                //Uart rx data is stored here
+dim i[NUM_OF_I_PARAMS]              //Index 0 used for return values
+dim s$[NUM_OF_S_PARAMS]             //Must be at least 5 elements
+dim urtcmd$                         //CMD line from uart
+dim tkn$,tlen                       //Used by command parser
+dim InConnection : InConnection = 0 //Set to 1 when in a connection
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+
+
+//------------------------------------------------------------------------------
+// Assert to check that a resultCode is 0 which means success
+//------------------------------------------------------------------------------
+#cmpif 0x00000001 : sub AssertRC(rc, tag)
+#cmpif 0x00000001 :     if (rc != 0) then
+#cmpif 0x00000001 :         print "Assert Error ";rc;" @ tag ";tag;"\r\n"
+#cmpif 0x00000001 :     endif
+#cmpif 0x00000001 : endsub
+
+//------------------------------------------------------------------------------
+// Assert to check that the value is as per specified
+//------------------------------------------------------------------------------
+#cmpif 0x00000001 : sub Assert(v1,v2,tag)
+#cmpif 0x00000001 :     if (v1 != v2) then
+#cmpif 0x00000001 :         print "Assert Error ";v1;"!=";v2;"@ tag ";tag;"\r\n"
+#cmpif 0x00000001 :     endif
+#cmpif 0x00000001 : endsub
+
+//------------------------------------------------------------------------------
+// Assert to check that the value is as per specified
+//------------------------------------------------------------------------------
+#cmpif 0x00000001 : sub AssertBound(v,vl,vh,tag)
+#cmpif 0x00000001 :     if (v < vl) then
+#cmpif 0x00000001 :         print "Assert Error ";v;"<";vl
+#cmpif 0x00000001 :     elseif (v > vh) then
+#cmpif 0x00000001 :         print "Assert Error ";v;">";vh
+#cmpif 0x00000001 :     else
+#cmpif 0x00000001 :         exitsub
+#cmpif 0x00000001 :     endif
+#cmpif 0x00000001 :     print " @ tag ";tag;"\r\n"
+#cmpif 0x00000001 : endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x80000000 : sub DbgMsg(byval msg$ as string)
+#cmpif 0x80000000 :     print "\n";msg$;"\r\n"
+#cmpif 0x80000000 : endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x80000000 : sub DbgMsgVal(byval msg$ as string, byval vl as integer)
+#cmpif 0x80000000 :     print "\n";msg$;" ";vl;"\r\n"
+#cmpif 0x80000000 : endsub
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//-------------------------------------------------------------------------
+//#CMD#//  ath OR disconnect
+//-------------------------------------------------------------------------
+function _disconnect()
+rc = BLEDISCONNECT(BleHandle)
+    if rc!=0 then
+        exitfunc rc
+    endif
+endfunc -3  //Don't give response to user
+
+//-------------------------------------------------------------------------
+// Process a caret character ^ do decide whether or not to switch to command mode
+// - When the carCnt value is 3, end func with 1 to switch to command mode
+// - Think of it like a boolean value
+//-------------------------------------------------------------------------
+function SwitchToCmd()
+    //If ^ was sent after the delay time (valid) increment the counter
+    if TimerRunning(CARET_TIMER)==0 then
+        carCnt = carCnt + 1
+        if carCnt<3 then
+            TimerStart(CARET_TIMER,CARET_TIMER_DUR_MS,0)
+        else
+            TimerCancel(CARET_TIMER)
+            exitfunc 1
+        endif
+    else
+        //Invalid press
+        print "\n"
+        TimerCancel(CARET_TIMER)
+        carCnt = 0
+    endif
+endfunc 0  //Don't give response to user
+
+//==============================================================================
+//UART data received
+//==============================================================================
+FUNCTION HndlrUartRxVSP()
+    dim uLen, bytesWaiting, newData$
+    IF BufferState == 0 && ModemStat == 1 then
+        //Get number of bytes waiting in actual Uart RX Buffer before reading
+        bytesWaiting = UartInfo(3)
+
+        //Read data that has arrived through via the UART
+        uLen = UartReadN(u$, 20)
+
+        //Get the most recently received data
+        newData$ = Right$(u$, bytesWaiting)
+
+        IF uLen > 0 then
+            if StrCmp(newData$,"^")==0 then
+                //Parse the ^ entry
+                if SwitchToCmd() == 1 then
+                    print "\n"
+                    //Switch to command mode
+                    rc = SendMsgApp(0,CMD_MODE)
+                endif
+            else
+                rc = BLEGATTCWRITE(BleHandle, RXHandle, u$)
+                BufferState = 1
+                u$ = ""
+            endif
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//BLE connection timed out
+//==============================================================================
+FUNCTION HndlrConnTO()
+    PRINT "Connection attempt timed out.\n"
+ENDFUNC 1
+
+
+//==============================================================================
+//Characteristic found
+//==============================================================================
+FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
+    IF (Mode == 1) THEN
+        //Modem in
+        IF (cProp == 0 && hVal == 0 && isUuid == 0) THEN
+            //No modem in/out characteristics
+            ModemInOutExists = 0
+            Mode = 3
+            UUID1$ = BASEUUID
+            UUID2$ = RXUUID
+            rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
+            #cmpif 0x00000001 : AssertRC(rc, 325)
+        ELSE
+            MIHandle = hVal
+            Mode = 2
+            UUID1$ = BASEUUID
+            UUID2$ = MOUUID
+            rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
+            #cmpif 0x00000001 : AssertRC(rc, 332)
+        ENDIF
+    ELSEIF (Mode == 2) THEN
+        //Modem out
+        MOHandle = hVal
+        Mode = 3
+        UUID1$ = BASEUUID
+        UUID2$ = RXUUID
+        rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
+        #cmpif 0x00000001 : AssertRC(rc, 341)
+    ELSEIF (Mode == 3) THEN
+        //RX
+        IF (cProp == 0 && hVal == 0 && isUuid == 0) THEN
+            //Characteristic not found
+            rc = _disconnect()
+            PRINT "VSP RX characteristic was not found, disconnected.\n"
+        ELSE
+            //Characteristic found
+            RXHandle = hVal
+            Mode = 4
+            UUID1$ = BASEUUID
+            UUID2$ = TXUUID
+            rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
+            #cmpif 0x00000001 : AssertRC(rc, 355)
+        ENDIF
+    ELSEIF (Mode == 4) THEN
+        //TX
+        IF (cProp == 0 && hVal == 0 && isUuid == 0) THEN
+            //Characteristic not found
+            rc = _disconnect()
+            PRINT "VSP TX characteristic was not found, disconnected.\n"
+        ELSE
+            //Characteristic found
+            TXHandle = hVal
+            Mode = 5
+            UUID1$ = BASEUUID
+            UUID2$ = MOUUID
+            rc = BLEGATTCFINDDESC(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0, 0xFE012902, 0)
+            #cmpif 0x00000001 : AssertRC(rc, 370)
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Characteristic written
+//==============================================================================
+FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
+    if (nSts !=0) then
+        #cmpif 0x80000000 : DbgMsg("## Pairing..")
+        rc = BlePair(cHndl,1)
+        #cmpif 0x00000001 : AssertRC(rc, 381)
+        exitfunc 1
+    endif
+
+    IF (Mode == 7) THEN
+        //Enable TX notIFications
+        Mode = 8
+        UUID1$ = "\01\00"
+        rc = BLEGATTCWRITE(BleHandle, TXCCCDHandle, UUID1$)
+        #cmpif 0x00000001 : AssertRC(rc, 390)
+    ELSEIF (Mode == 8) THEN
+        //Write to Modem In
+        IF (ModemInOutExists == 1) THEN
+            Mode = 9
+            UUID1$ = "\01"
+            BufferFull = 0
+            rc = BLEGATTCWRITE(BleHandle, MIHandle, UUID1$)
+            #cmpif 0x00000001 : AssertRC(rc, 398)
+        ELSE
+            BufferFull = 0
+            BufferState = 0
+            Mode = 10
+            ModemStat = 1
+            u$ = ""
+            RecBuf$ = ""
+            print "Ready to transmit/receive!\n"
+            rc = SendMsgApp(0,BRIDGE_VSP_MODE)
+        ENDIF
+    ELSEIF (Mode == 9) THEN
+        //Now ready to send data
+        BufferFull = 0
+        BufferState = 0
+        Mode = 10
+        u$ = ""
+        RecBuf$ = ""
+        print "Ready to transmit/receive!\n"
+        rc = SendMsgApp(0,BRIDGE_VSP_MODE)
+    ELSEIF (Mode == 10) THEN
+        //UART data was written
+        BufferState = 0
+        rc = HndlrUartRxVSP()
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//Received BLE notification
+//==============================================================================
+FUNCTION HndlrAttrNotify()
+    dim nCtx, Hndl, Data$, discard, UartSent, arc
+    arc = BLEGATTCNOTIFYREAD(nCtx, Hndl, Data$, discard)
+    while (arc == 0)
+        IF (Hndl == MOHandle) then
+            //Modem Out changed
+            UUID1$ = "\01"
+            IF (strcmp(UUID1$, Data$) == 0) then
+                ModemStat = 1
+                rc = HndlrUartRxVSP()
+            ELSE
+                ModemStat = 0
+            ENDIF
+        ELSEIF (Hndl == TXHandle) then
+            //Data
+            IF BufferFull == 0 then
+                UartSent = UARTWRITE(Data$)
+                IF UartSent != strlen(Data$) then
+                    STRSHIFTLEFT(Data$, UartSent)
+                    RecBuf$ = Data$
+
+                    //NotIFy that we cannot accept more data
+                    UUID1$ = "\00"
+                    BufferFull = 1
+                    rc = BLEGATTCWRITE(BleHandle, MIHandle, UUID1$)
+                ENDIF
+            ELSE
+                //Buffer is full
+                RecBuf$ = RecBuf$ + Data$
+            ENDIF
+        ENDIF
+        Data$ = ""
+        arc = BLEGATTCNOTIFYREAD(nCtx, Hndl, Data$, discard)
+    endwhile
+ENDFUNC 1
+
+//==============================================================================
+//UART transmit buffer empty
+//==============================================================================
+FUNCTION HndlrUartTxEmpty()
+    dim UartSent
+    IF (strlen(RecBuf$) > 0) then
+        UartSent = UARTWRITE(RecBuf$)
+        IF (UartSent == strlen(RecBuf$)) then
+            //Cleared - notify
+            RecBuf$ = ""
+            UUID1$ = "\01"
+            BufferFull = 0
+            rc = BLEGATTCWRITE(BleHandle, MIHandle, UUID1$)
+        ELSE
+            //Not cleared so shift
+            STRSHIFTLEFT(RecBuf$, UartSent)
+        ENDIF
+    ELSE
+        BufferFull = 0
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//CCCD Descriptor found
+//==============================================================================
+FUNCTION HndlrFindDesc(nCtx, Hndl)
+    IF (Mode == 5) THEN
+        //Modem out CCCD
+        MOCCCDHandle = Hndl
+        Mode = 6
+        UUID1$ = BASEUUID
+        UUID2$ = TXUUID
+        rc = BLEGATTCFINDDESC(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0, 0xFE012902, 0)
+    ELSEIF (Mode == 6) THEN
+        //TX CCCD
+        TXCCCDHandle = Hndl
+        Mode = 7
+
+        IF (ModemInOutExists == 1) THEN
+            //Enable modem out notifications
+            UUID1$ = "\01\00"
+            rc = BLEGATTCWRITE(BleHandle, MOCCCDHandle, UUID1$)
+            #cmpif 0x00000001 : AssertRC(rc, 506)
+        ELSE
+            //Modem in doesn't exist - enable TX notifications
+            Mode = 8
+            UUID1$ = "\01\00"
+            rc = BLEGATTCWRITE(BleHandle, TXCCCDHandle, UUID1$)
+            #cmpif 0x00000001 : AssertRC(rc, 512)
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//BLE characteristics data changed
+//==============================================================================
+FUNCTION HndlrAttrRead(nCtx, Hndl, Stat)
+    dim Data$, discard, UartSent, nAhndl, nOfst
+    rc = BleGattcReadData(Hndl,nAhndl,nOfst,Data$)
+    IF (Hndl == MOHandle) then
+        //Modem Out changed
+        UUID1$ = "\01"
+        IF (strcmp(UUID1$, Data$) == 0) then
+            ModemStat = 1
+            rc = HndlrUartRxVSP()
+        ELSE
+            ModemStat = 0
+        ENDIF
+    ELSEIF (Hndl == TXHandle) then
+        //Data
+        IF BufferFull == 0 then
+            UartSent = UARTWRITE(Data$)
+            IF UartSent != strlen(Data$) then
+                STRSHIFTLEFT(Data$, UartSent)
+                RecBuf$ = Data$
+
+                //Notify that we cannot accept more data
+                UUID1$ = "\00"
+                BufferFull = 1
+                rc = BLEGATTCWRITE(BleHandle, MIHandle, UUID1$)
+            ENDIF
+        ELSE
+            //Buffer is full
+            RecBuf$ = RecBuf$ + Data$
+        ENDIF
+    ENDIF
+    Data$ = ""
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// This shows the cuttent connection parameters
+//------------------------------------------------------------------------------
+#cmpif 0x80000000 : sub ShowConnParms(nCtx)
+#cmpif 0x80000000 :   dim intrvl,sprvto,slat
+#cmpif 0x80000000 :   rc = BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
+#cmpif 0x80000001 :   AssertRC(rc, 8740)
+#cmpif 0x80000000 :   if rc==0 then
+#cmpif 0x80000000 :     print "\n## Conn :: Interval=";intrvl;",Supervision Tout=";sprvto;",Slave Latency=";slat
+#cmpif 0x80000000 :   endif
+#cmpif 0x80000000 : endsub
+
+//==============================================================================
+//BLE message
+//==============================================================================
+FUNCTION HndlrBleMsg(nMsgId, nCtx)
+    //Clear the caret count
+    carCnt = 0
+
+    select nMsgId
+    case BLE_EVBLEMSGID_CONNECT
+        #cmpif 0x80000000 : DbgMsg("## Connect")
+        #cmpif 0x80000000 : ShowConnParms(nCtx)
+        //Opening the GATT client only when connected to save memory
+        rc = BleGattcOpen(256, 0)
+        #cmpif 0x00000001 : AssertRC(rc, 565)
+        BleHandle = nCtx
+        Mode = 1
+        dim UUID1$, UUID2$
+        UUID1$ = BASEUUID
+        UUID2$ = MIUUID
+        rc = BLEGATTCFINDCHAR(nCtx, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
+        #cmpif 0x00000001 : AssertRC(rc, 572)
+        PRINT "Connected!\n"
+        InConnection = 1
+
+        //Encrypt the connection if previously bonded with this device
+        dim addr$, fAsCentral, info, rollingAge, rollingCount
+        rc = BleGetAddrFromConnHandle(nCtx, addr$)
+        if (rc==0) then
+            if (BleBondingIsTrusted(addr$,fAsCentral,info,rollingAge,rollingCount)>0) then
+                rc = BleEncryptConnection(nCtx, 7, ENCRYPT_MITM_REQUIREMENT)   //Might not need this
+                #cmpif 0x80000000 : DbgMsg("## Encrypting..")
+            endif
+        endif
+
+    case BLE_EVBLEMSGID_DISCONNECT
+        //Disconnected!
+        #cmpif 0x80000000 : DbgMsg("## Disconnect")
+        PRINT "\nDisconnected!\n"
+        InConnection = 0
+        BleGattcClose()
+        rc = SendMsgApp(0,CMD_MODE)
+
+    case BLE_EVBLEMSGID_NEW_BOND
+        //Start process of writing characteristics and descriptors from the beginning
+        #cmpif 0x80000000 : DbgMsg("## New Bond")
+        Mode = 6
+        exitfunc HndlrFindDesc(0, TXCCCDHandle)
+
+    case BLE_EVBLEMSGID_UPDATED_BOND
+        #cmpif 0x80000000 : DbgMsg("## Updated Bond")
+        Mode = 6
+        exitfunc HndlrFindDesc(0, TXCCCDHandle)
+
+        
+    #cmpif 0x80000000 : case BLE_EVBLEMSGID_DISPLAY_PASSKEY
+    #cmpif 0x80000000 :     DbgMsgVal("## Display Pairing Passkey ",nCtx)
+
+    #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER
+    #cmpif 0x80000000 :     DbgMsg("## Conn to Bonded Master ")
+
+    #cmpif 0x80000000 : case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
+    #cmpif 0x80000000 :     DbgMsgVal("## Auth Key Request, type=",nCtx)
+      
+    #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+    #cmpif 0x80000000 :     ShowConnParms(nCtx)
+        
+    #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
+    #cmpif 0x80000000 :     DbgMsg("## Conn Parm Negotiation FAILED")
+    
+    case else        
+    endselect
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function ClearS()
+  dim j
+  for j = 0 to (NUM_OF_S_PARAMS-1)
+    s$[j]=""
+  next
+endfunc 0
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function ClearI()
+  dim j
+  for j = 0 to (NUM_OF_I_PARAMS-1)
+    i[j]=0
+  next
+endfunc 0
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub UartRsp(rsp as integer)
+    if rsp == 0 then
+        print ok$;pr$
+    elseif rsp == -2 then
+        print pr$
+    elseif rsp == -3 then
+        print ok$
+    elseif rsp == -4 then
+        print uc$;pr$
+    elseif rsp > 0 then
+        print er$;integer.h' rsp;pr$
+    endif
+endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function ExtractIntTokens(u$,stIdx,num)
+  while num>0
+    tlen = ExtractIntToken(u$,i[stIdx])
+    if tlen == 0 then
+      exitfunc 4
+    endif
+    num=num-1
+    stIdx = stIdx+1
+  endwhile
+endfunc 0
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function ExtractStrTokens(u$,stIdx,num)
+  while num>0
+    tlen = ExtractStrToken(u$,s$[stIdx])
+    if tlen == 0 then
+      exitfunc 3
+    endif
+    num=num-1
+    stIdx = stIdx+1
+  endwhile
+endfunc 0
+
+//-------------------------------------------------------------------------
+//#CMD#//  ato OR bridge
+//-------------------------------------------------------------------------
+sub _bridge()
+    TimerCancel(CARET_TIMER)
+    carCnt = 0
+    rc = SendMsgApp(0,BRIDGE_VSP_MODE)
+endsub
+
+//-------------------------------------------------------------------------
+//#CMD#//  at+bls OR scan
+//-------------------------------------------------------------------------
+function _scan()
+    rc = BLESCANSTART(SCAN_TMT, 0)
+    if rc!=0 then
+        exitfunc rc
+    endif
+endfunc -1      //Don't give response to user
+
+//-------------------------------------------------------------------------
+//#CMD#//  atd #HEXbdAddr7bytes# OR connect #HEXbdAddr7bytes#
+//-------------------------------------------------------------------------
+function _connect()
+    if InConnection == 1 then
+        print "\nALREADY CONNECTED"
+        exitfunc -2
+    endif
+
+    //default min and max interval
+    i[1] = 7500
+    i[2] = 30000
+            
+    rc = ExtractStrTokens(urtcmd$,1,1)
+
+    //Use #defined/stored mac address if none given
+    if rc!=0 then
+        s$[1] = BTAddr
+    else
+        //Extract optional integer which will be the connection interval
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc==0 then
+        i[2]=i[1]
+        endif
+    endif
+    s$[1] = StrDehexize$(s$[1])
+
+    //Stop scanning in case
+    rc = BleScanStop()
+
+    //Connect to target device
+    rc = BLECONNECT(s$[1], 5000, i[1], i[2], 500000)
+
+    if rc!=0 then
+        exitfunc rc
+    endif
+endfunc -1
+
+//-------------------------------------------------------------------------
+//#CMD#//  at+btd #HEXbdAddr7bytes#
+//-------------------------------------------------------------------------
+function _delete()
+    rc = ExtractStrTokens(urtcmd$,1,1)
+
+    if rc!=0 then
+        exitfunc -2
+    endif
+
+    s$[1] = StrDehexize$(s$[1])
+
+    rc = BleBondingEraseKey(s$[1])
+    if rc!=0 then
+        exitfunc rc
+    endif
+endfunc 0
+
+//------------------------------------------------------------------------------
+// #CMD#//  at+bti
+// #CMD#//  at+btd #HEXbdAddr7bytes#
+//------------------------------------------------------------------------------
+Function _at()
+    StrShiftLeft(urtcmd$,1)              //Remove the '+'
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen > 0 then
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if strcmp(tkn$,"btd")==0 then
+            exitfunc _delete()
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        elseif strcmp(tkn$,"bls")==0 then
+            exitfunc _scan()
+        endif
+    endif
+endfunc -4  //Print 'UNKNOWN COMMAND' if incorrect command
+
+//------------------------------------------------------------------------------
+//#CMD#//  misc i  clearall
+//#CMD#//  misc i  set #INTidx# #INTval#
+//#CMD#//  misc s$ clearall
+//#CMD#//  misc s$ set #INTidx# #STRescapedvalue#
+//#CMD#//  misc s$ sethex #INTidx# #HEXdigitsvalue#
+//------------------------------------------------------------------------------
+function _Misc()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"s$")==0 then
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"clearall")==0 then
+      exitfunc ClearS()
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"set")==0 then
+      //Extract 1 (#INTidx#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      if (i[1] < 0) || (i[1] >= NUM_OF_S_PARAMS) then
+        exitfunc 6
+      endif
+      //Extract 1 (#STRescapedvalue#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,i[1],1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      StrDeEscape(s$[i[1]])
+      exitfunc 0
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"sethex")==0 then
+      //Extract 1 (#INTidx#) and store starting at i[1]
+      rc = ExtractIntTokens(urtcmd$,1,1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      if (i[1] < 0) || (i[1] >= NUM_OF_S_PARAMS) then
+        exitfunc 6
+      endif
+      //Extract 1 (#STRescapedvalue#) and store starting at s$[1]
+      rc = ExtractStrTokens(urtcmd$,i[1],1)
+      if rc != 0 then
+        exitfunc rc
+      endif
+      StrDeEscape(s$[i[1]])
+      exitfunc 0
+    endif
+  endif
+  //=================================================
+  if strcmp(tkn$,"i")==0 then
+    tlen = ExtractStrToken(urtcmd$,tkn$)
+    if tlen == 0 then
+      exitfunc 5
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"clearall")==0 then
+      exitfunc ClearI()
+    endif
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"set")==0 then
+      dim idx
+      tlen = ExtractIntToken(urtcmd$,idx)
+      if tlen == 0 then
+        exitfunc 5
+      endif
+      if (idx < 0) || (idx >= NUM_OF_I_PARAMS) then
+        exitfunc 6
+      endif
+      tlen = ExtractIntToken(urtcmd$,i[idx])
+      if tlen == 0 then
+        exitfunc 5
+      endif
+      exitfunc 0
+    endif
+  endif
+endfunc 5
+
+//------------------------------------------------------------------------------
+// This handler is called when there is an scan timeout
+//------------------------------------------------------------------------------
+function HndlrScanTO() as integer
+    UartRsp(0)
+endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function OnUartCmd() as integer
+    rc = -2 //Assume there is no error
+    tlen = ExtractStrToken(urtcmd$,tkn$) //Get first token
+    if tlen > 0 then
+
+        if strcmp(tkn$,"at")==0 then
+            rc = _at()
+
+        elseif strcmp(tkn$,"atd")==0 || strcmp(tkn$,"connect")==0 then
+            rc = _connect()
+
+        elseif StrCmp(tkn$,"ato")==0 || StrCmp(tkn$,"bridge")==0 then
+            _bridge()
+            rc = -1       //Don't give response to user
+
+        elseif strcmp(tkn$,"scan")==0  then
+            rc = _scan()
+
+        elseif StrCmp(tkn$,"ato")==0 || StrCmp(tkn$,"bridge")==0 then
+            rc = SendMsgApp(0,BRIDGE_VSP_MODE)
+            rc = -1       //Don't give response to user
+
+        elseif StrCmp(tkn$,"ath")==0 || StrCmp(tkn$,"disconnect")==0 then
+            rc = _disconnect()
+
+        elseif strcmp(tkn$,"misc")==0 then
+            rc = _misc()
+
+        elseif strcmp(tkn$,"stop")==0 then
+            rc = BleScanStop()
+
+        elseif strcmp(tkn$,"quit")==0 || strcmp(tkn$,"exit")==0 then
+            if (InConnection == 1) then
+                //Disconnect
+                rc = _disconnect()
+            endif
+            print "\nVersion ";APP_VERSION
+            exitfunc 0
+
+        elseif strcmp(tkn$,"bdaddr")==0 then
+            s$[1] = SysInfo$(4)
+            print "\n";StrHexize$(s$[1])
+
+        endif
+    endif
+    //Send a response back to the user
+    UartRsp(rc)
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when data has arrived at the serial port
+//------------------------------------------------------------------------------
+function HndlrUartRxCmd()
+    dim nMatch : nMatch = 0
+    //Check if CR has been received
+    nMatch=UartReadMatch(stRsp$,13)
+    if nMatch!=0 then
+        //CR exists in the input buffer
+        urtcmd$ = strsplitleft$(stRsp$,nMatch)
+        exitfunc OnUartCmd()
+    endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Called after SendMsgApp is called. Used to switch between command and bridge mode
+// cmd: 0 = switch to command mode
+//      1 = switch to bridge mode
+//
+// msgID: Not Used
+//------------------------------------------------------------------------------
+function SetMode(msgID, cmd) as integer
+    if cmd==BRIDGE_VSP_MODE then
+        if InConnection == 0 then
+            print "\n";nc$;pr$
+            exitfunc 1
+        endif
+
+        ONEVENT EVUARTRX        CALL HndlrUartRxVSP
+        print ok$;"\n"
+    elseif cmd==CMD_MODE then
+        ONEVENT  EVUARTRX       CALL HndlrUartRxCmd
+        UartRsp(0)
+    endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there at least one scan response waiting to be read
+//------------------------------------------------------------------------------
+function HndlrScanResp()
+    DIM periphAddr$, advData$, nDiscarded, nRssi, nme$
+
+    //Read all cached advert reports
+    rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
+    WHILE (rc == 0)
+        rc = BLEGETADBYTAG(advData$, 0x09, nme$)
+        print "\nSCAN: "; StrHexize$(periphAddr$);" ";nRssi;" \22"; nme$ ; "\22";
+        rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
+    ENDWHILE
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Called on a transition on the nAutorun pin (DTR in UwTerminal)
+//------------------------------------------------------------------------------
+function HndlrGpioChan0()
+    dim i : i = GpioRead(22)
+
+    //If DTR unticked
+    if i == 1 then
+        TimerStart(DISCON_TIMER, DISCON_TIMER_DUR_MS, 0)
+
+    //DTR ticked -> switch to command mode
+    elseif TimerRunning(DISCON_TIMER)!=0 then
+        TimerCancel(DISCON_TIMER)
+        exitfunc SetMode(0, CMD_MODE)
+    endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub Initialise()
+  //Just works pairing will work without confirmation
+  rc = BleSecMngrJustWorksConf(0)
+  //Use 'Just Works' pairing
+  rc = BleSecMngrIoCap(0)
+  //Bond when pairing
+  rc = BleSecMngrBondReq(1)
+endsub
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//Setup pairing
+Initialise()
+
+//Setup nAutorun pin to control switching between command and bridge mode
+rc=GpioBindEvent(0,22,2)
+
+//Connect to device at startup if needed
+IF (CONNECT_ON_STARTUP == 1) THEN
+    //Connect
+    rc = _connect()
+    print "\nConnecting: ";StrHexize$(s$[1]);"\n"
+ELSE
+    //Send user prompt
+    UartRsp(0)
+ENDIF
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+ONEVENT EVBLEMSG           CALL HndlrBleMsg
+ONEVENT EVBLE_CONN_TIMEOUT CALL HndlrConnTO
+ONEVENT EVFINDCHAR         CALL HndlrFindChar
+ONEVENT EVATTRWRITE        CALL HndlrAttrWrite
+ONEVENT EVATTRNOTIFY       CALL HndlrAttrNotify
+ONEVENT EVFINDDESC         CALL HndlrFindDesc
+ONEVENT EVUARTRX           CALL HndlrUartRxCmd
+ONEVENT EVUARTTXEMPTY      CALL HndlrUartTxEmpty
+OnEvent EVATTRREAD         CALL HndlrAttrRead
+OnEvent EVGPIOCHAN0        CALL HndlrGpioChan0
+OnEvent EVBLE_SCAN_TIMEOUT CALL HndlrScanTO
+OnEvent EVBLE_ADV_REPORT   CALL HndlrScanResp
+OnEvent EVMSGAPP           CALL SetMode
+OnEvent EVTMR0             CALL _disconnect
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WAITEVENT
