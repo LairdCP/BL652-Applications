@@ -1,0 +1,13 @@
+//===============================================================================
+// Enter Command mode
+//
+//ARGS: vPort
+//
+//===============================================================================
+//SET vPort ""
+//#include "EnterCmdMode.sbr"  //Enter Command Mode
+//===============================================================================
+
+#include "ResetViaBreak.sbr"
+SENDCMD [vPort] "[cLoginMagicCommand]"
+WAITRESPEX 5000 [vPort] "[cOK]"

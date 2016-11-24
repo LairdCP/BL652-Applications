@@ -1,3 +1,10 @@
 # compiled smartBASIC *.uwc files
-Applications/*.uwc
-Manual Code/*.uwc
+*/*.uwc
+*/*.aut.txt
+*/*/*.uwc
+*/*/*.aut.txt
+*/RegrTest/Log/*
+*/RegrTest/Log/*/*
+
+StringPlayer.exe
+

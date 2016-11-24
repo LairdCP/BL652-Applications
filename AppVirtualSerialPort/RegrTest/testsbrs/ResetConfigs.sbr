@@ -1,0 +1,18 @@
+//===============================================================================
+// Used to reset an AT device on logical port specified in variable vPort
+//
+//ARGS: vPort
+//
+//===============================================================================
+//SET vPort ""
+//#include "ResetConfigs.sbr"  //Clear configs and reset the module
+//===============================================================================
+
+#include "DTRoff.sbr"
+#include "ResetViaBreak.sbr"
+
+SENDCMD [vPort] "at&f 0xFFFFFFFE\r"
+WAITRESPEX 5000 [vPort] "FFS Erased, Rebooting..."
+WAITRESPEX 5000 [vPort] "\n00\r"
+
+#include "DTRon.sbr"

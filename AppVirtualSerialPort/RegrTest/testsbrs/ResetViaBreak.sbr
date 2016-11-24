@@ -1,0 +1,14 @@
+//===============================================================================
+// Used to reset an AT device on logical port specified in variable vPort
+//
+//ARGS: vPort
+//
+//===============================================================================
+//SET vPort ""
+//#include "ResetViaBreak.sbr"
+//===============================================================================
+
+PRINT "Resetting AT module [vPort] using break"
+BREAKON  [vPort] [cBreakOnTime]
+BREAKOFF [vPort] [cBreakOffTime]
+DELAY "[cBreakPostDelay]"

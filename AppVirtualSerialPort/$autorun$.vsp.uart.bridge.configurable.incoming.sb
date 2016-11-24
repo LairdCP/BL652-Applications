@@ -58,7 +58,14 @@
 //#set $cmpif, 0x0060  //Allow configuration over UART & VSP
 //#set $cmpif, 0x0000FFFF  //All Features + NO debug messages
 #set $cmpif, 0xFFFFFFFF  //All Features + all debug messages
-
+//
+//
+//
+#define AppVer                 "1.00"                             //Application version
+#define AppUpdated             "24/Nov/2016"                      //Application last updated
+//
+//
+//
 //******************************************************************************
 // Documentation
 //******************************************************************************
@@ -89,89 +96,89 @@
 //   2 = full BT address excluding address type, 
 //   3 = last 4 characters, 
 //   4 = last 6 characters
-#define DevNameFormatConfigDef   0                                  
+#define DevNameFormatConfigDef   0      //0
     #define DevNameFormatConfigMin   0
     #define DevNameFormatConfigMax   4
 //Default TX Power in dBm
-#define TxPowerConfigDef         4                                  
+#define TxPowerConfigDef         4      //1
     #define TxPowerConfigMin         -20
     #define TxPowerConfigMax         4
 //Default disconnect time (if device does not encrypt connection - VSP flag must be set to encrypted) in ms
-#define EncrDisconToutConfigDef  8000                               
+#define EncrDisconToutConfigDef  8000      //2
     #define EncrDisconToutConfigMin  1000
     #define EncrDisconToutConfigMax  20000
 //Default Advertising interval (lower will raise the power consumption)
-#define AdvertIntvlConfigDef     250                                
+#define AdvertIntvlConfigDef     250      //3
     #define AdvertIntvlConfigMin     20
     #define AdvertIntvlConfigMax     10240
 //Default Minimum connection interval
-#define MinConnIntConfigDef      7500                               
+#define MinConnIntConfigDef      7500      //4
     #define MinConnIntConfigMin      7500
     #define MinConnIntConfigMax      3998750
 //Default Maximum connection interval
-#define MaxConnIntConfigDef       40000                              
+#define MaxConnIntConfigDef       40000      //5
     #define MaxConnIntConfigMin      7500
     #define MaxConnIntConfigMax      3998750
 //Default UART baud rate
-#define UARTSpeedConfigDef       115200                             
+#define UARTSpeedConfigDef       115200      //6
     #define UARTSpeedConfigMin       1200
     #define UARTSpeedConfigMax       1000000
 //Default UART Tx buffer length
-#define UARTTxBufConfigDef       0                                  
+#define UARTTxBufConfigDef       0      //7
     #define UARTTxBufConfigMin       0
     #define UARTTxBufConfigMax       4096
 //Default UART Rx buffer length
-#define UARTRxBufConfigDef       0                                  
+#define UARTRxBufConfigDef       0      //8
     #define UARTRxBufConfigMin       0
     #define UARTRxBufConfigMax       4096
 //Default action of CONN pin (-1 for no gpio indication, otherwise the GPIO selected)
-#define CONNPinConfigDef         29                                  
+#define CONNPinConfigDef         29      //9
     #define CONNPinConfigMin         -1
     #define CONNPinConfigMax         31
 //Default action of ENCR pin (-1 for no gpio indication, otherwise the GPIO selected)
-#define ENCRPinConfigDef         30                                  
+#define ENCRPinConfigDef         30      //10
     #define ENCRPinConfigMin         -1
     #define ENCRPinConfigMax         31
 //Default UUID of Tx characteristic (sibling of Base UUID)
-#define VspTxUUIDConfigDef       0x2000                             
-    #define VspTxUUIDConfigMin       0
+#define VspTxUUIDConfigDef       0x2000      //11
+    #define VspTxUUIDConfigMin       1
     #define VspTxUUIDConfigMax       0xFFFF
 //Default UUID of Rx characteristic (sibling of Base UUID)
-#define VspRxUUIDConfigDef       0x2001                             
-    #define VspRxUUIDConfigMin       0
+#define VspRxUUIDConfigDef       0x2001      //12
+    #define VspRxUUIDConfigMin       1
     #define VspRxUUIDConfigMax       0xFFFF
 //Default UUID of Modem-In characteristic (sibling of Base UUID)
 //Set to 0 to disable (it will also disable MdmIn)
-#define VspMdmInUUIDConfigDef    0x2003                             
+#define VspMdmInUUIDConfigDef    0x2003      //13
     #define VspMdmInUUIDConfigMin    0
     #define VspMdmInUUIDConfigMax    0xFFFF
 //Default UUID of Modem-Out characteristic (sibling of Base UUID)
 //Set to 0 to disable (it will also disable MdmOut)
-#define VspMdmOutUUIDConfigDef   0x2002                             
+#define VspMdmOutUUIDConfigDef   0x2002      //14
     #define VspMdmOutUUIDConfigMin   0
     #define VspMdmOutUUIDConfigMax   0xFFFF
 //Default length of Tx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
-#define VspTxBufConfigDef        384                                
+#define VspTxBufConfigDef        384      //15
     #define VspTxBufConfigMin        0
     #define VspTxBufConfigMax        1024
 //Default length of Rx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
-#define VspRxBufConfigDef        384                                
+#define VspRxBufConfigDef        384      //16
     #define VspRxBufConfigMin        0
     #define VspRxBufConfigMax        1024
 //Encrypted without MITM    
-#define VspFlagsConfigDef        8                                  
+#define VspFlagsConfigDef        8      //17
     #define VspFlagsConfigMin        4
     #define VspFlagsConfigMax        0x1C
 
-//VSP default
-#define BaseUUIDConfigDef        "569a1101b87f490c92cb11ba5ea5167c" 
-    #define BaseUUIDConfigMinLen     32
-    #define BaseUUIDConfigMaxLen     32
 //Default advertised name of device
-#define DeviceNameConfigDef_BL652    "LAIRD BL652"                  
-#define DeviceNameConfigDef_BL600    "LAIRD BL600"
+#define DeviceNameConfigDef_BL652    "LAIRD BL652"   //0
+#define DeviceNameConfigDef_BL600    "LAIRD BL600"   //0
     #define DeviceNameConfigMinLen    1
     #define DeviceNameConfigMaxLen    12
+//VSP default
+#define BaseUUIDConfigDef        "569a1101b87f490c92cb11ba5ea5167c"    //1
+    #define BaseUUIDConfigMinLen     32
+    #define BaseUUIDConfigMaxLen     32
 
 //LED GPIO pin configuration
 #define BL600GPIOLED1Pin       18                                 //GPIO for LED1 (DVK-BL600)
@@ -218,9 +225,6 @@
 #define AppModeAppBridge       0                                  //Application in bridge mode
 #define AppModeAppCmd          1                                  //Application in command mode
 #define AppModeAppLogin        2                                  //Application in Login mode for first LOGIN_MODE_TIMEOUT_MS milliseconds
-
-#define AppVer                 "0.12"                             //Application version
-#define AppUpdated             "14/11/2016"                       //Application last updated
 
 #define UartConfigParameters   "CN81H"                            //Can only be "CN81H" or "CN81N"
 
@@ -410,6 +414,8 @@ function ConfigKeyGetDef( keyID as integer) as integer
         defval=EncrDisconToutConfigDef
     case DevNameFormatConfigID
         defval=DevNameFormatConfigDef
+    case TxPowerConfigID
+        defval=TxPowerConfigDef
     case CONNPinConfigID
         defval=CONNPinConfigDef
     case ENCRPinConfigID
@@ -535,6 +541,9 @@ function ConfigKeyIsValid( keyID as integer, byref newVal as integer) as integer
     case ENCRPinConfigID
         isValid=InRange(newVal,ENCRPinConfigMin,ENCRPinConfigMax)
         
+    case TxPowerConfigID
+        isValid=InRange(newVal,TxPowerConfigMin,TxPowerConfigMax)
+        
     case else
         isValid=0
     endselect
@@ -592,7 +601,7 @@ sub ConfigKeyGetDef$( keyID as integer, byref defVal$ as string)
             defVal$=DeviceNameConfigDef_BL652
         endif
     case else
-        defVal$=""
+        defVal$="-"
     endselect
     
 endsub
@@ -790,6 +799,10 @@ endfunc 1
 //------------------------------------------------------------------------------
 function SetupGAPService()
     dim TmpStr$, TmpVal, MinCntInt, MaxCntInt, DevName$
+    
+    //Set the tx power level
+    TmpVal = ConfigKeyGet( TxPowerConfigID)
+    rc=BleTxPowerSet(TmpVal)
 
     //Read the minimum connection interval and check sensible value
     MinCntInt = ConfigKeyGet( MinConnIntConfigID)   
@@ -1087,7 +1100,7 @@ endfunc 0
 //##CMD##  ver
 //------------------------------------------------------------------------------
 function _ver(byref bufferStr$)        
-    bufferStr$ = "\nVSP Squared version " + AppVer + " updated " + AppUpdated + " on "
+    bufferStr$ = "\nVSP Version " + AppVer + " updated " + AppUpdated + " on "
     if (DevID == BL600_DEV_ID) then
         //Running on BL600
         bufferStr$ = bufferStr$ + "BL600 " + GetVersion$( 6,6,14,6)            
