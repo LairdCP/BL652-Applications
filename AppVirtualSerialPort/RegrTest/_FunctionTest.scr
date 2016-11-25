@@ -22,6 +22,7 @@ TITLE "**** _FuncionTest START****"
 
 #include "C10000.sub" //Enter Command mode after power up using magic command
 #include "C10010.sub"  //Enter Command mode & INTEGER check config key validation
+#include "C10020.sub"  //Enter Command mode & STRING check config key validation
 
 //--------------------
 //ADD Tests Above here

@@ -89,6 +89,7 @@
 
                                 //    1234567890123456789012345678901234567890
 #define LoginMagicCommand            "@command_mode@\r"
+#define LoginCmdLen                  15    //this must be manually adjusted if changed
 
 //Default selection if the BT address is appended to the advertised device name 
 //   0 = none, 
@@ -186,7 +187,7 @@
 #define BL652GPIOLED1Pin       17                                 //GPIO for LED1 (DVK-BL652)
 #define BL652GPIOLED2Pin       19                                 //GPIO for LED2 (DVK-BL652)
 
-#define MaxCmdStringSize       384                                //Maximum allowable size of strings (1024 maximum (for BL652) or 512 maximum (for BL600))
+#define MaxCmdStringSize       144                                //Maximum allowable size of strings (1024 maximum (for BL652) or 512 maximum (for BL600))
  
 #define MaxDevNameSize         20                                 //Maximum allowable size of the advertised device name (additional characters will be clipped off)
 
@@ -241,7 +242,9 @@
 #define NUM_OF_I_PARAMS           (8)                             // size of i[]        
 #define NUM_OF_S_PARAMS           (8)                             // size of s$[]
 
-#define LOGIN_MODE_TIMEOUT_MS                           60000 //Login modeout timeout in seconds
+#define LOGIN_MODE_TIMEOUT_MS      60000 //Login modeout timeout in seconds
+
+#define PROMPT_OK                  "OK\r\n>"
 
 //******************************************************************************
 // Global Variable Declarations
@@ -269,6 +272,9 @@ dim VSPRecBuf$
 //UART send/receive buffer (for application command mode)
 dim UARTSndBuf$
 dim UARTRecBuf$
+
+//Terminator for commands in command mode
+dim SearchStr$ : SearchStr$ = "\r"
 
 //Holds the device ID
 dim DevID
@@ -1139,16 +1145,26 @@ endfunc 0
 //##CMD##  bridge
 //------------------------------------------------------------------------------
 sub _bridge()
+    //update the led indication
     #cmpif 0x00000004 : if (DevID == BL600_DEV_ID) then
     #cmpif 0x00000004 :     GPIOWrite(BL600GPIOLED2Pin, 0)
     #cmpif 0x00000004 : elseif (DevID == BL652_DEV_ID) then
     #cmpif 0x00000004 :     GPIOWrite(BL652GPIOLED2Pin, 0)
     #cmpif 0x00000004 : endif
+    
+    //change mode
     AppMode = AppModeAppBridge
+    
+    //flush the command mode buffers as they are no longer required so no need to hog memory
+    UARTRecBuf$=""
+    VSPRecBuf$=""
+    
+    //change handlers so that data transfer happens in 'C'
     ONEVENT EVVSPRX CALL HndlrBridge
     ONEVENT EVUARTRX CALL HndlrBridge
     ONEVENT EVVSPTXEMPTY CALL HndlrBridge
     ONEVENT EVUARTTXEMPTY CALL HndlrBridge
+    
     #cmpif 0x80000000 : DbgMsg("## BRIDGE MODE")
 endsub
 
@@ -1301,7 +1317,7 @@ sub AppendRspEnd(rsp as integer, byref bufferStr$ )
     endif
     
     if rsp == 0 then
-        bufferStr$ = bufferStr$ + "OK\r\n>"
+        bufferStr$ = bufferStr$ + PROMPT_OK
     elseif rsp > 0 then
         dim tmpStr$
         sprint #tmpStr$, integer.h' rsp
@@ -1415,35 +1431,75 @@ function ParseCommand(byref CommandStr$, byref rspBuf$)
     
 endfunc 1
 
-//------------------------------------------------------------------------------
-// In Login or Command mode and data has arrived from the peer
-//------------------------------------------------------------------------------
-function HndlrVSPCommand()
-    //Data received from VSP
-    dim VSPData$
-    rc = BleVSPRead(VSPData$, MaxCmdStringSize - strlen(VSPRecBuf$))
-    VSPRecBuf$ = VSPRecBuf$ + VSPData$
 
+//------------------------------------------------------------------------------
+// Routine to check for command mode at startup
+//------------------------------------------------------------------------------
+function CheckForLoginCommand(byref newData$, byref ORIGRecBuf$, byref FWDSndBuf$, byref RSPSndBuf$)
+    Dim CmdLen
+    
+    //bridge this new string if a connection exists
+    if (ConnectionID != 0) then
+        //connection exists so throw the string across
+        FWDSndBuf$=FWDSndBuf$+newData$
+        //flush the data out
+        rc = SendBufferedData()
+    endif
+    ORIGRecBuf$ = ORIGRecBuf$+newData$
+    //if the buffer is longer than the length of the command string then we
+    //are no longer going to get the magic login command so just enter bridge mode
+    if strlen(ORIGRecBuf$) >= LoginCmdLen then
+        //we can test if we have the command
+        newData$=left$(ORIGRecBuf$,LoginCmdLen)
+        if strcmp(newData$,LoginMagicCommand)==0 then
+            //magic command received so remain in command mode
+            #cmpif 0x80000000 : DbgMsg("## Login CmdMode\n")
+            //change to command mode
+            AppMode = AppModeAppCmd
+            //and send an OK back out of the uart
+            RSPSndBuf$=RSPSndBuf$+PROMPT_OK
+            //empty the receicebuf
+            ORIGRecBuf$=""
+            //flush the data out
+            rc = SendBufferedData()
+        else
+            //no magic command
+            _bridge()
+        endif
+        //stop timer
+        TimerCancel(1)
+    else
+        newData$ = "\r"
+        CmdLen = StrPos(ORIGRecBuf$, newData$, 0)
+        if (CmdLen >= 0) then
+            //stop timer
+            TimerCancel(1)
+            //not magic command
+            _bridge()
+        endif
+    endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Routine to service command mode, if it returns 0, then it implies exit the application
+//------------------------------------------------------------------------------
+function ProcessCommands(byref ORIGRecBuf$,byref RSPSndBuf$)
+    dim CmdLen, CmdStr$
+    
     //Check if any commands are present
-    dim CmdLen, SearchStr$, CmdStr$
-    SearchStr$ = "\r"
     CmdLen = 1
     while (CmdLen >= 0)
-        CmdLen = StrPos(VSPRecBuf$, SearchStr$, 0)
+        CmdLen = StrPos(ORIGRecBuf$, SearchStr$, 0)
         if (CmdLen >= 0) then
             //Command is present
             CmdLen = CmdLen + 1
-            CmdStr$ = Left$(VSPRecBuf$, CmdLen)
-            StrShiftLeft(VSPRecBuf$, CmdLen)
+            CmdStr$ = Left$(ORIGRecBuf$, CmdLen)
+            StrShiftLeft(ORIGRecBuf$, CmdLen)
 
             //Parse and run command
             if (CmdLen > 1) then
                 //Command is not empty
-                if (AppMode == AppModeAppCmd) then
-                    rc = ParseCommand(CmdStr$,VSPSndBuf$)
-                else
-                    rc = ParseLogin(CmdStr$,VSPSndBuf$,UARTSndBuf$)
-                endif
+                rc = ParseCommand(CmdStr$,RSPSndBuf$)
                 if (rc == 0) then
                     //Exit application
                     exitfunc 0
@@ -1451,42 +1507,67 @@ function HndlrVSPCommand()
             endif
         endif
     endwhile
+
+endfunc 1
+
+//------------------------------------------------------------------------------
+// In Login or Command mode and data has arrived from the peer
+//------------------------------------------------------------------------------
+function HndlrVSPCommand()
+    //Data received from VSP
+    dim newData$
+    rc = BleVSPRead(newData$, MaxCmdStringSize - strlen(VSPRecBuf$))
+    
+    if (AppMode == AppModeAppCmd) then
+        //--------------------------------------------
+        //in command mode
+        //--------------------------------------------
+        //Check if any commands are present
+        VSPRecBuf$ = VSPRecBuf$ + newData$
+        
+        //process commands
+        exitfunc ProcessCommands(VSPRecBuf$,VSPSndBuf$)
+        
+    else
+        //--------------------------------------------
+        //in login mode
+        //--------------------------------------------
+        
+        //scan the data for login command
+        exitfunc CheckForLoginCommand(newData$, VSPRecBuf$,  UARTSndBuf$, VSPSndBuf$)
+        
+    endif
+    
 endfunc 1
 
 //------------------------------------------------------------------------------
 // In Login or Command mode and data has arrived from the uart
 //------------------------------------------------------------------------------
 function HndlrUARTCommand()
-    //Data received from UART
-    rc = UARTReadN(UARTRecBuf$, MaxCmdStringSize)
-    
-    //Check if any commands are present
-    dim CmdLen, SearchStr$, CmdStr$
-    SearchStr$ = "\r"
-    CmdLen = 1
-    while (CmdLen >= 0)
-        CmdLen = StrPos(UARTRecBuf$, SearchStr$, 0)
-        if (CmdLen >= 0) then
-            //Command is present
-            CmdLen = CmdLen + 1
-            CmdStr$ = Left$(UARTRecBuf$, CmdLen)
-            StrShiftLeft(UARTRecBuf$, CmdLen)
 
-            //Parse and run command
-            if (CmdLen > 1) then
-                //Command is not empty
-                if (AppMode == AppModeAppCmd) then
-                    rc = ParseCommand(CmdStr$,UARTSndBuf$)
-                else
-                    rc = ParseLogin(CmdStr$,UARTSndBuf$,VSPSndBuf$)
-                endif
-                if (rc == 0) then
-                    //Exit application
-                    exitfunc 0
-                endif
-            endif
-        endif
-    endwhile
+    //Data received from UART
+    if (AppMode == AppModeAppCmd) then
+        //--------------------------------------------
+        //in command mode
+        //--------------------------------------------
+        rc = UARTReadN(UARTRecBuf$, MaxCmdStringSize)
+
+        //process commands
+        exitfunc ProcessCommands(UARTRecBuf$,UARTSndBuf$)
+        
+    else
+        //--------------------------------------------
+        //in login mode
+        //--------------------------------------------
+        dim newData$
+        
+        rc = UARTReadN(newData$, LoginCmdLen)
+        
+        //scan the data for login command
+        exitfunc CheckForLoginCommand(newData$, UARTRecBuf$, VSPSndBuf$, UARTSndBuf$)
+        
+    endif
+    
 endfunc 1
 
 //------------------------------------------------------------------------------
