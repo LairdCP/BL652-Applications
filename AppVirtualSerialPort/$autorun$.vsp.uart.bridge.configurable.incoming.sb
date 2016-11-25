@@ -50,19 +50,19 @@
 //   0x00000010 : Not used
 //   0x00000020 : Allow configuration over UART
 //   0x00000040 : Allow configuration over VSP
-//   0x00000080 : Not used
+//   0x00000080 : Allow 'exit' command in command mode
 //
 // Upper 16 bits used for debugging
 //   0x80000000 : Enable debugging messages
 //   ======================================================
-//#set $cmpif, 0x0060  //Allow configuration over UART & VSP
+//#set $cmpif, 0x00C0  //Allow configuration over UART & VSP
 //#set $cmpif, 0x0000FFFF  //All Features + NO debug messages
 #set $cmpif, 0xFFFFFFFF  //All Features + all debug messages
 //
 //
 //
 #define AppVer                 "1.00"                             //Application version
-#define AppUpdated             "24/Nov/2016"                      //Application last updated
+#define AppUpdated             "28/Nov/2016"                      //Application last updated
 //
 //
 //
@@ -87,19 +87,12 @@
 // Definitions
 //******************************************************************************
 
-                                //    1234567890123456789012345678901234567890
-#define LoginMagicCommand            "@command_mode@\r"
-#define LoginCmdLen                  15    //this must be manually adjusted if changed
-
 //Default selection if the BT address is appended to the advertised device name 
-//   0 = none, 
-//   1 = full BT address including address type, 
-//   2 = full BT address excluding address type, 
-//   3 = last 4 characters, 
-//   4 = last 6 characters
+//   0 = BT Address not included 
+//   1-7 = Last X bytes, which means 2X Charactes as they are converted to hex
 #define DevNameFormatConfigDef   0      //0
     #define DevNameFormatConfigMin   0
-    #define DevNameFormatConfigMax   4
+    #define DevNameFormatConfigMax   7
 //Default TX Power in dBm
 #define TxPowerConfigDef         4      //1
     #define TxPowerConfigMin         -20
@@ -171,13 +164,17 @@
     #define VspFlagsConfigMin        4
     #define VspFlagsConfigMax        0x1C
 
+//Default Login Password (Must NOT be > 19 because \r is added and we want to be 20 max)
+#define LoginPswrdConfigDef      "@command_mode@"   //0
+    #define LoginPswrdConfigMinLen   8
+    #define LoginPswrdConfigMaxLen   19
 //Default advertised name of device
-#define DeviceNameConfigDef_BL652    "LAIRD BL652"   //0
-#define DeviceNameConfigDef_BL600    "LAIRD BL600"   //0
+#define DeviceNameConfigDef_BL652    "LAIRD BL652"   //1
+#define DeviceNameConfigDef_BL600    "LAIRD BL600"   //1
     #define DeviceNameConfigMinLen    1
     #define DeviceNameConfigMaxLen    12
 //VSP default
-#define BaseUUIDConfigDef        "569a1101b87f490c92cb11ba5ea5167c"    //1
+#define BaseUUIDConfigDef        "569a1101b87f490c92cb11ba5ea5167c"    //2
     #define BaseUUIDConfigMinLen     32
     #define BaseUUIDConfigMaxLen     32
 
@@ -219,8 +216,9 @@
 #define VspFlagsConfigID          17                              //nonval key where VSP service flag is stored
 
 //The following are STRING configs so need to be remapped to 0 .. N
-#define DeviceNameConfigID     0                                  //nonval key where the advertised device name is stored
-#define BaseUUIDConfigID       1                                  //nonval key where base VSP UUID is stored
+#define LoginPswrdConfigID     0                                  //nonval key where the login password is stored (8-19) characters
+#define DeviceNameConfigID     1                                  //nonval key where the advertised device name is stored
+#define BaseUUIDConfigID       2                                  //nonval key where base VSP UUID is stored
 
 
 #define AppModeAppBridge       0                                  //Application in bridge mode
@@ -281,6 +279,10 @@ dim DevID
 
 //Holds the connection ID of the VSP client (if one is connected)
 dim ConnectionID
+
+//Login Password cache
+dim LoginPassword$ 
+dim LoginPasswordLen 
 
 //Holds the various GPIO pin numbers (varies based on module)
 dim CONNPin, ENCRpin
@@ -362,6 +364,12 @@ endif
 //------------------------------------------------------------------------------
 #cmpif 0x80000000 : sub DbgMsgVal(byval msg$ as string, byval vl as integer)
 #cmpif 0x80000000 :     print "\n";msg$;" ";vl
+#cmpif 0x80000000 : endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x80000000 : sub DbgMsgVal$(byval msg$ as string, byref vl$ as string)
+#cmpif 0x80000000 :     print "\n";msg$;" ";vl$
 #cmpif 0x80000000 : endsub
 
 //------------------------------------------------------------------------------
@@ -606,6 +614,8 @@ sub ConfigKeyGetDef$( keyID as integer, byref defVal$ as string)
             //BL652 module
             defVal$=DeviceNameConfigDef_BL652
         endif
+    case LoginPswrdConfigID
+        defVal$=LoginPswrdConfigDef
     case else
         defVal$="-"
     endselect
@@ -655,6 +665,12 @@ function ConfigKey$IsValid( keyID as integer, newVal$ as string) as integer
         
     case DeviceNameConfigID
         if( (nlen>=DeviceNameConfigMinLen) && (nlen<=DeviceNameConfigMaxLen) ) then
+            //valid length
+            isValid=1
+        endif
+    
+    case LoginPswrdConfigID
+        if( (nlen>=LoginPswrdConfigMinLen) && (nlen<=LoginPswrdConfigMaxLen) ) then
             //valid length
             isValid=1
         endif
@@ -820,25 +836,21 @@ function SetupGAPService()
     DevName$ = ConfigKeyGet$( DeviceNameConfigID)
     //Append part of module BT address if required
     TmpVal = ConfigKeyGet( DevNameFormatConfigID)
+    #cmpif 0x80000000 : DbgMsgVal("## DevNameFormat =",TmpVal)
     //Default selection if the BT address is appended to the advertised device name 
-    //(0 = none, 1 = full BT address, 2 = last 4 characters, 3 = last 6 characters)
-    if (TmpVal > 0 && TmpVal < 4) then
+    if ((TmpVal >= 1) && (TmpVal <= 7)) then
         //Get device address
         TmpStr$ = SysInfo$(4)
-        if (TmpVal == 2) then
-            //Exclude address type
-            TmpStr$ = Right$(TmpStr$, 12)
-        elseif (TmpVal == 3) then
-            //Last 4 characters (2 bytes before being converted to hex)
-            TmpStr$ = Right$(TmpStr$, 2)
-        elseif (TmpVal == 4) then
-            //Last 6 characters (3 bytes before being converted to hex)
-            TmpStr$ = Right$(TmpStr$, 3)
-        endif
-
+        //#cmpif 0x80000000 : dim x$ : x$=strhexize$(TmpStr$)
+        //#cmpif 0x80000000 : DbgMsgVal$("## SysInfo$(4) =",x$)
+        TmpStr$ = Right$(TmpStr$, TmpVal)
         //Append to device name
         DevName$ = DevName$ + "-" + strhexize$(TmpStr$)
     endif
+    //take the righmost max characters
+    DevName$ = right$(DevName$,MaxDevNameSize)
+    
+    #cmpif 0x80000000 : DbgMsgVal$("## DeviceName =",DevName$)
 
     //Initialise the GAP service with the connection interval data and device name
     rc = BleGapSvcInit(DevName$, 0, 0, MinCntInt, MaxCntInt, 4000000,  0)
@@ -1158,6 +1170,7 @@ sub _bridge()
     //flush the command mode buffers as they are no longer required so no need to hog memory
     UARTRecBuf$=""
     VSPRecBuf$=""
+    LoginPassword$="" : LoginPasswordLen=0
     
     //change handlers so that data transfer happens in 'C'
     ONEVENT EVVSPRX CALL HndlrBridge
@@ -1326,29 +1339,6 @@ sub AppendRspEnd(rsp as integer, byref bufferStr$ )
 endsub
 
 //------------------------------------------------------------------------------
-// Data has arrive from uart when we are in the LOGIN mode
-//------------------------------------------------------------------------------
-function ParseLogin(byref CommandStr$, byref replyBuf$, byref forwardBuf$)
-    if strcmp(CommandStr$,LoginMagicCommand)==0 then
-        //magic command received so remain in command mode
-        AppMode = AppModeAppCmd
-        //and send an OK
-        AppendRspEnd(0,replyBuf$)
-        #cmpif 0x80000000 : DbgMsg("## Login CmdMode\n")
-    else
-        _bridge()
-        if (ConnectionID != 0) then
-            //we are in connection so send the data to peer
-            forwardBuf$=CommandStr$
-        endif
-    endif
-    //stop timer
-    TimerCancel(1)
-    //flush data to originator
-    rc = SendBufferedData()
-endfunc 1
-
-//------------------------------------------------------------------------------
 // Function for parsing commands when in application command mode, as follows:-
 //------------------------------------------------------------------------------
 function ParseCommand(byref CommandStr$, byref rspBuf$)
@@ -1405,9 +1395,9 @@ function ParseCommand(byref CommandStr$, byref rspBuf$)
             //Outputs client BT address (if one is connected)
             rc = _client(bufferStr$)
             
-        elseif (strcmp(tkn$, "exit") == 0) then
-            //Returns to module command mode
-            exitfunc 0
+        #cmpif 0x00000080 : elseif (strcmp(tkn$, "exit") == 0) then
+        #cmpif 0x00000080 :     //Returns to module command mode
+        #cmpif 0x00000080 :     exitfunc 0
             
         elseif (strcmp(tkn$, "si") == 0) then
             //Returns sysinfo
@@ -1436,7 +1426,7 @@ endfunc 1
 // Routine to check for command mode at startup
 //------------------------------------------------------------------------------
 function CheckForLoginCommand(byref newData$, byref ORIGRecBuf$, byref FWDSndBuf$, byref RSPSndBuf$)
-    Dim CmdLen
+    Dim CmdLen,GoForBridge
     
     //bridge this new string if a connection exists
     if (ConnectionID != 0) then
@@ -1446,38 +1436,50 @@ function CheckForLoginCommand(byref newData$, byref ORIGRecBuf$, byref FWDSndBuf
         rc = SendBufferedData()
     endif
     ORIGRecBuf$ = ORIGRecBuf$+newData$
-    //if the buffer is longer than the length of the command string then we
-    //are no longer going to get the magic login command so just enter bridge mode
-    if strlen(ORIGRecBuf$) >= LoginCmdLen then
-        //we can test if we have the command
-        newData$=left$(ORIGRecBuf$,LoginCmdLen)
-        if strcmp(newData$,LoginMagicCommand)==0 then
-            //magic command received so remain in command mode
-            #cmpif 0x80000000 : DbgMsg("## Login CmdMode\n")
-            //change to command mode
-            AppMode = AppModeAppCmd
-            //and send an OK back out of the uart
-            RSPSndBuf$=RSPSndBuf$+PROMPT_OK
-            //empty the receicebuf
-            ORIGRecBuf$=""
-            //flush the data out
-            rc = SendBufferedData()
+    
+    //now only scan for login command if password len is >= than min
+    GoForBridge=0
+    if ( LoginPasswordLen >= DeviceNameConfigMinLen ) then
+        //if the buffer is longer than the length of the command string then we
+        //are no longer going to get the magic login command so just enter bridge mode
+        if strlen(ORIGRecBuf$) >= LoginPasswordLen then
+            //we can test if we have the command
+            newData$=left$(ORIGRecBuf$,LoginPasswordLen)
+            if strcmp(newData$,LoginPassword$)==0 then
+                //magic command received so remain in command mode
+                #cmpif 0x80000000 : DbgMsg("## Login CmdMode\n")
+                //change to command mode
+                AppMode = AppModeAppCmd
+                //and send an OK back out of the uart
+                RSPSndBuf$=RSPSndBuf$+PROMPT_OK
+                //empty the receicebuf
+                ORIGRecBuf$=""
+                //flush the data out
+                rc = SendBufferedData()
+                //stop timer
+                TimerCancel(1)
+            else
+                //no magic command
+                GoForBridge=1
+            endif
         else
-            //no magic command
-            _bridge()
+            newData$ = "\r"
+            CmdLen = StrPos(ORIGRecBuf$, newData$, 0)
+            if (CmdLen >= 0) then
+                GoForBridge=1
+            endif
         endif
+    else
+        GoForBridge=1
+    endif
+    
+    if GoForBridge != 0 then
         //stop timer
         TimerCancel(1)
-    else
-        newData$ = "\r"
-        CmdLen = StrPos(ORIGRecBuf$, newData$, 0)
-        if (CmdLen >= 0) then
-            //stop timer
-            TimerCancel(1)
-            //not magic command
-            _bridge()
-        endif
+        //not magic command
+        _bridge()
     endif
+    
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -1561,7 +1563,7 @@ function HndlrUARTCommand()
         //--------------------------------------------
         dim newData$
         
-        rc = UARTReadN(newData$, LoginCmdLen)
+        rc = UARTReadN(newData$, LoginPasswordLen)
         
         //scan the data for login command
         exitfunc CheckForLoginCommand(newData$, UARTRecBuf$, VSPSndBuf$, UARTSndBuf$)
@@ -1617,6 +1619,18 @@ sub SetupGPIOs()
 endsub
 
 //------------------------------------------------------------------------------
+// Initialise
+//------------------------------------------------------------------------------
+sub Initialise()
+    //cache the login password
+    LoginPassword$   = ConfigKeyGet$( LoginPswrdConfigID ) + "\r"
+    LoginPasswordLen = strlen(LoginPassword$)
+    
+    
+endsub
+
+
+//------------------------------------------------------------------------------
 // Configures the UART
 //------------------------------------------------------------------------------
 function SetupUART()
@@ -1665,6 +1679,8 @@ endfunc 1
 //******************************************************************************
 // Start up code from here -equivalent to main() in a 'C' application
 //******************************************************************************
+
+Initialise()
 
 rc = SetupUART()
 if (rc != 1) then

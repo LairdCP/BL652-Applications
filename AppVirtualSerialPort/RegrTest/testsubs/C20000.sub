@@ -1,0 +1,35 @@
+//*******************************************************************************
+TITLE "<<<NewSub>>>"
+SET vFileName "C20000"  //Enter Command mode & connect
+//===============================================================================
+PORT 0   "COM[cComPortS]"  "[cBaudS]"
+PORT 1   "COM[cComPortC]"  "[cBaudC]"
+TITLE "**** [vFileName] ****"
+//===============================================================================
+
+SET vPort "0"
+#include "ResetConfigs.sbr"  //Clear configs
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].A: Enter Command Mode"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Make a connection"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "0"   //Conn Interval
+SET vArg1 "0"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "4"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+
+//===============================================================================
+TITLE "**** [vFileName] ****"
+PORT_CLOSE 0
+PORT_CLOSE 1
+//===============================================================================
+

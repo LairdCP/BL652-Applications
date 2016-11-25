@@ -6,7 +6,8 @@
 //===============================================================================
 DECLARE vCmd
 DECLARE vPort
-DECLARE vPort1
+DECLARE vPortS
+DECLARE vPortC
 DECLARE vResp
 DECLARE vTemp0
 DECLARE vTemp1
@@ -98,7 +99,14 @@ DECLARE vArg7
 DECLARE vArg8
 DECLARE vArg9
 
+DECLARE vDevName
+
+DECLARE vBreakOnTime
+DECLARE vBreakOffTime
+
 //===============================================================================
 //Initialise variables
 //===============================================================================
 
+SET vPortS "0"
+SET vPortC "1"
