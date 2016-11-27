@@ -1,0 +1,297 @@
+//===============================================================================
+// Three Throughput Tests
+//   C->S
+//   S->C
+//   Both Directions 
+//===============================================================================
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.2: Reset both ends and make a connection"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+CONSOLEUPDATE true
+PRINT "Resetting..."
+CONSOLEUPDATE false
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+CONSOLEUPDATE true
+PRINT "Done"
+CONSOLEUPDATE false
+
+CONSOLEUPDATE true
+PRINT "Connecting with interval = [vConnIntvl] ..."
+CONSOLEUPDATE false
+
+SET vArg0         "[cMACADDRSq]"   
+//SET vConnIntvl    "7500"
+#include "Connect.sbr"  //Initiate connection
+
+CONSOLEUPDATE true
+PRINT "Done"
+CONSOLEUPDATE false
+
+CONSOLEUPDATE true
+PRINT "===================================================================="
+PRINT "Test Time =[vHours]:[vMinutes]:[vSeconds] = [vMilliSecs]msec"
+CONSOLEUPDATE false
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.3: Exchange data - 20 bytes each way to force into bridge"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortS]
+FLUSHRX [vPortC]
+TXSTRING [vPortS] "1234567890123456789\r"
+TXSTRING [vPortC] "ABCEDFGHIJKLMNOPQRS\r"
+WAITRESPEX 5000 [vPortS] "ABCEDFGHIJKLMNOPQRS\r"
+WAITRESPEX 5000 [vPortC] "1234567890123456789\r"
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].1:  C->S "
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//JUMP TESTEND01                                          //!!
+
+SET vTemp9 "abcedfghijklm_nopqrstuvwxyz"  //27
+SET vTemp8 "ABCEDFGHIJKLM-NOPQRSTUVWXYZ"  //27
+SET vTemp7 "0123456789"                   //10
+
+SET vTemp0 "[vTemp8][vTemp7][vTemp9]"     //64
+SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
+
+SET vTemp4 "[vTemp0][vTemp1]"                                                     //128
+SET vTemp2 "[vTemp4][vTemp4][vTemp4][vTemp4]"                                     //512
+SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+//SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2]"                                     //2048
+
+SET SCcount "0"
+SET CScount "0"
+STRLEN vTemp3 ThisLen3
+
+FLUSHRX [vPortS]
+FLUSHTX [vPortS]
+FLUSHRX [vPortC]
+FLUSHTX [vPortC]
+
+TIMER START vTimer1
+TXSTRING [vPortC] "[vTemp3]"    //C>
+LABEL LOOPA01                                          //!!
+TXSTRING [vPortC] "[vTemp3]"    //C>
+WAITRESPEX 60000 [vPortS] "[vTemp3]"   //S<
+ADD CScount "[ThisLen3]"
+
+TIMER ELAPSE vTimer1 vElapse1
+TST vElapse1 "[vMilliSecs]"
+JUMPLT LOOPA01                                          //!!
+WAITRESPEX 60000 [vPortS] "[vTemp3]"   //S<
+TIMER ELAPSE vTimer1 vElapse1
+ADD CScount "[ThisLen3]"
+
+SET vBitRateCS "[CScount]"
+TST vBitRateCS "268430"
+JUMPGT CALCA01                                          //!!
+MUL vBitRateCS "8000"
+DIV vBitRateCS "[vElapse1]"
+JUMPGT CALCB01                                          //!!
+LABEL CALCA01                                           //!!
+MUL vBitRateCS "8"
+DIV vBitRateCS "[vElapse1]"
+MUL vBitRateCS "1000"
+LABEL CALCB01                                           //!!
+
+CONSOLEUPDATE true
+PRINT "Intvl=[vConnIntvl]us : CSbytes [CScount] => [vBitRateCS]bps "
+CONSOLEUPDATE false
+
+LABEL TESTEND01                                         //!!
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].2:  C->S (bi-directional traffic)"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//JUMP TESTEND03                                          //!!
+
+SET vTemp9 "abcedfghijklm_nopqrstuvwxyz"  //27
+SET vTemp8 "ABCEDFGHIJKLM-NOPQRSTUVWXYZ"  //27
+SET vTemp7 "0123456789"                   //10
+
+SET vTemp0 "[vTemp8][vTemp7][vTemp9]"     //64
+SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
+
+SET vTemp4 "[vTemp0][vTemp1]"                                                     //128
+SET vTemp2 "[vTemp4][vTemp4][vTemp4][vTemp4]"                                     //512
+SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+//SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2]"                                     //2048
+
+SET SCcount "0"
+SET CScount "0"
+STRLEN vTemp3 ThisLen3
+
+FLUSHRX [vPortS]
+FLUSHTX [vPortS]
+FLUSHRX [vPortC]
+FLUSHTX [vPortC]
+
+TIMER START vTimer1
+TXSTRING [vPortC] "[vTemp3]"    //C>
+TXSTRING [vPortS] "[vTemp3]"    //S>
+LABEL LOOPA03                                          //!!
+WAITRESPEX 60000 [vPortS] "[vTemp3]"   //S<
+TXSTRING [vPortC] "[vTemp3]"    //C>
+ADD CScount "[ThisLen3]"
+
+SAVERESPNE vResp [vPortC]
+FLUSHRX [vPortC]
+TXSTRING [vPortS] "[vResp]"     //S>
+
+TIMER ELAPSE vTimer1 vElapse1
+TST vElapse1 "[vMilliSecs]"
+JUMPLT LOOPA03                                          //!!
+WAITRESPEX 60000 [vPortS] "[vTemp3]"   //S<
+TIMER ELAPSE vTimer1 vElapse1
+ADD CScount "[ThisLen3]"
+
+SET vBitRateCS "[CScount]"
+TST vBitRateCS "268430"
+JUMPGT CALCA03                                          //!!
+MUL vBitRateCS "8000"
+DIV vBitRateCS "[vElapse1]"
+JUMPGT CALCB03                                          //!!
+LABEL CALCA03                                           //!!
+MUL vBitRateCS "8"
+DIV vBitRateCS "[vElapse1]"
+MUL vBitRateCS "1000"
+LABEL CALCB03                                           //!!
+
+CONSOLEUPDATE true
+PRINT "Intvl=[vConnIntvl]us : CSbytes [CScount] => [vBitRateCS]bps (bi-directional traffic)"
+CONSOLEUPDATE false
+
+LABEL TESTEND03                                         //!!
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].3:  S->C "
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//JUMP TESTEND02                                          //!!
+
+SET vTemp9 "abcedfghijklm_nopqrstuvwxyz"  //27
+SET vTemp8 "ABCEDFGHIJKLM-NOPQRSTUVWXYZ"  //27
+SET vTemp7 "0123456789"                   //10
+
+SET vTemp0 "[vTemp8][vTemp7][vTemp9]"     //64
+SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
+
+SET vTemp4 "[vTemp0][vTemp1]"                                                     //128
+SET vTemp2 "[vTemp4][vTemp4][vTemp4][vTemp4]"                                     //512
+SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+//SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2]"                                     //2048
+
+SET SCcount "0"
+SET CScount "0"
+STRLEN vTemp3 ThisLen3
+STRLEN vTemp4 ThisLen4
+
+FLUSHRX [vPortS]
+FLUSHTX [vPortS]
+FLUSHRX [vPortC]
+FLUSHTX [vPortC]
+
+TIMER START vTimer1
+TXSTRING [vPortS] "[vTemp3]"    //S>
+LABEL LOOPA02                                           //!!
+TXSTRING [vPortS] "[vTemp3]"    //S>
+WAITRESPEX 60000 [vPortC] "[vTemp3]"   //C<
+ADD SCcount "[ThisLen3]"
+
+TIMER ELAPSE vTimer1 vElapse1
+TST vElapse1 "[vMilliSecs]"
+JUMPLT LOOPA02                                          //!!
+WAITRESPEX 60000 [vPortC] "[vTemp3]"   //C<
+TIMER ELAPSE vTimer1 vElapse1
+ADD SCcount "[ThisLen3]"
+
+SET vBitRateSC "[SCcount]"
+TST vBitRateSC "268430"
+JUMPGT CALCA02                                          //!!
+MUL vBitRateSC "8000"
+DIV vBitRateSC "[vElapse1]"
+JUMPGT CALCB02                                          //!!
+LABEL CALCA02                                           //!!
+MUL vBitRateSC "8"
+DIV vBitRateSC "[vElapse1]"
+MUL vBitRateSC "1000"
+LABEL CALCB02                                           //!!
+
+CONSOLEUPDATE true
+PRINT "Intvl=[vConnIntvl]us : SCbytes [SCcount] => [vBitRateSC]bps "
+CONSOLEUPDATE false
+
+LABEL TESTEND02                                         //!!
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].4:  S->C bi-directional traffic"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//JUMP TESTEND04                                          //!!
+
+SET vTemp9 "abcedfghijklm_nopqrstuvwxyz"  //27
+SET vTemp8 "ABCEDFGHIJKLM-NOPQRSTUVWXYZ"  //27
+SET vTemp7 "0123456789"                   //10
+
+SET vTemp0 "[vTemp8][vTemp7][vTemp9]"     //64
+SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
+
+SET vTemp4 "[vTemp0][vTemp1]"                                                     //128
+SET vTemp2 "[vTemp4][vTemp4][vTemp4][vTemp4]"                                     //512
+SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+//SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2]"                                     //2048
+
+SET SCcount "0"
+SET CScount "0"
+STRLEN vTemp3 ThisLen3
+STRLEN vTemp4 ThisLen4
+
+FLUSHRX [vPortS]
+FLUSHTX [vPortS]
+FLUSHRX [vPortC]
+FLUSHTX [vPortC]
+
+TIMER START vTimer1
+TXSTRING [vPortS] "[vTemp3]"    //S>
+TXSTRING [vPortC] "[vTemp3]"    //C>
+LABEL LOOPA04                                           //!!
+TXSTRING [vPortS] "[vTemp4]"    //S>
+WAITRESPEX 60000 [vPortC] "[vTemp4]"   //C<
+ADD SCcount "[ThisLen4]"
+
+SAVERESPNE vResp [vPortS]
+FLUSHRX [vPortS]
+TXSTRING [vPortC] "[vResp]"     //C>
+
+TIMER ELAPSE vTimer1 vElapse1
+TST vElapse1 "[vMilliSecs]"
+JUMPLT LOOPA04                                          //!!
+WAITRESPEX 60000 [vPortC] "[vTemp3]"   //C<
+TIMER ELAPSE vTimer1 vElapse1
+ADD SCcount "[ThisLen3]"
+
+SET vBitRateSC "[SCcount]"
+TST vBitRateSC "268430"
+JUMPGT CALCA04                                          //!!
+MUL vBitRateSC "8000"
+DIV vBitRateSC "[vElapse1]"
+JUMPGT CALCB04                                          //!!
+LABEL CALCA04                                           //!!
+MUL vBitRateSC "8"
+DIV vBitRateSC "[vElapse1]"
+MUL vBitRateSC "1000"
+LABEL CALCB04                                           //!!
+
+CONSOLEUPDATE true
+PRINT "Intvl=[vConnIntvl]us : SCbytes [SCcount] => [vBitRateSC]bps (bi-directional traffic)"
+CONSOLEUPDATE false
+
+LABEL TESTEND04                                         //!!
+
+

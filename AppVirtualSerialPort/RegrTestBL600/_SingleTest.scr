@@ -1,0 +1,45 @@
+//###############################################################################
+// File : _SingleTest.scr
+//###############################################################################
+//
+//===============================================================================
+//Declare Platform specific Constants & Variables
+//===============================================================================
+#include "PlatformConfig.sub"
+
+//===============================================================================
+//Invoke shared setup stuff between and full and single
+//===============================================================================
+#include "_CommonHdr.sub"
+
+//===============================================================================
+// Invoke tests here
+TITLE "**** _SingleTest START****"
+//###############################################################################
+//--------------------
+//ADD Tests below here
+//--------------------
+
+//#include "C10000.sub"  //Enter Command mode after power up using magic command
+//#include "C10010.sub"  //Enter Command mode & INTEGER check config key validation
+//#include "C10020.sub"  //Enter Command mode & STRING check config key validation
+//#include "C11000.sub"  //Check the device is advertising in command mode - format 0-4
+//#include "C20000.sub"  //Connect and enter VSP command mode
+//#include "C20002.sub"  //Connect and enter VSP command mode (Encrypted)
+//#include "C20010.sub"  //Connect and enter VSP command mode - check can write config
+//#include "C30000.sub"  //Bridge Mode test (upto 2232 bytes each way simultaneously)
+#include "C50000.sub"  //Throughput Test at 7500us connection interval  C->S only
+
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//The following MUST be done last as it erases the application 
+//#include "C90000.sub"  //Connect and enter VSP command mode and erase app
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+//--------------------
+//ADD Tests Above here
+//--------------------
+//###############################################################################
+TITLE "**** _SingleTest END****"
+

@@ -1,0 +1,261 @@
+//*******************************************************************************
+TITLE "<<<NewSub>>>"
+SET vFileName "C11000"  //Check the device is advertising in command mode - format 0-4
+//===============================================================================
+PORT 0   "COM[cComPortS]"  "[cBaudS]"
+PORT 1   "COM[cComPortC]"  "[cBaudC]"
+TITLE "**** [vFileName] ****"
+//===============================================================================
+
+SET vDevName  "WooburnRocks"
+
+SET vPort "0"
+#include "ResetConfigs.sbr"  //Clear configs
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set Device Name"
+SENDCMD [vPortS] "cfg$ wr 1 \22[vDevName]\22\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+PRINT "Set TX Power"
+SENDCMD [vPortS] "cfg wr 1 4\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Reset and set defulat and Enter Command Mode and format=0"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set device Name format"
+SENDCMD [vPortS] "cfg wr 0 0\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+SET vTemp0 "[vDevName]"
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Reset and set defulat and Enter Command Mode and format=1"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set device Name format"
+SENDCMD [vPortS] "cfg wr 0 1\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+MID$ vTemp1 "[cMACADDRSq]" -2 2
+MID$ vTemp0 "[vDevName]-[vTemp1]" -20 20
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Reset and set defulat and Enter Command Mode and format=2"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set device Name format"
+SENDCMD [vPortS] "cfg wr 0 2\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+MID$ vTemp1 "[cMACADDRSq]" -4 4
+MID$ vTemp0 "[vDevName]-[vTemp1]" -20 20
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Reset and set defulat and Enter Command Mode and format=3"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set device Name format"
+SENDCMD [vPortS] "cfg wr 0 3\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+MID$ vTemp1 "[cMACADDRSq]" -6 6
+MID$ vTemp0 "[vDevName]-[vTemp1]" -20 20
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Reset and set defulat and Enter Command Mode and format=4"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set device Name format"
+SENDCMD [vPortS] "cfg wr 0 4\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+MID$ vTemp1 "[cMACADDRSq]" -8 8
+MID$ vTemp0 "[vDevName]-[vTemp1]" -20 20
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Reset and set defulat and Enter Command Mode and format=5"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set device Name format"
+SENDCMD [vPortS] "cfg wr 0 5\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+MID$ vTemp1 "[cMACADDRSq]" -10 10
+MID$ vTemp0 "[vDevName]-[vTemp1]" -20 20
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Reset and set defulat and Enter Command Mode and format=6"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set device Name format"
+SENDCMD [vPortS] "cfg wr 0 6\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+MID$ vTemp1 "[cMACADDRSq]" -12 12
+MID$ vTemp0 "[vDevName]-[vTemp1]" -20 20
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: Reset and set defulat and Enter Command Mode and format=7"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set device Name format"
+SENDCMD [vPortS] "cfg wr 0 7\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+MID$ vTemp1 "[cMACADDRSq]" -14 14
+MID$ vTemp0 "[vDevName]-[vTemp1]" -20 20
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+
+//===============================================================================
+TITLE "**** [vFileName] ****"
+PORT_CLOSE 0
+PORT_CLOSE 1
+//===============================================================================
+

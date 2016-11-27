@@ -12,6 +12,8 @@
 
 */RegrTest/Log/*
 */RegrTest/Log/*/*
+*/RegrTestBL600/Log/*
+*/RegrTestBL600/Log/*/*
 
 StringPlayer*.exe
 AppVirtualSerialPort/$autorun$.vsp.uart.bridge.configurable.incoming-*.sb

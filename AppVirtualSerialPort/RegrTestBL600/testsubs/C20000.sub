@@ -1,0 +1,339 @@
+//*******************************************************************************
+TITLE "<<<NewSub>>>"
+SET vFileName "C20000"  //Connect and enter VSP command mode
+//===============================================================================
+PORT 0   "COM[cComPortS]"  "[cBaudS]"
+PORT 1   "COM[cComPortC]"  "[cBaudC]"
+TITLE "**** [vFileName] ****"
+//===============================================================================
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.0: Initialise"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vConnIntvl          "7500"
+SET vSuperTout          "5000000"
+SET vDevName            "WooburnRocks"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.1: Server Config and reset both sides"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "ResetConfigs.sbr"  //Clear configs
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set Device Name"
+SENDCMD [vPortS] "cfg$ wr 1 \22[vDevName]\22\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+PRINT "Set TX Power"
+SENDCMD [vPortS] "cfg wr 1 4\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.2: Make a connection and enter VSP command mode"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0         "[cMACADDRSq]"   
+SET vConnIntvl    "7500"
+#include "Connect.sbr"  //Initiate connection
+
+SENDCMD [vPortC] "[cLoginMagicCommand]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "ver\r"
+WAITRESPEX 5000 [vPortC] "[cVer]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].2: test command 'ver' in both lower and upper case"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SENDCMD [vPortC] "ver\r"
+WAITRESPEX 5000 [vPortC] "[cVer]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "VER\r"
+WAITRESPEX 5000 [vPortC] "[cVer]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "Ver\r"
+WAITRESPEX 5000 [vPortC] "[cVer]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].3: test 'reset'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortC]
+SENDCMD [vPortC] "reset\r"
+#include "WaitDiscon.sbr"  //Wait for confirmation that disconnection has happened
+
+PRINT "Reconnect and enter VSP command mode "
+SET vArg0         "[cMACADDRSq]"   
+SET vConnIntvl    "7500"
+#include "Connect.sbr"  //Initiate connection
+
+SENDCMD [vPortC] "[cLoginMagicCommand]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "ver\r"
+WAITRESPEX 5000 [vPortC] "[cVer]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].4: test 'addr'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SENDCMD [vPortC] "addr\r"
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].5: test 'conninfo'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SENDCMD [vPortC] "conninfo\r"
+WAITRESPEX 5000 [vPortC] "Interval=7500,SuperTout=500000,SlaveLatency=0,NotEncrypted"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].6: test 'bridge'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortC]
+FLUSHRX [vPortS]
+SENDCMD [vPortC] "bridge\r"
+DELAY "2000"
+FLUSHRX [vPortC]
+FLUSHRX [vPortS]
+TXSTRING [vPortC] "Hello"
+WAITRESPEX 5000 [vPortS] "Hello"
+TXSTRING [vPortS] "World"
+WAITRESPEX 5000 [vPortC] "World"
+
+PRINT "Reset both ends and Reconnect and enter VSP command mode "
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+SET vArg0         "[cMACADDRSq]"   
+SET vConnIntvl    "7500"
+#include "Connect.sbr"  //Initiate connection
+
+SENDCMD [vPortC] "[cLoginMagicCommand]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "ver\r"
+WAITRESPEX 5000 [vPortC] "[cVer]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].7: test 'cfg rd n' for n=0 to 30 "
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SENDCMD [vPortC] "cfg rd 0\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 1\r"
+WAITRESPEX 5000 [vPortC] "4"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 2\r"
+WAITRESPEX 5000 [vPortC] "8000"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 3\r"
+WAITRESPEX 5000 [vPortC] "250"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 4\r"
+WAITRESPEX 5000 [vPortC] "7500"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 5\r"
+WAITRESPEX 5000 [vPortC] "40000"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 6\r"
+WAITRESPEX 5000 [vPortC] "115200"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 7\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 8\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 9\r"
+WAITRESPEX 5000 [vPortC] "29"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 10\r"
+WAITRESPEX 5000 [vPortC] "30"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 11\r"
+WAITRESPEX 5000 [vPortC] "8192"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 12\r"
+WAITRESPEX 5000 [vPortC] "8193"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 13\r"
+WAITRESPEX 5000 [vPortC] "8195"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 14\r"
+WAITRESPEX 5000 [vPortC] "8194"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 15\r"
+WAITRESPEX 5000 [vPortC] "384"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 16\r"
+WAITRESPEX 5000 [vPortC] "384"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 17\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 18\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 19\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 20\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 21\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 22\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 23\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 24\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg rd 25\r"
+WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].8: test 'cfg$ rd n' for n=0 to 9 "
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SENDCMD [vPortC] "cfg$ rd 0\r"
+WAITRESPEX 5000 [vPortC] "[cLoginPswrd]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 1\r"
+WAITRESPEX 5000 [vPortC] "[vDevName]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 2\r"
+WAITRESPEX 5000 [vPortC] "[cUuuidBase]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 3\r"
+WAITRESPEX 5000 [vPortC] "-"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 4\r"
+WAITRESPEX 5000 [vPortC] "-"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 5\r"
+WAITRESPEX 5000 [vPortC] "-"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 6\r"
+WAITRESPEX 5000 [vPortC] "-"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 7\r"
+WAITRESPEX 5000 [vPortC] "-"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 8\r"
+WAITRESPEX 5000 [vPortC] "-"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "cfg$ rd 9\r"
+WAITRESPEX 5000 [vPortC] "-"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].9: test 'client'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SENDCMD [vPortC] "client\r"
+WAITRESPEX 5000 [vPortC] "[cMACADDRCq]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].10: test 'si n'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SENDCMD [vPortC] "si 1003\r"
+WAITRESPEX 5000 [vPortC] "921600"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].11: test 'si$ n'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SENDCMD [vPortC] "si$ 4\r"
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].12: test 'exit'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortC]
+FLUSHRX [vPortS]
+TXSTRING [vPortC] "exit\r\r"
+DELAY "1000"
+SENDCMD [vPortS] "AT I 0\r"
+WAITRESPEX 5000 [vPortS] "[cATI0]"
+WAITRESPEX 5000 [vPortS] "\n00\r"
+
+
+
+//===============================================================================
+TITLE "**** [vFileName] ****"
+PORT_CLOSE 0
+PORT_CLOSE 1
+//===============================================================================
+

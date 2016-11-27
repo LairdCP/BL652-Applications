@@ -1,0 +1,284 @@
+//*******************************************************************************
+TITLE "<<<NewSub>>>"
+SET vFileName "C10010"  //Enter Command mode & INTEGER check config key validation
+//===============================================================================
+PORT 0   "COM[cComPortS]"  "[cBaudS]"
+TITLE "**** [vFileName] ****"
+//===============================================================================
+
+SET vPort "0"
+#include "ResetConfigs.sbr"  //Clear configs
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].A: Enter Command Mode"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0: DevNameFormatConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "0"   //ID
+SET vArg1 "0"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "7"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].1: TxPowerConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "1"   //ID
+SET vArg1 "4"   //Default Value
+SET vArg2 "-20"   //Min Value
+SET vArg3 "4"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].2: EncrDisconToutConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "2"   //ID
+SET vArg1 "8000"   //Default Value
+SET vArg2 "1000"   //Min Value
+SET vArg3 "20000"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].3: AdvertIntvlConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "3"   //ID
+SET vArg1 "250"   //Default Value
+SET vArg2 "20"   //Min Value
+SET vArg3 "10240"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].4: MinConnIntConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "4"   //ID
+SET vArg1 "7500"   //Default Value
+SET vArg2 "7500"   //Min Value
+SET vArg3 "40000"   //Max Value max is actually 3998750 set to Def value of ID=5
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].5: MaxConnIntConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "5"   //ID
+SET vArg1 "40000"   //Default Value
+SET vArg2 "7500"   //Min Value is actually 7500 set to Def value of ID=4
+SET vArg3 "3998750"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].6: UARTSpeedConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "6"   //ID
+SET vArg1 "115200"   //Default Value
+SET vArg2 "1200"   //Min Value
+SET vArg3 "1000000"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].7: UARTTxBufConfig"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "7"   //ID
+SET vArg1 "0"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "1024"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].8: UARTRxBufConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "8"   //ID
+SET vArg1 "0"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "1024"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].9: CONNPinConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "9"   //ID
+SET vArg1 "29"   //Default Value
+SET vArg2 "-1"   //Min Value
+SET vArg3 "31"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].10: ENCRPinConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "10"   //ID
+SET vArg1 "30"   //Default Value
+SET vArg2 "-1"   //Min Value
+SET vArg3 "31"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].11: VspTxUUIDConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "11"   //ID
+SET vArg1 "8192"   //Default Value
+SET vArg2 "1"   //Min Value
+SET vArg3 "65535"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].12: VspRxUUIDConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "12"   //ID
+SET vArg1 "8193"   //Default Value
+SET vArg2 "1"   //Min Value
+SET vArg3 "65535"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].13: VspMdmInUUIDConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "13"   //ID
+SET vArg1 "8195"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "65535"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].14: VspMdmOutUUIDConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "14"   //ID
+SET vArg1 "8194"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "65535"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].15: VspTxBufConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "15"   //ID
+SET vArg1 "384"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "1024"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].16: VspRxBufConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "16"   //ID
+SET vArg1 "384"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "1024"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].17: VspFlagsConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0 "17"   //ID
+SET vArg1 "0"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "3"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//SUBTITLE "Test:[vFileName].18:"
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//
+//SET vArg0 "18"   //ID
+//SET vArg1 ""   //Default Value
+//SET vArg2 ""   //Min Value
+//SET vArg3 ""   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//SUBTITLE "Test:[vFileName].19:"
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//
+//SET vArg0 "19"   //ID
+//SET vArg1 ""   //Default Value
+//SET vArg2 ""   //Min Value
+//SET vArg3 ""   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//SUBTITLE "Test:[vFileName].20:"
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//
+//SET vArg0 "20"   //ID
+//SET vArg1 ""   //Default Value
+//SET vArg2 ""   //Min Value
+//SET vArg3 ""   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//SUBTITLE "Test:[vFileName].21:"
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//
+//SET vArg0 "21"   //ID
+//SET vArg1 ""   //Default Value
+//SET vArg2 ""   //Min Value
+//SET vArg3 ""   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//SUBTITLE "Test:[vFileName].22:"
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//
+//SET vArg0 "22"   //ID
+//SET vArg1 ""   //Default Value
+//SET vArg2 ""   //Min Value
+//SET vArg3 ""   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//SUBTITLE "Test:[vFileName].23:"
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//
+//SET vArg0 "23"   //ID
+//SET vArg1 ""   //Default Value
+//SET vArg2 ""   //Min Value
+//SET vArg3 ""   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//SUBTITLE "Test:[vFileName].24:"
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//
+//SET vArg0 "24"   //ID
+//SET vArg1 ""   //Default Value
+//SET vArg2 ""   //Min Value
+//SET vArg3 ""   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//SUBTITLE "Test:[vFileName].25:"
+////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+//
+//SET vArg0 "25"   //ID
+//SET vArg1 ""   //Default Value
+//SET vArg2 ""   //Min Value
+//SET vArg3 ""   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//
+
+//===============================================================================
+TITLE "**** [vFileName] ****"
+PORT_CLOSE 0
+//===============================================================================
+

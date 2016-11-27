@@ -1,0 +1,13 @@
+//===============================================================================
+//
+//===============================================================================
+//#include "ScanStop.sbr"  //Stop Scanning
+//===============================================================================
+
+SET vBreakOnTime   "200"
+SET vBreakOffTime  "100"
+
+FLUSHRX [vPortC]
+BREAKON  [vPortC] [vBreakOnTime]
+BREAKOFF [vPortC] [vBreakOffTime]
+WAITRESPEX 5000 [vPortC] "\nOK\r\n"

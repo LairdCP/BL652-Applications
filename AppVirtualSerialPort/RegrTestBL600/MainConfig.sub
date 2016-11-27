@@ -1,0 +1,23 @@
+//===============================================================================
+//===============================================================================
+
+CONST cDEFDEVNAME               "LAIRD BL600"
+CONST cLoginMagicCommand        "@command_mode@\r"
+CONST cVer                      "VSP Version 1.00 updated 28/Nov/2016 on BL600 (1.8.92.0)"
+CONST cUuuidBase                "569a1101b87f490c92cb11ba5ea5167c"
+CONST cLoginPswrd               "@command_mode@"
+CONST cATI0                     "10\090\09BL600"
+
+
+//-------------------------------------------------------------------------------
+CONST cBreakOffTime             "2000"
+CONST cBreakOnTime              "1000"
+CONST cBreakPostDelay           "750"
+CONST cOK                       "OK\r\n>"
+CONST cERs                      "ER 0000"
+CONST cERf                      "\r\n>"
+CONST cPortCloseDelay           "2000"
+CONST cQUOTE                    "\22"
+CONST cPostResetDelay           "2000"
+
+

@@ -1,0 +1,135 @@
+//===============================================================================
+//===============================================================================
+
+//===============================================================================
+//Declare variables
+//===============================================================================
+DECLARE vCmd
+DECLARE vPort
+DECLARE vPortS
+DECLARE vPortC
+DECLARE vResp
+DECLARE vTemp0
+DECLARE vTemp1
+DECLARE vTemp2
+DECLARE vTemp3
+DECLARE vTemp4
+DECLARE vTemp5
+DECLARE vTemp6
+DECLARE vTemp7
+DECLARE vTemp8
+DECLARE vTemp9
+
+DECLARE vFileName
+
+DECLARE vData01
+DECLARE vData02
+DECLARE vData03
+DECLARE vData04
+DECLARE vData05
+DECLARE vData06
+DECLARE vData07
+DECLARE vData08
+DECLARE vData09
+
+DECLARE vData11
+DECLARE vData12
+DECLARE vData13
+DECLARE vData14
+DECLARE vData15
+
+DECLARE vData21
+DECLARE vData22
+DECLARE vData23
+DECLARE vData24
+DECLARE vData25
+
+DECLARE vData31
+DECLARE vData32
+DECLARE vData33
+DECLARE vData34
+DECLARE vData35
+
+DECLARE vData41
+DECLARE vData42
+DECLARE vData43
+DECLARE vData44
+DECLARE vData45
+
+DECLARE vData51
+DECLARE vData52
+DECLARE vData53
+DECLARE vData54
+DECLARE vData55
+
+DECLARE v1
+DECLARE v2
+DECLARE v3
+DECLARE v4
+DECLARE v5
+
+DECLARE vHours 
+DECLARE vMinutes 
+DECLARE vSeconds 
+DECLARE vMilliSecs
+
+DECLARE vTimer1
+DECLARE vTimer2
+DECLARE vTimer3
+DECLARE vTimer4
+DECLARE vElapse1
+DECLARE vElapse2
+DECLARE vElapse3
+DECLARE vElapse4
+
+DECLARE vByteCount
+DECLARE vBytesPerLoop
+//DECLARE vBitRate
+DECLARE vBitRateCS
+DECLARE vBitRateSC
+
+DECLARE vPrnIntervalMs
+DECLARE vPrnTargetMs
+
+DECLARE vNme
+DECLARE vKey
+
+DECLARE vArg0
+DECLARE vArg1
+DECLARE vArg2
+DECLARE vArg3
+DECLARE vArg4
+DECLARE vArg5
+DECLARE vArg6
+DECLARE vArg7
+DECLARE vArg8
+DECLARE vArg9
+
+DECLARE vDevName
+
+DECLARE vBreakOnTime
+DECLARE vBreakOffTime
+
+DECLARE vConnIntvl
+DECLARE vSuperTout
+
+DECLARE SCcount
+DECLARE CScount
+DECLARE ThisLen0
+DECLARE ThisLen1
+DECLARE ThisLen2
+DECLARE ThisLen3
+DECLARE ThisLen4
+DECLARE ThisLen5
+DECLARE ThisLen6
+DECLARE ThisLen7
+DECLARE ThisLen8
+DECLARE ThisLen9
+DECLARE tmpCount
+
+//===============================================================================
+//Initialise variables
+//===============================================================================
+
+SET vPortS "0"
+SET vPortC "1"

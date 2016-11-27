@@ -1,0 +1,114 @@
+//*******************************************************************************
+TITLE "<<<NewSub>>>"
+SET vFileName "C20010"  //Connect and enter VSP command mode - check can write config
+//===============================================================================
+PORT 0   "COM[cComPortS]"  "[cBaudS]"
+PORT 1   "COM[cComPortC]"  "[cBaudC]"
+TITLE "**** [vFileName] ****"
+//===============================================================================
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.0: Initialise"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vConnIntvl          "7500"
+SET vSuperTout          "5000000"
+SET vDevName            "WooburnRocks"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.1: Server Config and reset both sides"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "ResetConfigs.sbr"  //Clear configs
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+//Do NOT change device name
+//PRINT "Set Device Name"
+//SENDCMD [vPortS] "cfg$ wr 1 \22[vDevName]\22\r"
+//WAITRESPEX 5000 [vPortS] "[cOK]"
+
+//Do NOT change TX Power
+//PRINT "Set TX Power"
+//SENDCMD [vPortS] "cfg wr 1 4\r"
+//WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.2: Make a connection and enter VSP command mode"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0         "[cMACADDRSq]"   
+SET vConnIntvl    "7500"
+#include "Connect.sbr"  //Initiate connection
+
+SENDCMD [vPortC] "[cLoginMagicCommand]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "ver\r"
+WAITRESPEX 5000 [vPortC] "[cVer]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].1: DeviceNameConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vTemp0 "1"
+//Default
+SENDCMD [vPortC] "cfg$ rd [vTemp0]\r"
+WAITRESPEX 5000 [vPortC] "[cDEFDEVNAME]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+//too long
+SET vTemp1 "1234567890123"
+SENDCMD [vPortC] "cfg$ wr [vTemp0] \22[vTemp1]\22\r"
+WAITRESPEX 5000 [vPortC] "[cERs]0002[cERf]"
+SENDCMD [vPortC] "cfg$ rd [vTemp0]\r"
+WAITRESPEX 5000 [vPortC] "[cDEFDEVNAME]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+//too short
+SET vTemp1 ""
+SENDCMD [vPortC] "cfg$ wr [vTemp0] \22[vTemp1]\22\r"
+WAITRESPEX 5000 [vPortC] "[cERs]0002[cERf]"
+SENDCMD [vPortC] "cfg$ rd [vTemp0]\r"
+WAITRESPEX 5000 [vPortC] "[cDEFDEVNAME]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+//valid length
+SET vTemp1 "1"
+SENDCMD [vPortC] "cfg$ wr [vTemp0] \22[vTemp1]\22\r"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+SENDCMD [vPortC] "cfg$ rd [vTemp0]\r"
+WAITRESPEX 5000 [vPortC] "[vTemp1]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+//valid length
+SET vTemp1 "123456789012"
+SENDCMD [vPortC] "cfg$ wr [vTemp0] \22[vTemp1]\22\r"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+SENDCMD [vPortC] "cfg$ rd [vTemp0]\r"
+WAITRESPEX 5000 [vPortC] "[vTemp1]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].2: TxPowerConfigID"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "[vPortC]"
+SET vArg0 "1"   //ID
+SET vArg1 "4"   //Default Value
+SET vArg2 "-20"   //Min Value
+SET vArg3 "4"   //Max Value
+#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+SET vPort "[vPortS]"
+
+
+//===============================================================================
+TITLE "**** [vFileName] ****"
+PORT_CLOSE 0
+PORT_CLOSE 1
+//===============================================================================
+

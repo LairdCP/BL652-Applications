@@ -1,0 +1,73 @@
+//*******************************************************************************
+TITLE "<<<NewSub>>>"
+SET vFileName "C50000"  //Throughput Test at 7500us connection interval C->S only
+//===============================================================================
+PORT 0   "COM[cComPortS]"  "[cBaudS]"
+PORT 1   "COM[cComPortC]"  "[cBaudC]"
+TITLE "**** [vFileName] ****"
+//===============================================================================
+
+//-----------------------------------------------------------
+//Set the test time to be a minimum of 10 seconds
+//-----------------------------------------------------------
+SET vHours   "0"
+SET vMinutes "0"
+SET vSeconds "10"
+#include "ConvertToMillisec.sbr"   //   on exit [vMilliSecs] contains the milliseconds
+
+//TRACE false
+//TRACEWIN false
+CONSOLEUPDATE false
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.0: Initialise"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vConnIntvl          "7500"
+SET vSuperTout          "5000000"
+SET vDevName            "WooburnRocks"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.1: Server Config and reset both sides"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+CONSOLEUPDATE true
+PRINT "Configuring..."
+CONSOLEUPDATE false
+
+SET vPort "0"
+#include "ResetConfigs.sbr"  //Clear configs
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set Device Name"
+SENDCMD [vPortS] "cfg$ wr 1 \22[vDevName]\22\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+PRINT "Set TX Power"
+SENDCMD [vPortS] "cfg wr 1 4\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+// true
+PRINT "Done"
+CONSOLEUPDATE false
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.2: Test at 7.5ms connection interval"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vConnIntvl    "7500"
+#include "ThruPut_3.sbr"  // C->S, C->S and Both directions
+
+
+//===============================================================================
+
+CONSOLEUPDATE true
+PRINT "===================================================================="
+TRACE true
+TRACEWIN true
+
+TITLE "**** [vFileName] ****"
+PORT_CLOSE 0
+PORT_CLOSE 1
+//===============================================================================
+

@@ -258,9 +258,10 @@
 // 16 : VSP Low Level RX Buffer Size
 //        0..1024 - 0 will mean set the default. Values from 1 to XX are invalid.
 //        
-// 17 : VSP Service Encryption Requirement       
+// 17 : VSP Service Encryption Requirement (For BL652 only)
 //        Bit 0 : Set for encryption required
 //        Bit 1 : Set for MITM required
+//      Please note : Do not set this to non-zero for BL600 as there is a known issue
 // 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // String Configuration Keys

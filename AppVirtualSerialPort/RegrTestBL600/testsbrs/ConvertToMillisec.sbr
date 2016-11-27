@@ -1,0 +1,22 @@
+//===============================================================================
+// Used to convert Hours/Minutes/Seconds into milliseconds and the result is 
+// returned in variable vMilliSecs
+//
+//===============================================================================
+//SET vHours   ""
+//SET vMinutes ""
+//SET vSeconds ""
+//#include "ConvertToMillisec.sbr"
+//   on exit [vMilliSecs] contains the milliseconds
+//===============================================================================
+
+DECLARE vTmpCTM
+
+SET vTmpCTM "[vHours]"
+MUL vTmpCTM "60"
+ADD vTmpCTM "[vMinutes]"
+MUL vTmpCTM "60"
+ADD vTmpCTM "[vSeconds]"
+MUL vTmpCTM "1000"
+SET vMilliSecs "[vTmpCTM]"
+

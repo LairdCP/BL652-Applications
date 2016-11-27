@@ -1,0 +1,51 @@
+//===============================================================================
+// Check Integer Config Key
+//
+//ARGS: vPort
+//
+//===============================================================================
+//SET vArg0 "0"   //ID
+//SET vArg1 "0"   //Default Value
+//SET vArg2 "0"   //Min Value
+//SET vArg3 "4"   //Max Value
+//#include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
+//===============================================================================
+
+//Default
+SENDCMD [vPort] "cfg rd [vArg0]\r"
+WAITRESPEX 5000 [vPort] "[vArg1]"
+WAITRESPEX 5000 [vPort] "[cOK]"
+//Min-1
+SET vTemp0 "[vArg2]"
+SUB vTemp0 "1" 
+SENDCMD [vPort] "cfg wr [vArg0] [vTemp0]\r"
+WAITRESPEX 5000 [vPort] "[cERs]0002[cERf]"
+SENDCMD [vPort] "cfg rd [vArg0]\r"
+WAITRESPEX 5000 [vPort] "[vArg1]"
+WAITRESPEX 5000 [vPort] "[cOK]"
+//Max+1
+SET vTemp0 "[vArg3]"
+ADD vTemp0 "1" 
+SENDCMD [vPort] "cfg wr [vArg0] [vTemp0]\r"
+WAITRESPEX 5000 [vPort] "[cERs]0002[cERf]"
+SENDCMD [vPort] "cfg rd [vArg0]\r"
+WAITRESPEX 5000 [vPort] "[vArg1]"
+WAITRESPEX 5000 [vPort] "[cOK]"
+//Min
+SENDCMD [vPort] "cfg wr [vArg0] [vArg2]\r"
+WAITRESPEX 5000 [vPort] "[cOK]"
+SENDCMD [vPort] "cfg rd [vArg0]\r"
+WAITRESPEX 5000 [vPort] "[vArg2]"
+WAITRESPEX 5000 [vPort] "[cOK]"
+//Max
+SENDCMD [vPort] "cfg wr [vArg0] [vArg3]\r"
+WAITRESPEX 5000 [vPort] "[cOK]"
+SENDCMD [vPort] "cfg rd [vArg0]\r"
+WAITRESPEX 5000 [vPort] "[vArg3]"
+WAITRESPEX 5000 [vPort] "[cOK]"
+//Write Default
+SENDCMD [vPort] "cfg wr [vArg0] [vArg1]\r"
+WAITRESPEX 5000 [vPort] "[cOK]"
+SENDCMD [vPort] "cfg rd [vArg0]\r"
+WAITRESPEX 5000 [vPort] "[vArg1]"
+WAITRESPEX 5000 [vPort] "[cOK]"
