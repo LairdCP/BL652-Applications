@@ -1,10 +1,16 @@
-# compiled smartBASIC *.uwc files
+/*.uwc
 */*.uwc
-*/*.aut.txt
 */*/*.uwc
+
+/*.tws
+*/*.tws
+*/*/*.tws
+
+/*.aut.txt
+*/*.aut.txt
 */*/*.aut.txt
+
 */RegrTest/Log/*
 */RegrTest/Log/*/*
 
-StringPlayer.exe
-
+StringPlayer*.exe

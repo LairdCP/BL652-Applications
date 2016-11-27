@@ -358,6 +358,24 @@ endfunc 0  //Don't give response to user
 //UART data received
 //==============================================================================
 FUNCTION HndlrUartRxVSP()
+    dim uLen
+    IF BufferState == 0 && ModemStat == 1 then
+
+        //Read data that has arrived through via the UART
+        uLen = UartReadN(u$, 20)
+
+        IF uLen > 0 then
+            rc = BLEGATTCWRITE(BleHandle, RXHandle, u$)
+            BufferState = 1
+            StrShiftLeft(u$,uLen)
+        ENDIF
+    ENDIF
+ENDFUNC 1
+
+//==============================================================================
+//UART data received
+//==============================================================================
+FUNCTION HndlrUartRxVSPex()
     dim uLen, bytesWaiting, newData$
     IF BufferState == 0 && ModemStat == 1 then
         //Get number of bytes waiting in actual Uart RX Buffer before reading
@@ -380,7 +398,7 @@ FUNCTION HndlrUartRxVSP()
             else
                 rc = BLEGATTCWRITE(BleHandle, RXHandle, u$)
                 BufferState = 1
-                u$ = ""
+                StrShiftLeft(u$,uLen)
             endif
         ENDIF
     ENDIF

@@ -1,0 +1,100 @@
+//*******************************************************************************
+TITLE "<<<NewSub>>>"
+SET vFileName "C90000"  //Connect and enter VSP command mode and erase app
+//===============================================================================
+PORT 0   "COM[cComPortS]"  "[cBaudS]"
+PORT 1   "COM[cComPortC]"  "[cBaudC]"
+TITLE "**** [vFileName] ****"
+//===============================================================================
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.0: Initialise"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vConnIntvl          "7500"
+SET vSuperTout          "5000000"
+SET vDevName            "WooburnRocks"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.1: Server Config and reset both sides"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "ResetConfigs.sbr"  //Clear configs
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set Device Name"
+SENDCMD [vPortS] "cfg$ wr 1 \22[vDevName]\22\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+PRINT "Set TX Power"
+SENDCMD [vPortS] "cfg wr 1 4\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+SET vTemp0 "[vDevName]"
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.2: Make a connection and enter VSP command mode"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0         "[cMACADDRSq]"   
+SET vConnIntvl    "7500"
+#include "Connect.sbr"  //Initiate connection
+
+SENDCMD [vPortC] "[cLoginMagicCommand]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+SENDCMD [vPortC] "ver\r"
+WAITRESPEX 5000 [vPortC] "[cVer]"
+WAITRESPEX 5000 [vPortC] "[cOK]"
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].2: test command 'erase'"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortC]
+SENDCMD [vPortC] "erase\r"
+#include "WaitDiscon.sbr"  //Wait for confirmation that disconnection has happened
+
+//------------------------------------------------------------------------------
+PRINT "Scan from client"
+//------------------------------------------------------------------------------
+SET vTemp0 "[cDEFDEVNAME]"
+
+SET vArg0 "0"   //Scan Timeout
+#include "ScanStart.sbr"  //Start Scanning
+WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
+#include "ScanStop.sbr"  //Stop Scanning
+
+SENDCMD [vPortS] "AT I 0\r"
+WAITRESPEX 5000 [vPortS] "[cATI0]"
+WAITRESPEX 5000 [vPortS] "\n00\r"
+
+PRINT "************************************************************"
+PRINT "** DUT has no application - needs to be reloaded manually **"
+PRINT "************************************************************"
+
+
+
+//===============================================================================
+TITLE "**** [vFileName] ****"
+PORT_CLOSE 0
+PORT_CLOSE 1
+//===============================================================================
+

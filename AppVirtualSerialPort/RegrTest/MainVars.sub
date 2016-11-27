@@ -77,10 +77,16 @@ DECLARE vTimer1
 DECLARE vTimer2
 DECLARE vTimer3
 DECLARE vTimer4
+DECLARE vElapse1
+DECLARE vElapse2
+DECLARE vElapse3
+DECLARE vElapse4
 
 DECLARE vByteCount
 DECLARE vBytesPerLoop
-DECLARE vBitRate
+//DECLARE vBitRate
+DECLARE vBitRateCS
+DECLARE vBitRateSC
 
 DECLARE vPrnIntervalMs
 DECLARE vPrnTargetMs
@@ -103,6 +109,14 @@ DECLARE vDevName
 
 DECLARE vBreakOnTime
 DECLARE vBreakOffTime
+
+DECLARE vConnIntvl
+DECLARE vSuperTout
+
+DECLARE SCcount
+DECLARE CScount
+DECLARE ThisLen
+DECLARE tmpCount
 
 //===============================================================================
 //Initialise variables

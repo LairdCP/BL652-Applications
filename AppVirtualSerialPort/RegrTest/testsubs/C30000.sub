@@ -1,0 +1,110 @@
+//*******************************************************************************
+TITLE "<<<NewSub>>>"
+SET vFileName "C30000"  //Bridge Mode test (upto 4096 bytes each way simultaneously)
+//===============================================================================
+PORT 0   "COM[cComPortS]"  "[cBaudS]"
+PORT 1   "COM[cComPortC]"  "[cBaudC]"
+TITLE "**** [vFileName] ****"
+//===============================================================================
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.0: Initialise"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vConnIntvl          "7500"
+SET vSuperTout          "5000000"
+SET vDevName            "WooburnRocks"
+
+SET vTemp9 "abcedfghijklm_nopqrstuvwxyz"  //27
+SET vTemp8 "ABCEDFGHIJKLM-NOPQRSTUVWXYZ"  //27
+SET vTemp7 "0123456789"                   //10
+
+SET vTemp0 "[vTemp8][vTemp7][vTemp9]"     //64
+SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
+
+SET vTemp2 "[vTemp0][vTemp1][vTemp0][vTemp1][vTemp0][vTemp1][vTemp0][vTemp1]"     //512
+SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.1: Server Config and reset both sides"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vPort "0"
+#include "ResetConfigs.sbr"  //Clear configs
+#include "EnterCmdMode.sbr"  //Enter Command Mode
+
+PRINT "Set Device Name"
+SENDCMD [vPortS] "cfg$ wr 1 \22[vDevName]\22\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+PRINT "Set TX Power"
+SENDCMD [vPortS] "cfg wr 1 4\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+SET vPort "0"
+#include "ResetViaBreak.sbr"
+
+SET vPort "1"
+#include "ResetViaBreak.sbr"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].0.2: Make a connection"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+SET vArg0         "[cMACADDRSq]"   
+SET vConnIntvl    "7500"
+#include "Connect.sbr"  //Initiate connection
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].1: Exchange data - 5 bytes each way"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortS]
+FLUSHRX [vPortC]
+TXSTRING [vPortS] "Hello\r"
+TXSTRING [vPortC] "World\r"
+WAITRESPEX 5000 [vPortS] "World"
+WAITRESPEX 5000 [vPortC] "Hello"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].2: More Exchange data - 62 bytes each way"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortS]
+FLUSHRX [vPortC]
+TXSTRING [vPortS] "[vTemp0]"
+TXSTRING [vPortC] "[vTemp1]"
+WAITRESPEX 5000 [vPortS] "[vTemp1]"
+WAITRESPEX 5000 [vPortC] "[vTemp0]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].3: More Exchange data - 372 bytes each way"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortS]
+FLUSHRX [vPortC]
+TXSTRING [vPortS] "[vTemp2]"
+TXSTRING [vPortC] "[vTemp2]"
+WAITRESPEX 5000 [vPortS] "[vTemp2]"
+WAITRESPEX 5000 [vPortC] "[vTemp2]"
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+SUBTITLE "Test:[vFileName].3: More Exchange data - 2232 bytes each way"
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+FLUSHRX [vPortS]
+FLUSHRX [vPortC]
+TXSTRING [vPortS] "[vTemp3]"
+TXSTRING [vPortC] "[vTemp3]"
+WAITRESPEX 5000 [vPortS] "[vTemp3]"
+WAITRESPEX 5000 [vPortC] "[vTemp3]"
+
+
+//===============================================================================
+TITLE "**** [vFileName] ****"
+PORT_CLOSE 0
+PORT_CLOSE 1
+//===============================================================================
+

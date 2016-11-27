@@ -1,0 +1,12 @@
+//===============================================================================
+//
+//===============================================================================
+//SET vArg0 ""   //Destination mac address - 14 hex digits
+//#include "Connect.sbr"  //Initiate connection
+//===============================================================================
+
+TXSTRING [vPortC] "connect [vArg0] [vConnIntvl]\r"
+WAITRESPEX 8000 [vPortC] "Connected!"
+WAITRESPEX 8000 [vPortC] "Ready to transmit/receive!"
+WAITRESPEX 8000 [vPortC] "OK"
+
