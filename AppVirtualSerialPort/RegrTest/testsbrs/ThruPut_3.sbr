@@ -68,10 +68,11 @@ SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
 SET vTemp4 "[vTemp0][vTemp1]"                                                     //128
 SET vTemp2 "[vTemp4][vTemp4][vTemp4][vTemp4]"                                     //512
 SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+//SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2]"                                     //2048
 
 SET SCcount "0"
 SET CScount "0"
-STRLEN vTemp3 ThisLen
+STRLEN vTemp3 ThisLen3
 
 FLUSHRX [vPortS]
 FLUSHTX [vPortS]
@@ -82,15 +83,15 @@ TIMER START vTimer1
 TXSTRING [vPortC] "[vTemp3]"    //C>
 LABEL LOOPA01                                          //!!
 TXSTRING [vPortC] "[vTemp3]"    //C>
-WAITRESPEX 5000 [vPortS] "[vTemp3]"   //S<
-ADD CScount "[ThisLen]"
+WAITRESPEX 60000 [vPortS] "[vTemp3]"   //S<
+ADD CScount "[ThisLen3]"
 
 TIMER ELAPSE vTimer1 vElapse1
 TST vElapse1 "[vMilliSecs]"
 JUMPLT LOOPA01                                          //!!
-WAITRESPEX 5000 [vPortS] "[vTemp3]"   //S<
-TST vElapse1 "[vMilliSecs]"
-ADD CScount "[ThisLen]"
+WAITRESPEX 60000 [vPortS] "[vTemp3]"   //S<
+TIMER ELAPSE vTimer1 vElapse1
+ADD CScount "[ThisLen3]"
 
 SET vBitRateCS "[CScount]"
 TST vBitRateCS "268430"
@@ -110,7 +111,7 @@ CONSOLEUPDATE false
 
 LABEL TESTEND01                                         //!!
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-SUBTITLE "Test:[vFileName].1:  C->S (bi-directional traffic)"
+SUBTITLE "Test:[vFileName].2:  C->S (bi-directional traffic)"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 //JUMP TESTEND03                                          //!!
 
@@ -124,10 +125,11 @@ SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
 SET vTemp4 "[vTemp0][vTemp1]"                                                     //128
 SET vTemp2 "[vTemp4][vTemp4][vTemp4][vTemp4]"                                     //512
 SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+//SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2]"                                     //2048
 
 SET SCcount "0"
 SET CScount "0"
-STRLEN vTemp3 ThisLen
+STRLEN vTemp3 ThisLen3
 
 FLUSHRX [vPortS]
 FLUSHTX [vPortS]
@@ -138,9 +140,9 @@ TIMER START vTimer1
 TXSTRING [vPortC] "[vTemp3]"    //C>
 TXSTRING [vPortS] "[vTemp3]"    //S>
 LABEL LOOPA03                                          //!!
-WAITRESPEX 5000 [vPortS] "[vTemp3]"   //S<
+WAITRESPEX 60000 [vPortS] "[vTemp3]"   //S<
 TXSTRING [vPortC] "[vTemp3]"    //C>
-ADD CScount "[ThisLen]"
+ADD CScount "[ThisLen3]"
 
 SAVERESPNE vResp [vPortC]
 FLUSHRX [vPortC]
@@ -149,9 +151,9 @@ TXSTRING [vPortS] "[vResp]"     //S>
 TIMER ELAPSE vTimer1 vElapse1
 TST vElapse1 "[vMilliSecs]"
 JUMPLT LOOPA03                                          //!!
-WAITRESPEX 5000 [vPortS] "[vTemp3]"   //S<
-TST vElapse1 "[vMilliSecs]"
-ADD CScount "[ThisLen]"
+WAITRESPEX 60000 [vPortS] "[vTemp3]"   //S<
+TIMER ELAPSE vTimer1 vElapse1
+ADD CScount "[ThisLen3]"
 
 SET vBitRateCS "[CScount]"
 TST vBitRateCS "268430"
@@ -171,7 +173,7 @@ CONSOLEUPDATE false
 
 LABEL TESTEND03                                         //!!
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-SUBTITLE "Test:[vFileName].2:  S->C "
+SUBTITLE "Test:[vFileName].3:  S->C "
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 //JUMP TESTEND02                                          //!!
 
@@ -185,10 +187,12 @@ SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
 SET vTemp4 "[vTemp0][vTemp1]"                                                     //128
 SET vTemp2 "[vTemp4][vTemp4][vTemp4][vTemp4]"                                     //512
 SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+//SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2]"                                     //2048
 
 SET SCcount "0"
 SET CScount "0"
-STRLEN vTemp3 ThisLen
+STRLEN vTemp3 ThisLen3
+STRLEN vTemp4 ThisLen4
 
 FLUSHRX [vPortS]
 FLUSHTX [vPortS]
@@ -199,15 +203,15 @@ TIMER START vTimer1
 TXSTRING [vPortS] "[vTemp3]"    //S>
 LABEL LOOPA02                                           //!!
 TXSTRING [vPortS] "[vTemp3]"    //S>
-WAITRESPEX 5000 [vPortC] "[vTemp3]"   //C<
-ADD SCcount "[ThisLen]"
+WAITRESPEX 60000 [vPortC] "[vTemp3]"   //C<
+ADD SCcount "[ThisLen3]"
 
 TIMER ELAPSE vTimer1 vElapse1
 TST vElapse1 "[vMilliSecs]"
 JUMPLT LOOPA02                                          //!!
-WAITRESPEX 5000 [vPortC] "[vTemp3]"   //C<
-TST vElapse1 "[vMilliSecs]"
-ADD SCcount "[ThisLen]"
+WAITRESPEX 60000 [vPortC] "[vTemp3]"   //C<
+TIMER ELAPSE vTimer1 vElapse1
+ADD SCcount "[ThisLen3]"
 
 SET vBitRateSC "[SCcount]"
 TST vBitRateSC "268430"
@@ -241,10 +245,12 @@ SET vTemp1 "[vTemp7][vTemp8][vTemp9]"     //64
 SET vTemp4 "[vTemp0][vTemp1]"                                                     //128
 SET vTemp2 "[vTemp4][vTemp4][vTemp4][vTemp4]"                                     //512
 SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2][vTemp2]"     //4096
+//SET vTemp3 "[vTemp2][vTemp2][vTemp2][vTemp2]"                                     //2048
 
 SET SCcount "0"
 SET CScount "0"
-STRLEN vTemp3 ThisLen
+STRLEN vTemp3 ThisLen3
+STRLEN vTemp4 ThisLen4
 
 FLUSHRX [vPortS]
 FLUSHTX [vPortS]
@@ -255,9 +261,9 @@ TIMER START vTimer1
 TXSTRING [vPortS] "[vTemp3]"    //S>
 TXSTRING [vPortC] "[vTemp3]"    //C>
 LABEL LOOPA04                                           //!!
-TXSTRING [vPortS] "[vTemp3]"    //S>
-WAITRESPEX 5000 [vPortC] "[vTemp3]"   //C<
-ADD SCcount "[ThisLen]"
+TXSTRING [vPortS] "[vTemp4]"    //S>
+WAITRESPEX 60000 [vPortC] "[vTemp4]"   //C<
+ADD SCcount "[ThisLen4]"
 
 SAVERESPNE vResp [vPortS]
 FLUSHRX [vPortS]
@@ -266,9 +272,9 @@ TXSTRING [vPortC] "[vResp]"     //C>
 TIMER ELAPSE vTimer1 vElapse1
 TST vElapse1 "[vMilliSecs]"
 JUMPLT LOOPA04                                          //!!
-WAITRESPEX 5000 [vPortC] "[vTemp3]"   //C<
-TST vElapse1 "[vMilliSecs]"
-ADD SCcount "[ThisLen]"
+WAITRESPEX 60000 [vPortC] "[vTemp3]"   //C<
+TIMER ELAPSE vTimer1 vElapse1
+ADD SCcount "[ThisLen3]"
 
 SET vBitRateSC "[SCcount]"
 TST vBitRateSC "268430"

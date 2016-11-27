@@ -11,8 +11,8 @@ TITLE "**** [vFileName] ****"
 //Set the test time to be a minimum of 10 seconds
 //-----------------------------------------------------------
 SET vHours   "0"
-SET vMinutes "1"
-SET vSeconds "0"
+SET vMinutes "0"
+SET vSeconds "10"
 #include "ConvertToMillisec.sbr"   //   on exit [vMilliSecs] contains the milliseconds
 
 //TRACE false
@@ -55,7 +55,7 @@ CONSOLEUPDATE false
 SUBTITLE "Test:[vFileName].0.2: Test at 7.5ms connection interval"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-SET vConnIntvl    "7500"
+SET vConnIntvl    "30000"
 #include "ThruPut_3.sbr"  // C->S, C->S and Both directions
 
 

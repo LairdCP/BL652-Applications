@@ -1,6 +1,6 @@
 //*******************************************************************************
 TITLE "<<<NewSub>>>"
-SET vFileName "C20000"  //Connect and enter VSP command mode
+SET vFileName "C20002"  //Connect and enter VSP command mode (Encrypted)
 //===============================================================================
 PORT 0   "COM[cComPortS]"  "[cBaudS]"
 PORT 1   "COM[cComPortC]"  "[cBaudC]"
@@ -29,6 +29,10 @@ WAITRESPEX 5000 [vPortS] "[cOK]"
 
 PRINT "Set TX Power"
 SENDCMD [vPortS] "cfg wr 1 4\r"
+WAITRESPEX 5000 [vPortS] "[cOK]"
+
+PRINT "Set VSP Encryption"
+SENDCMD [vPortS] "cfg wr 17 1\r"
 WAITRESPEX 5000 [vPortS] "[cOK]"
 
 SET vPort "0"
@@ -104,7 +108,7 @@ SUBTITLE "Test:[vFileName].5: test 'conninfo'"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 SENDCMD [vPortC] "conninfo\r"
-WAITRESPEX 5000 [vPortC] "Interval=7500,SuperTout=500000,SlaveLatency=0,NotEncrypted"
+WAITRESPEX 5000 [vPortC] "Interval=7500,SuperTout=500000,SlaveLatency=0,Encrypted"
 WAITRESPEX 5000 [vPortC] "[cOK]"
 
 
@@ -213,7 +217,7 @@ WAITRESPEX 5000 [vPortC] "384"
 WAITRESPEX 5000 [vPortC] "[cOK]"
 
 SENDCMD [vPortC] "cfg rd 17\r"
-WAITRESPEX 5000 [vPortC] "0"
+WAITRESPEX 5000 [vPortC] "1"
 WAITRESPEX 5000 [vPortC] "[cOK]"
 
 SENDCMD [vPortC] "cfg rd 18\r"

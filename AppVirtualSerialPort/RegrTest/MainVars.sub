@@ -115,7 +115,16 @@ DECLARE vSuperTout
 
 DECLARE SCcount
 DECLARE CScount
-DECLARE ThisLen
+DECLARE ThisLen0
+DECLARE ThisLen1
+DECLARE ThisLen2
+DECLARE ThisLen3
+DECLARE ThisLen4
+DECLARE ThisLen5
+DECLARE ThisLen6
+DECLARE ThisLen7
+DECLARE ThisLen8
+DECLARE ThisLen9
 DECLARE tmpCount
 
 //===============================================================================

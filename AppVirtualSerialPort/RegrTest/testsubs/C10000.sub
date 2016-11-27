@@ -148,7 +148,7 @@ WAITRESPEX 5000 [vPortS] "384"
 WAITRESPEX 5000 [vPortS] "[cOK]"
 
 SENDCMD [vPortS] "cfg rd 17\r"
-WAITRESPEX 5000 [vPortS] "8"
+WAITRESPEX 5000 [vPortS] "0"
 WAITRESPEX 5000 [vPortS] "[cOK]"
 
 SENDCMD [vPortS] "cfg rd 18\r"
