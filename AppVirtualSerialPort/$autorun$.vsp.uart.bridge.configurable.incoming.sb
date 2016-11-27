@@ -26,14 +26,270 @@
 // +++++                                                                      ++
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
-// <name>
-// (Version <version>)
-//  -- <description>
+// -------------------
+// Application Version
+// -------------------
+#define AppVer                 "1.00"                             //Application version
+#define AppUpdated             "28/Nov/2016"                      //Application last updated
 //
-// <information>
+// -------------------
+// Application History
+// -------------------
+// 1.00 "28/Nov/2016"
+//    Initial Release. @7.5ms conn interval
+//       Throughput : 10.5kbps  Client->Server
+//                    64kbps    Server->Client
 //
 //******************************************************************************
-
+// -----------
+// Usage Guide
+// -----------
+//
+// ~~~~~~~~~
+// Overview
+// ~~~~~~~~~
+//
+// This application provides a Virtual Serial Port Service which bridges the uart
+// to the air-side BLE VSP.
+// 
+// On start/power up, for the first 60 seconds it will accept a password which by
+// default is "@command_mode@" and if recieved from either the uart or vsp, then 
+// it will fall into configuration mode so that the application can be configured
+// using a text command api as described below and the new configuration is 
+// automatically saved in non-volatile memory.
+// (To reset configuration, enter config mode, enter the command 'exit' which will
+//  result in the module entering the native command mode and then enter the
+//  command   AT&F 0xFFFFFFFE and the non-volatile data and bonding data will be 
+//  deleted and automatically reset and re-enter the application)
+//  
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Compile time configuration
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// 
+// The features (including debugging ones) of this application can be adjusted
+// by setting a bitmask specified via the "#set $cmpif" statement which one 
+// can search for below. Details of which bit does what is specified near that
+// statement and will not be repeated here.
+// 
+// Suffice to say that the compilation bitmask, as shipped, allows for the 
+// config mode to be accessed over the VSP connection within the 60 seconds
+// of reset.
+// 
+// For security reasons the user is encouraged to consider if the ability to
+// capture the config mode over the air is a risk not worth taking. In that
+// case clear the appropriate bit in the "#set $cmpif" statement. At the very
+// least, if the feature is not disabled, then it is highly recommended that
+// the Login Password be changed via command "cfg$ wr 1 newpassword"
+//
+// In a similar manner it is also recommended that the 'exit' command is 
+// disabled in a similar manner.
+//
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//  DEBUGGING :: Upper 16 bits of the compilation bitmask
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// 
+// There is a bit dedicated to using LED1 when a connection is up which is 
+// useful for debugging.
+// 
+// In addition there is a compilation bitmask which can be enabled to
+// indicate whether the application is in config on bridge mode via LED2. 
+// That same led will be flashed if there is an error.
+//
+// Finally, bit 31 (0x80000000) is very useful for debugging as it enables 
+// very verbose messages that are output via the uart as things happen.
+// All debuggin messages sent this ways start with "\n## " to facilitate
+// differentiation from normal traffic
+// 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Indication via general purpose I/O
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// 
+// It is possible to use two digital output pins to indicate that there is
+// a connection and that the connection is encrypted.
+// 
+// The config key 9 is used to specify a SIO pin number (0..31) which is will
+// be set to 1 when there is a connection and 0 when there isn't. If the 
+// config key is set to -1, then it is not enabled. Please be careful not to
+// allocate a pin that is being used for UART activity
+// 
+// The config key 10 is used to specify a SIO pin number (0..31) which is will
+// be set to 1 when the connection is encrypted and 0 when there isn't. If the 
+// config key is set to -1, then it is not enabled. Please be careful not to
+// allocate a pin that is being used for UART activity
+// 
+// Note that if both keys are set to the same pin number, then it implies that
+// when encrypted VSP operation is required then that SIO pin will go high 
+// only when data can be transferred.
+// 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// The commands in config mode are as follows in alphabetical order :-
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//  
+// addr
+//   Outputs the mac address of the module
+//   
+// bridge
+//   Use this command to exot config mode and into bridge mode so that if there 
+//   is a connection, then any data arriving over the uart is conveyed to the 
+//   peer and vice-versa any data coming over the air is output from the uart
+//   
+// cfg rd #INTid
+//   Outputs the current integer value of configuration key #INTid
+//     All the keys are described below
+// 
+// cfg$ rd #INTid
+//   Outputs the current string value of configuration key #INTid
+//     All the keys are described below
+//   
+// cfg wr #INTid #INTval
+//   Writes new value #INTval to the integer configuration key #INTid.
+//   If the value is invalid then it will be rejected. An OK response
+//   implies it was accepted.
+//     All the keys are described below
+// 
+// cfg$ wr #INTid #STRval
+//   Writes new value #STRval to the integer configuration key #INTid.
+//   If the value is invalid then it will be rejected. An OK response
+//   implies it was accepted.
+//   The string value #STRval, must be delimited with double quotes "
+//   if the string contains whitespace
+//     All the keys are described below
+// 
+// client
+//   If in a connection, then the mac address of the peer is output, otherwise 
+//   the message "NO-CONNECTION"
+//   
+// conninfo
+//   If in a connection, then connection related information is output as follows:-
+//      Interval=7500,SuperTout=500000,SlaveLatency=0,Encrypted
+//      or
+//      Interval=7500,SuperTout=500000,SlaveLatency=0,NotEncrypted
+//   where the latter is for non-ecnrypted connections and the integer values will
+//   be as per the connection setup.
+//   If there is no connection otherwise the message "NO-CONNECTION"
+// 
+// erase
+//   If the appropriate SIO pin is high, then the application will be deleted
+//   and the module will be reset resulting it advertising so that it can be
+//   connected to and over a non-encrypted virtual serial port service a new
+//   application can be downloaded over the air
+// 
+// exit
+//   Abort the application and enter the native command mode of the module
+//   from where you could completely erase all non-volatile data, including
+//   the application using the command AT&F* and then reload a new applicatio
+//   over the uart (or VSP if the appropriate pin is in the correct state
+//   for the module to start advertising for a connection)
+//   
+// reset
+//   Reset the module and if nAutorun is low, the application will restart
+//   
+// si #INTid
+//   Outputs the value returned by SYSINFO(#INTid)
+// 
+// si$ #INTid
+//   Outputs the value returned by SYSINFO$(#INTid)
+//   
+// ver
+//   Outputs the application version info
+//   
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Integer Configuration Keys
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// 
+// 0 : Device Name Format
+//        0    - The MAC address is not automtically appended to the device name
+//        1..7 - The right most bytes of the max after conversion to hex are appended
+//               Note: The number of characters appended is double this value
+//               
+// 1 : Transmit Power (dBm)              
+//        -20..4 - The transmit power to use, nearest value in the actual power table
+//                 will be used. In BL600/620 that means a value divisible by 4
+//                 
+// 2 : Encryption Wait Timeout (milliseconds)
+//        1000..20000 - If encryption is enabled (see key 17) then on connection a
+//                      timer is started and if the master has not enabled encryption
+//                      by the this time times out, then the module will disconnect
+//                      
+// 3 : Advertising Interval (milliseconds)
+//        20..10240 - This sets the advertising interval. Lower values results in
+//                    more energy consumption and so will impact on battery life
+//                    
+// 4 : Minimum Connection Interval (microseconds)
+//        7500.. 3998750 - This specifies the acceptable minimum connection interval
+//                         Note longer values will impact throughput
+//                         It must <= the maximum connection interval (see key 5)
+//                         otherwise it will be rejected
+//                    
+// 5 : Maximum Connection Interval (microseconds)
+//        7500.. 3998750 - This specifies the acceptable maximum connection interval
+//                         Note longer values will impact throughput
+//                         It must >= the minimum connection interval (see key 4)
+//                         otherwise it will be rejected
+// 
+// 6 : Uart Baudrate
+//        1200..1000000 - This is the baudrate for the UART interface
+//        
+// 7 : Uart Low Level TX Buffer Size
+//        0..1024 - 0 will mean set the default. Values from 1 to 31 are invalid.
+//        
+// 8 : Uart Low Level RX Buffer Size
+//        0..1024 - 0 will mean set the default. Values from 1 to 31 are invalid.
+//                 
+// 9 : Connection LED Indication gpio pin
+//       -1..31 - This is the SIO pin to indicate that a connection exists.
+//                A value of -1 implies do not indicate
+//                Also see related key 10.
+//                 
+// 10 : Encryption LED Indication gpio pin
+//       -1..31 - This is the SIO pin to indicate that the connection is encrypted.
+//                A value of -1 implies do not indicate
+//                Also see related key 9.
+//                
+// 11 : 16 bit offset UUID for TX Characteristic
+// 12 : 16 bit offset UUID for RX Characteristic
+// 13 : 16 bit offset UUID for MODEM_IN Characteristic
+// 14 : 16 bit offset UUID for MODEM_OUT Characteristic
+//       1..0xFFFF - These are the 16 bit offsets from the base of the VSP Service UUID
+// 
+// 15 : VSP Low Level TX Buffer Size
+//        0..1024 - 0 will mean set the default. Values from 1 to XX are invalid.
+//        
+// 16 : VSP Low Level RX Buffer Size
+//        0..1024 - 0 will mean set the default. Values from 1 to XX are invalid.
+//        
+// 17 : VSP Service Encryption Requirement       
+//        Bit 0 : Set for encryption required
+//        Bit 1 : Set for MITM required
+// 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// String Configuration Keys
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// 
+// 0 : Login Password from Configuration Mode
+//        Specify the password for entering configuration mode within 60 seconds
+//        of a power cycle (or reset) which must be between 8 and 19 characters
+//        long. 
+//        The default password is "@command_mode@".
+//        If this password is received from either the uart or the vsp 
+//        connection, then bridge mode will be abondoned and config mode entered
+//        
+// 1 : Device Name
+//        The default is "LAIRD BL652" which is the same as the inbuilt command
+//        mode VSP service. If there are embedded spaces, then the double quote
+//        must be used as delimiter
+//        
+// 2 : VSP Service 128bit UUID
+//        This is the 128 bit UUID for the VSP service and used as a base for 
+//        the 16 bit UUIDs (TX, RX, MODEMIN, MODEMOUT) which are specified via
+//        keys 11,12,13,14 respectively.
+//        The UUID has 16 bit offset of 1101 from the Laird Base UUID of
+//                569a0000b87f490c92cb11ba5ea5167c
+//        
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// String Configuration Keys
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//  
 //******************************************************************************
 // Compiler/Debug options
 //******************************************************************************
@@ -45,25 +301,25 @@
 // Lower 16 bits used for feature set
 //   0x00000001 : Not used
 //   0x00000002 : LED1: connection status (on = connected)
-//   0x00000004 : LED2: app mode (on = app command mode)
+//   0x00000004 : LED2: Operation mode (ON = app config mode)
 //   0x00000008 : LED2: flashes if fatal error occured
 //   0x00000010 : Not used
-//   0x00000020 : Allow command mode over UART
-//   0x00000040 : Allow command mode over VSP
+//   0x00000020 : Allow config mode over UART
+//   0x00000040 : Allow config mode over VSP
 //   0x00000080 : Allow 'exit' command in command mode
 //
 // Upper 16 bits used for debugging
 //   0x80000000 : Enable debugging messages
 //   0x00010000 : Enable Asserts printed out of UART
 //   ======================================================
-//#set $cmpif, 0x00C0  //Allow configuration over UART & VSP
+#set $cmpif, 0x000000E0  //Allow configuration over UART & VSP & 'exit' command
+//#set $cmpif, 0x000000A0  //Allow configuration over UART only & 'exit' command
+//#set $cmpif, 0x00000040  //Allow configuration over UART only
 //#set $cmpif, 0x0000FFFF  //All Features + NO debug messages
-#set $cmpif, 0xFFFFFFFF  //All Features + all debug messages
+//#set $cmpif, 0xFFFFFFFF  //All Features + all debug messages
 //
 //
 //
-#define AppVer                 "1.00"                             //Application version
-#define AppUpdated             "28/Nov/2016"                      //Application last updated
 //
 //
 //
@@ -121,11 +377,11 @@
 //Default UART Tx buffer length
 #define UARTTxBufConfigDef       0      //7
     #define UARTTxBufConfigMin       0
-    #define UARTTxBufConfigMax       4096
+    #define UARTTxBufConfigMax       1024
 //Default UART Rx buffer length
 #define UARTRxBufConfigDef       0      //8
     #define UARTRxBufConfigMin       0
-    #define UARTRxBufConfigMax       4096
+    #define UARTRxBufConfigMax       1024
 //Default action of CONN pin (-1 for no gpio indication, otherwise the GPIO selected)
 #define CONNPinConfigDef         29      //9
     #define CONNPinConfigMin         -1
@@ -175,9 +431,9 @@
     #define DeviceNameConfigMinLen    1
     #define DeviceNameConfigMaxLen    12
 //VSP default
-#define BaseUUIDConfigDef        "569a1101b87f490c92cb11ba5ea5167c"    //2
-    #define BaseUUIDConfigMinLen     32
-    #define BaseUUIDConfigMaxLen     32
+#define VspServiceUUIDConfigDef  "569a1101b87f490c92cb11ba5ea5167c"    //2
+    #define VspServiceUUIDConfigMinLen   32
+    #define VspServiceUUIDConfigMaxLen   32
 
 //LED GPIO pin configuration
 #define BL600GPIOLED1Pin       18                                 //GPIO for LED1 (DVK-BL600)
@@ -217,9 +473,9 @@
 #define VspEncryptConfigID        17                              //nonval key where VSP service encryption flag is stored
 
 //The following are STRING configs so need to be remapped to 0 .. N
-#define LoginPswrdConfigID     0                                  //nonval key where the login password is stored (8-19) characters
-#define DeviceNameConfigID     1                                  //nonval key where the advertised device name is stored
-#define BaseUUIDConfigID       2                                  //nonval key where base VSP UUID is stored
+#define LoginPswrdConfigID         0                              //nonval key where the login password is stored (8-19) characters
+#define DeviceNameConfigID         1                              //nonval key where the advertised device name is stored
+#define VspServiceUUIDConfigID     2                              //nonval key where base VSP UUID is stored
 
 
 #define AppModeAppBridge       0                                  //Application in bridge mode
@@ -361,19 +617,19 @@ endif
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 #cmpif 0x80000000 : sub DbgMsg(byval msg$ as string)
-#cmpif 0x80000000 :     print "\n";msg$
+#cmpif 0x80000000 :     print "\n## ";msg$
 #cmpif 0x80000000 : endsub
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 #cmpif 0x80000000 : sub DbgMsgVal(byval msg$ as string, byval vl as integer)
-#cmpif 0x80000000 :     print "\n";msg$;" ";vl
+#cmpif 0x80000000 :     print "\n## ";msg$;" ";vl
 #cmpif 0x80000000 : endsub
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 #cmpif 0x80000000 : sub DbgMsgVal$(byval msg$ as string, byref vl$ as string)
-#cmpif 0x80000000 :     print "\n";msg$;" ";vl$
+#cmpif 0x80000000 :     print "\n## ";msg$;" ";vl$
 #cmpif 0x80000000 : endsub
 
 //------------------------------------------------------------------------------
@@ -595,8 +851,8 @@ sub ConfigKeyGetDef$( keyID as integer, byref defVal$ as string)
     #cmpif 0x00010000 : AssertBound(keyID, 0, (CONFIG_KEY_ID_MAX_STR-1), 5550 )
     
     select keyID
-    case BaseUUIDConfigID
-        defVal$=BaseUUIDConfigDef
+    case VspServiceUUIDConfigID
+        defVal$=VspServiceUUIDConfigDef
     case DeviceNameConfigID
         if (DevID == BL600_DEV_ID) then
             //BL600 module
@@ -648,7 +904,7 @@ function ConfigKey$IsValid( keyID as integer, newVal$ as string) as integer
     nlen = strlen(newVal$) //get length of new value
     
     select keyID
-    case BaseUUIDConfigID
+    case VspServiceUUIDConfigID
         tmpStr1$=StrDehexize$(newVal$)
         if( strlen(tmpStr1$) == 16 ) then
             isValid=1
@@ -769,7 +1025,7 @@ function OpenVSPService()
     vspRxBufLen = ConfigKeyGet( VspRxBufConfigID)
     
     //Base UUID
-    TmpStr$ = ConfigKeyGet$( BaseUUIDConfigID )
+    TmpStr$ = ConfigKeyGet$( VspServiceUUIDConfigID )
     TmpStr$ = StrDehexize$(TmpStr$)
     BaseUUID = BleHandleUuid128(TmpStr$)
     //Tx UUID handles
@@ -833,13 +1089,13 @@ function SetupGAPService()
     DevName$ = ConfigKeyGet$( DeviceNameConfigID)
     //Append part of module BT address if required
     TmpVal = ConfigKeyGet( DevNameFormatConfigID)
-    #cmpif 0x80000000 : DbgMsgVal("## DevNameFormat =",TmpVal)
+    #cmpif 0x80000000 : DbgMsgVal("DevNameFormat =",TmpVal)
     //Default selection if the BT address is appended to the advertised device name 
     if ((TmpVal >= 1) && (TmpVal <= 7)) then
         //Get device address
         TmpStr$ = SysInfo$(4)
         //#cmpif 0x80000000 : dim x$ : x$=strhexize$(TmpStr$)
-        //#cmpif 0x80000000 : DbgMsgVal$("## SysInfo$(4) =",x$)
+        //#cmpif 0x80000000 : DbgMsgVal$("SysInfo$(4) =",x$)
         TmpStr$ = Right$(TmpStr$, TmpVal)
         //Append to device name
         DevName$ = DevName$ + "-" + strhexize$(TmpStr$)
@@ -847,7 +1103,7 @@ function SetupGAPService()
     //take the righmost max characters
     DevName$ = right$(DevName$,MaxDevNameSize)
     
-    #cmpif 0x80000000 : DbgMsgVal$("## DeviceName =",DevName$)
+    #cmpif 0x80000000 : DbgMsgVal$("DeviceName =",DevName$)
 
     //Initialise the GAP service with the connection interval data and device name
     rc = BleGapSvcInit(DevName$, 0, 0, MinCntInt, MaxCntInt, 4000000,  0)
@@ -907,7 +1163,7 @@ sub GetConnParms(byref outStr$)
         endif
     endif
     if rc!=0 then
-        outStr$="NO CONNECTION"
+        outStr$="NO-CONNECTION"
     endif
 endsub
 
@@ -945,7 +1201,7 @@ function HndlrBleMsg(nMsgId, nCtx)
     case BLE_EVBLEMSGID_CONNECT
         //Connection
         if (ConnectionID==0) then
-            #cmpif 0x80000000 : DbgMsg("## Connected")
+            #cmpif 0x80000000 : DbgMsg("Connected")
             ConnectionID = nCtx
             Encrypted = 0
             #cmpif 0x00000002 : GPIOWrite(GPIOLED1Pin, 1)
@@ -974,7 +1230,7 @@ function HndlrBleMsg(nMsgId, nCtx)
     case BLE_EVBLEMSGID_DISCONNECT
         //Disconnection
         if (ConnectionID==nCtx) then
-            #cmpif 0x80000000 : DbgMsg("## Disconnected")
+            #cmpif 0x80000000 : DbgMsg("Disconnected")
             ConnectionID = 0
             #cmpif 0x00000002 : GPIOWrite(GPIOLED1Pin, 0)
             if (CONNPin >= 0) then
@@ -992,7 +1248,7 @@ function HndlrBleMsg(nMsgId, nCtx)
         
     case BLE_EVBLEMSGID_ENCRYPTED
         //Encrypted connection
-        #cmpif 0x80000000 :  DbgMsg("## Encrypted")
+        #cmpif 0x80000000 :  DbgMsg("Encrypted")
         //set flag to indicate we are encrypted
         Encrypted = 1
         if (TimerRunning(0) > 0) then
@@ -1006,25 +1262,25 @@ function HndlrBleMsg(nMsgId, nCtx)
         endif
         
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_DISPLAY_PASSKEY
-    #cmpif 0x80000000 :     DbgMsgVal("## Display Pairing Passkey ",nCtx)
+    #cmpif 0x80000000 :     DbgMsgVal("Display Pairing Passkey ",nCtx)
 
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_NEW_BOND
-    #cmpif 0x80000000 :     DbgMsg("## New Bond")
+    #cmpif 0x80000000 :     DbgMsg("New Bond")
 
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_UPDATED_BOND
-    #cmpif 0x80000000 :     DbgMsg("## Updated Bond")
+    #cmpif 0x80000000 :     DbgMsg("Updated Bond")
 
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER
-    #cmpif 0x80000000 :     DbgMsg("## Conn to Bonded Master ")
+    #cmpif 0x80000000 :     DbgMsg("Conn to Bonded Master ")
 
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
-    #cmpif 0x80000000 :     DbgMsgVal("## Auth Key Request, type=",nCtx)
+    #cmpif 0x80000000 :     DbgMsgVal("Auth Key Request, type=",nCtx)
       
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
     #cmpif 0x80000000 :     ShowConnParms()
         
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
-    #cmpif 0x80000000 :     DbgMsg("## Conn Parm Negotiation FAILED")
+    #cmpif 0x80000000 :     DbgMsg("Conn Parm Negotiation FAILED")
         
     case else        
     endselect
@@ -1183,7 +1439,7 @@ sub _bridge()
     ONEVENT EVVSPTXEMPTY CALL HndlrBridge
     ONEVENT EVUARTTXEMPTY CALL HndlrBridge
     
-    #cmpif 0x80000000 : DbgMsg("## BRIDGE MODE")
+    #cmpif 0x80000000 : DbgMsg("BRIDGE MODE")
 endsub
 
 //------------------------------------------------------------------------------
@@ -1452,7 +1708,7 @@ function CheckForLoginCommand(byref newData$, byref ORIGRecBuf$, byref FWDSndBuf
             newData$=left$(ORIGRecBuf$,LoginPasswordLen)
             if strcmp(newData$,LoginPassword$)==0 then
                 //magic command received so remain in command mode
-                #cmpif 0x80000000 : DbgMsg("## Login CmdMode\n")
+                #cmpif 0x80000000 : DbgMsg("Login CmdMode\n")
                 //change to command mode
                 AppMode = AppModeAppCmd
                 //and send an OK back out of the uart
@@ -1677,7 +1933,7 @@ endfunc 1
 //------------------------------------------------------------------------------
 function HndlrTmr1()
     _bridge()
-    #cmpif 0x80000000 : DbgMsg("## Login Timer Expired")
+    #cmpif 0x80000000 : DbgMsg("Login Timer Expired")
 endfunc 1
 
 

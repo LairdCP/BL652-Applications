@@ -22,13 +22,13 @@ TITLE "**** _SingleTest START****"
 
 //#include "C10000.sub"  //Enter Command mode after power up using magic command
 //#include "C10010.sub"  //Enter Command mode & INTEGER check config key validation
-//#include "C10020.sub"  //Enter Command mode & STRING check config key validation
+#include "C10020.sub"  //Enter Command mode & STRING check config key validation
 //#include "C11000.sub"  //Check the device is advertising in command mode - format 0-4
 //#include "C20000.sub"  //Connect and enter VSP command mode
 //#include "C20002.sub"  //Connect and enter VSP command mode (Encrypted)
 //#include "C20010.sub"  //Connect and enter VSP command mode - check can write config
 //#include "C30000.sub"  //Bridge Mode test (upto 2232 bytes each way simultaneously)
-#include "C50000.sub"  //Throughput Test at 7500us connection interval  C->S only
+//#include "C50000.sub"  //Throughput Test at 7500us connection interval  C->S only
 
 
 

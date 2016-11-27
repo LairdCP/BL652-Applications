@@ -22,7 +22,7 @@ SUBTITLE "Test:[vFileName].0: DevNameFormatConfigID"
 SET vArg0 "0"   //ID
 SET vArg1 "0"   //Default Value
 SET vArg2 "0"   //Min Value
-SET vArg3 "4"   //Max Value
+SET vArg3 "7"   //Max Value
 #include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -87,27 +87,27 @@ SET vArg3 "1000000"   //Max Value
 #include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-SUBTITLE "Test:[vFileName].7:"
+SUBTITLE "Test:[vFileName].7: UARTTxBufConfig"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 SET vArg0 "7"   //ID
 SET vArg1 "0"   //Default Value
 SET vArg2 "0"   //Min Value
-SET vArg3 "4096"   //Max Value
+SET vArg3 "1024"   //Max Value
 #include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-SUBTITLE "Test:[vFileName].8: CONNPinConfigID"
+SUBTITLE "Test:[vFileName].8: UARTRxBufConfigID"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 SET vArg0 "8"   //ID
 SET vArg1 "0"   //Default Value
 SET vArg2 "0"   //Min Value
-SET vArg3 "4096"   //Max Value
+SET vArg3 "1024"   //Max Value
 #include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-SUBTITLE "Test:[vFileName].9: ENCRPinConfigID"
+SUBTITLE "Test:[vFileName].9: CONNPinConfigID"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 SET vArg0 "9"   //ID
@@ -117,7 +117,7 @@ SET vArg3 "31"   //Max Value
 #include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-SUBTITLE "Test:[vFileName].10:"
+SUBTITLE "Test:[vFileName].10: ENCRPinConfigID"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 SET vArg0 "10"   //ID
@@ -191,9 +191,9 @@ SUBTITLE "Test:[vFileName].17: VspFlagsConfigID"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 SET vArg0 "17"   //ID
-SET vArg1 "8"   //Default Value
-SET vArg2 "4"   //Min Value
-SET vArg3 "28"   //Max Value  28 == 0x1C
+SET vArg1 "0"   //Default Value
+SET vArg2 "0"   //Min Value
+SET vArg3 "3"   //Max Value
 #include "CheckCfgKeyInt.sbr"  //Check Integer Config Key validation
 
 ////:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

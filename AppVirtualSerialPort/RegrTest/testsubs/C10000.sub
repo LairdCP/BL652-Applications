@@ -58,7 +58,7 @@ SUBTITLE "Test:[vFileName].5: test 'conninfo'"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 SENDCMD [vPortS] "conninfo\r"
-WAITRESPEX 5000 [vPortS] "NO CONNECTION"
+WAITRESPEX 5000 [vPortS] "NO-CONNECTION"
 WAITRESPEX 5000 [vPortS] "[cOK]"
 
 
