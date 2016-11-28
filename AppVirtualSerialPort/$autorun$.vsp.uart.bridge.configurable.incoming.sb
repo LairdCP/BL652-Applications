@@ -53,14 +53,19 @@
 // to the air-side BLE VSP.
 // 
 // On start/power up, for the first 60 seconds it will accept a password which by
-// default is "@command_mode@" and if recieved from either the uart or vsp, then 
+// default is "@command_mode@" and if received from either the uart or vsp, then 
 // it will fall into configuration mode so that the application can be configured
 // using a text command api as described below and the new configuration is 
 // automatically saved in non-volatile memory.
+//
 // (To reset configuration, enter config mode, enter the command 'exit' which will
 //  result in the module entering the native command mode and then enter the
 //  command   AT&F 0xFFFFFFFE and the non-volatile data and bonding data will be 
 //  deleted and automatically reset and re-enter the application)
+// 
+// It is also possible to enable encrypted VSP operation and for now only 'Just Works'
+// pairing is recomended as the support for MITM protection is not provided but will
+// be added at a later release of this application
 //  
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Compile time configuration
@@ -164,7 +169,7 @@
 //      Interval=7500,SuperTout=500000,SlaveLatency=0,Encrypted
 //      or
 //      Interval=7500,SuperTout=500000,SlaveLatency=0,NotEncrypted
-//   where the latter is for non-ecnrypted connections and the integer values will
+//   where the latter is for non-encrypted connections and the integer values will
 //   be as per the connection setup.
 //   If there is no connection otherwise the message "NO-CONNECTION"
 // 
@@ -177,7 +182,7 @@
 // exit
 //   Abort the application and enter the native command mode of the module
 //   from where you could completely erase all non-volatile data, including
-//   the application using the command AT&F* and then reload a new applicatio
+//   the application using the command AT&F* and then reload a new application
 //   over the uart (or VSP if the appropriate pin is in the correct state
 //   for the module to start advertising for a connection)
 //   
@@ -194,11 +199,11 @@
 //   Outputs the application version info
 //   
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Integer Configuration Keys
+// Integer Configuration Keys (for commands "cfg rd" and "cfg wr")
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // 
 // 0 : Device Name Format
-//        0    - The MAC address is not automtically appended to the device name
+//        0    - The MAC address is not automatically appended to the device name
 //        1..7 - The right most bytes of the max after conversion to hex are appended
 //               Note: The number of characters appended is double this value
 //               
@@ -260,11 +265,13 @@
 //        
 // 17 : VSP Service Encryption Requirement (For BL652 only)
 //        Bit 0 : Set for encryption required
-//        Bit 1 : Set for MITM required
-//      Please note : Do not set this to non-zero for BL600 as there is a known issue
+//        Bit 1 : Set for MITM required  (Future enhancement, leave 0 for now)
+//      Please note : 
+//         (*) Do not set this to non-zero for BL600 as there is a known issue
+//         (*) Do not set the MITM bit as it is for futue.
 // 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// String Configuration Keys
+// String Configuration Keys (for commands "cfg$ rd" and "cfg$ wr")
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // 
 // 0 : Login Password from Configuration Mode
@@ -273,7 +280,7 @@
 //        long. 
 //        The default password is "@command_mode@".
 //        If this password is received from either the uart or the vsp 
-//        connection, then bridge mode will be abondoned and config mode entered
+//        connection, then bridge mode will be abandoned and config mode entered
 //        
 // 1 : Device Name
 //        The default is "LAIRD BL652" which is the same as the inbuilt command
@@ -287,10 +294,6 @@
 //        The UUID has 16 bit offset of 1101 from the Laird Base UUID of
 //                569a0000b87f490c92cb11ba5ea5167c
 //        
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// String Configuration Keys
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//  
 //******************************************************************************
 // Compiler/Debug options
 //******************************************************************************
@@ -318,28 +321,6 @@
 //#set $cmpif, 0x00000040  //Allow configuration over UART only
 //#set $cmpif, 0x0000FFFF  //All Features + NO debug messages
 //#set $cmpif, 0xFFFFFFFF  //All Features + all debug messages
-//
-//
-//
-//
-//
-//
-//******************************************************************************
-// Documentation
-//******************************************************************************
-//
-//loadup: create VSP service (load settings from NV flash)
-//set global var to either APP_CMD_MODE or APP_PASS_MODE depending on GPIO value
-//on connect + APP_PASS_MODE:
-//    use vsp functions to pass data through
-//
-//on connect + APP_CMD_MODE
-//    receive data, when \n (or \r?) is detected use cmd-application style 
-//    command parsing (optionally string insensitive?)
-//    option to erase module?
-//    if settings updated then on disconnect do not readvertise, destroy VSP 
-//    instance, re-run OpenVSPService - do not update APP_*_MODE variable, 
-//    restart advertising
 //
 //******************************************************************************
 // Definitions
