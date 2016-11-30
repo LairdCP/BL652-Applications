@@ -29,12 +29,18 @@
 // -------------------
 // Application Version
 // -------------------
-#define AppVer                 "1.00"                             //Application version
-#define AppUpdated             "28/Nov/2016"                      //Application last updated
+#define AppVer                 "1.01"                             //Application version
+#define AppUpdated             "30/Nov/2016"                      //Application last updated
 //
 // -------------------
 // Application History
 // -------------------
+// 1.01 "30/Nov/2016"
+//    Bug Fix: DeviceNameConfigMinLen was bing used instead of LoginPswrdConfigMinLen
+//             when checking for password. However, since that value is 1 it is 
+//             relatively benign
+//    On BL600 default baudrate is now 9600 instead of 115200
+//
 // 1.00 "28/Nov/2016"
 //    Initial Release. @7.5ms conn interval
 //       Throughput : 10.5kbps  Client->Server
@@ -353,7 +359,8 @@
     #define MaxConnIntConfigMin      7500
     #define MaxConnIntConfigMax      3998750
 //Default UART baud rate
-#define UARTSpeedConfigDef       115200      //6
+#define UARTSpeedConfigDef_BL600  9600        //6
+#define UARTSpeedConfigDef_BL652  115200      //6
     #define UARTSpeedConfigMin       1200
     #define UARTSpeedConfigMax       1000000
 //Default UART Tx buffer length
@@ -661,7 +668,13 @@ function ConfigKeyGetDef( keyID as integer) as integer
     case MaxConnIntConfigID
         defval=MaxConnIntConfigDef
     case UARTSpeedConfigID
-        defval=UARTSpeedConfigDef
+        if (DevID == BL600_DEV_ID) then
+            //BL600 module
+            defval=UARTSpeedConfigDef_BL600
+        elseif (DevID == BL652_DEV_ID) then
+            //BL652 module
+            defval=UARTSpeedConfigDef_BL652
+        endif
     case UARTTxBufConfigID
         defval=UARTTxBufConfigDef
     case UARTRxBufConfigID
@@ -1682,7 +1695,7 @@ function CheckForLoginCommand(byref newData$, byref ORIGRecBuf$, byref FWDSndBuf
     
     //now only scan for login command if password len is >= than min
     GoForBridge=0
-    if ( LoginPasswordLen >= DeviceNameConfigMinLen ) then
+    if ( LoginPasswordLen >= LoginPswrdConfigMinLen ) then
         //if the buffer is longer than the length of the command string then we
         //are no longer going to get the magic login command so just enter bridge mode
         if strlen(ORIGRecBuf$) >= LoginPasswordLen then
