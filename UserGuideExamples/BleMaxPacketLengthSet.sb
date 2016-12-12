@@ -1,0 +1,5 @@
+dim rc
+rc = BLEMAXPACKETLENGTHSET(155)
+if rc == 0 THEN
+    PRINT "Maximum packet length changed to 155 bytes\n"
+endif

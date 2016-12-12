@@ -1,0 +1,81 @@
+
+// Example :: BleGattcAttributeMtuRequest.sb
+
+// IMPORTANT: before running this application, the ATT_MTU is set using the
+// interactive command 'AT+CFG 211 247' followed by 'ATZ' for the value
+// to take effect
+// In order to achieve an ATT_MTU larger than the default 23, the remote device
+// should also have its maximum ATT_MTU set to a value greater than 23. If the
+// remote device is a BL652, the same AT+CFG command should be used
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle
+
+DIM rc, stRsp$, addr$
+
+//==============================================================================
+// This handler is called when there is a BLE message
+//==============================================================================
+function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as integer
+  dim hz
+
+  select nMsgId
+  case BLE_EVBLEMSGID_CONNECT
+    print " --- Connect: (";integer.h' nCtx;")\n"
+    // Upon connection, request a new attribute length. The value used will be that
+    // whcih was set using 'AT+CFG 211 num' before running the program
+    rc = BleGattcAttributeMtuRequest(nCtx)
+
+  case BLE_EVBLEMSGID_DISCONNECT
+    print " --- Disconnect: (";integer.h' nCtx;")\n"
+    // Upon disconnection, start advertising again
+    rc = BleAdvertStart(0,addr$,100,0,0)
+
+  case else
+
+  endselect
+endfunc 1
+
+//==============================================================================
+// This handler is called when the packet length is changed
+//==============================================================================
+function HandlerPacketLength(BYVAL hConn, BYVAL Tx_Octets, BYVAL Tx_Time, BYVAL Rx_Octets, BYVAL Rx_Time)
+
+    print "Packet Length Change: \n"
+    print "Handle: ";integer.h' hConn;"\n"
+    print "Tx_Octets=";Tx_Octets;" Tx_Time =";Tx_Time;"\n"
+    print "Rx_Octets=";Rx_Octets;" Rx_Time =";Rx_Time;"\n"
+
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is an event that the attribute MTU has changed
+//==============================================================================
+function HandlerAttrMTU(BYVAL hCOnn AS INTEGER, BYVAL nSize AS INTEGER)
+
+    print "Attribute MTU Changed - Handle:";integer.h' hConn;" Size:";nSize;"\n"
+
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVBLEMSG                 call HandlerBleMsg
+OnEvent  EVATTRIBUTEMTU    	      call HandlerAttrMTU
+OnEvent  EVPACKETLENGTH    	      call HandlerPacketLength
+
+
+// Initialise LE routines
+rc = BleAdvertStart(0,addr$,100,0,0)
+// Set maximum packet length to be 251
+rc = BleMaxPacketLengthSet(251)
+// Open the gatt client. Specify the buffer size to be 251 to be able to receive
+// notifications up to 244 bytes long (maximum supported by BL652 when ATT_MTU = 247)
+rc = BleGattcOpen(251, 0)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WAITEVENT
