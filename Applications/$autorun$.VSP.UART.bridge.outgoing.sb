@@ -605,10 +605,6 @@ FUNCTION HndlrBleMsg(nMsgId, nCtx)
         if (rc==0) then
             if (BleBondingIsTrusted(addr$,fAsCentral,info,rollingAge,rollingCount)>0) then
                 rc = BleEncryptConnection(nCtx, 7, ENCRYPT_MITM_REQUIREMENT)   //Might not need this
-            else
-                //not trusted so try to talk unencrypted
-                Mode = 6
-                exitfunc HndlrFindDesc(0, TXCCCDHandle)
             endif
         endif
 
