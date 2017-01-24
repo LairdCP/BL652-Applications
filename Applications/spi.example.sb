@@ -1,0 +1,93 @@
+//The SPI slave used here is the 4 Mbit Macronix MX25R4035F
+
+#define     SPI_CS_GPIO_NUMBER  22
+
+DIM rc
+DIM h   //handle
+DIM rl  //readlen
+DIM rd$,wr$,p$
+DIM wren
+
+
+//-------------------------------------------------------------
+//Get eeprom Status Register
+//-------------------------------------------------------------
+FUNCTION EepromStatus()
+  GpioWrite(SPI_CS_GPIO_NUMBER,0)
+  wr$="\05\00" : rd$="" : rc=SpiReadWrite(wr$,rd$)
+  GpioWrite(SPI_CS_GPIO_NUMBER,1)
+ENDFUNC StrGetChr(rd$,1)
+
+//-------------------------------------------------------------
+//Wait for WR bit in status flag to reset
+//-------------------------------------------------------------
+SUB WaitWrite()
+  DO
+    GpioWrite(SPI_CS_GPIO_NUMBER,0)
+    wr$="\05\00" : rd$="" : rc=SpiReadWrite(wr$,rd$)
+    GpioWrite(SPI_CS_GPIO_NUMBER,1)
+  UNTIL ((StrGetChr(rd$,1)&1)==0)
+ENDSUB
+
+//-------------------------------------------------------------
+//Enable writes in eeprom
+//-------------------------------------------------------------
+SUB EnableWrite()
+  GpioWrite(SPI_CS_GPIO_NUMBER,0)
+  wr$="\06" : rd$="" : rc=SpiWrite(wr$)
+  GpioWrite(SPI_CS_GPIO_NUMBER,1)
+ENDSUB
+
+//-------------------------------------------------------------
+// Configure the Chip Select line using SIO22 as an output
+//-------------------------------------------------------------
+rc= GpioSetFunc(SPI_CS_GPIO_NUMBER,2,1)
+// ensure CS is not enabled
+GpioWrite(SPI_CS_GPIO_NUMBER,1)
+
+//-------------------------------------------------------------
+//open the SPI
+//-------------------------------------------------------------
+rc=SpiOpen(0,125000,0,h)
+
+
+//.............................................................
+//Write DEADBEEFBAADC0DE 8 bytes to memory at location 0x0180
+//.............................................................
+EnableWrite()
+wr$="\02\01\80\DE\AD\BE\EF\BA\AD\C0\DE"
+PRINT "\nWriting to location 0x180  ";StrHexize$(wr$)
+GpioWrite(SPI_CS_GPIO_NUMBER,0)
+rc=SpiWrite(wr$)
+GpioWrite(SPI_CS_GPIO_NUMBER,1)
+WaitWrite()
+
+//.............................................................
+//Read from written location
+//.............................................................
+wr$="\03\01\80\00\00\00\00\00\00\00\00"
+rd$=""
+GpioWrite(SPI_CS_GPIO_NUMBER,0)
+rc=SpiReadWrite(wr$,rd$)
+GpioWrite(SPI_CS_GPIO_NUMBER,1)
+PRINT "\nData at location 0x0180 is ";StrHexize$(rd$)
+
+//.............................................................
+//Prepare for reads from location 0x180 and then read 4 and then 8 bytes
+//.............................................................
+wr$="\03\01\80"
+GpioWrite(SPI_CS_GPIO_NUMBER,0)
+rc=SpiWrite(wr$)
+rd$=""
+rc=SpiRead(rd$,4)
+PRINT "\nData at location 0x0180 is ";StrHexize$(rd$)
+rd$=""
+rc=SpiRead(rd$,8)
+GpioWrite(SPI_CS_GPIO_NUMBER,1)
+PRINT "\nData at location 0x0184 is ";StrHexize$(rd$)
+
+
+//-------------------------------------------------------------
+//close the SPI
+//-------------------------------------------------------------
+SpiClose(h)
