@@ -97,7 +97,7 @@ onerror next HandlerOnErr
 // Initialise advert report and add characteristic value to it
 //------------------------------------------------------------------------------
 sub MakeAdvertRpts()
-    dim tempVal$ //Characteristic value
+    dim tempVal$ //temporary value to hold Temperature svc UUID and Temperature Value
     dim advRpt$  //Advert report
     dim scnRpt$  //Empty scan report
 
@@ -105,11 +105,11 @@ sub MakeAdvertRpts()
     AssertRC(rc, 105)
 
     //Encode temperature advert data
-    rc=BleEncode16(tempVal$, UUID_HEALTH_THERMOMETER_SERVICE, 0)   //Encode temperature svc UUID from index 0 in charVal$
+    rc=BleEncode16(tempVal$, UUID_HEALTH_THERMOMETER_SERVICE, 0)   //Encode temperature svc UUID from index 0 in tempVal$
     AssertRC(rc, 109)
-    rc=BleEncodeFloat(tempVal$, TEMP_MANTISSA, TEMP_EXPONENT, 2)   //Encode temp (342 * 10^-1) as float from index 2 in charVal$
-    AssertRC(rc, 111)
 
+    rc=BleEncodeFloat(tempVal$, TEMP_MANTISSA, TEMP_EXPONENT, 2)   //Encode temp (342 * 10^-1) as float from index 2 in tempVal$
+    AssertRC(rc, 111)
     //Append temperature value to the advert report
     rc=BleAdvRptAppendAD(advRpt$, BLE_CHARVAL_AD_TAG, tempVal$)
     AssertRC(rc, 115)
@@ -141,7 +141,7 @@ endsub
 // Handler definitions
 //******************************************************************************
 function h()     //Incase you want to update the temperature periodically
-    dim tempVal$ //Characteristic value
+    dim tempVal$ //temporary value to hold Temperature svc UUID and Temperature Value
     dim advRpt$  //Advert report
     dim scnRpt$  //Empty scan report
 
@@ -149,9 +149,9 @@ function h()     //Incase you want to update the temperature periodically
     AssertRC(rc, 149)
 
     //Encode temperature advert data
-    rc=BleEncode16(tempVal$, UUID_HEALTH_THERMOMETER_SERVICE, 0)   //Encode temperature svc UUID from index 0 in charVal$
+    rc=BleEncode16(tempVal$, UUID_HEALTH_THERMOMETER_SERVICE, 0)   //Encode temperature svc UUID from index 0 in tempVal$
     AssertRC(rc, 153)
-    rc=BleEncodeFloat(tempVal$, 1992, -2, 2)                       //Encode temp (342 * 10^-1) as float from index 2 in charVal$
+    rc=BleEncodeFloat(tempVal$, 1992, -2, 2)                       //Encode temp (342 * 10^-1) as float from index 2 in tempVal$
     AssertRC(rc, 155)
 
     //Append temperature value to the advert report
