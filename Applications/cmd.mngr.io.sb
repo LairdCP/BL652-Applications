@@ -1,0 +1,733 @@
+// Copyright (c) 2014, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// This app provides for a command interface over the uart to allow testing of the
+// different peripherals on the BL652.
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Convention : (1) Case sensitive, and commands are presented in alphabetic order
+//              (2) If line ends with \ then it continues on next line. That does
+//                  not mean that it should be sent as multiple lines
+//              (3) Replace anything between ##
+//              (4) #INTaaaa# means a number in decimal, hex, octal or binary
+//                      format -> 23 == 0x17 == h'17 == o'23 == b'10111
+//                      aaaa is just a description
+//              (5) #HEXaaaa# means a string without delimitors consisting of hex
+//                      characters only aaaa is just a description
+//              (6) #STRaaaa# means a string without delimitors
+//                      aaaa is just a description
+//              (7) "STRaaaa" means a string which must have the " delimitor
+//                      aaaa is just a description
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+//******************************************************************************
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+        // size of i[]
+#define NUM_OF_I_PARAMS                     (10)
+        // size of s$[] and must be at least 8 elements for BleSvcRegDevInfo()
+#define NUM_OF_S_PARAMS                     (10)
+        // Number of UUID handles
+#define NUM_OF_UUIDS                        (8)
+        // Number of generic handles
+#define NUM_OF_HANDLES                      (10)
+
+
+//******************************************************************************
+// Register Error Handler as early as possible
+//******************************************************************************
+sub HandlerOnErr()
+  print "\n OnErr - ";GetLastError();"\n"
+endsub
+onerror next HandlerOnErr
+
+//******************************************************************************
+// Debugging resource as early as possible
+//******************************************************************************
+
+//==============================================================================
+//==============================================================================
+sub AssertResCode(byval rc as integer,byval tag as integer)
+  if rc!=0 then
+    print "\nFailed with ";integer.h' rc;" at tag ";tag
+  endif
+endsub
+
+//******************************************************************************
+// Library Import
+//******************************************************************************
+
+//******************************************************************************
+// Debugging resource after libs
+//******************************************************************************
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+dim rc
+dim stRsp$ as string        //Uart rx data is stored here
+
+dim ok$,er$,pr$
+
+dim i[NUM_OF_I_PARAMS]      // index 0 used for return values
+dim s$[NUM_OF_S_PARAMS]     // must be at least 8 elements for BleSvcRegDevInfo()
+dim huuid[NUM_OF_UUIDS+1]   //contains uuid handles
+dim handle[NUM_OF_HANDLES+1] //generic handles
+
+dim urtcmd$                 //cmd line from uart
+dim tkn$,tlen               //used by command parser
+dim conns                   //number of connections
+dim urts                    //will be <0 if uart parser suspended
+
+//******************************************************************************
+// Initialisse Global Variable
+//******************************************************************************
+
+ok$    = "\nOK"
+er$    = "\nERROR "
+pr$    = "\r\n>"
+
+urts=0 //not suspended
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+
+//==============================================================================
+//==============================================================================
+sub UartRsp(rsp as integer)
+  if rsp == 0 then
+    print ok$;pr$
+  elseif rsp > 0 then
+    print er$;integer.h' rsp;pr$
+  endif
+  urts = rsp
+endsub
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function ExtractIntTokens(u$,stIdx,num)
+  while num>0
+    tlen = ExtractIntToken(u$,i[stIdx])
+    if tlen == 0 then
+      exitfunc 4
+    endif
+    num=num-1
+    stIdx = stIdx+1
+  endwhile
+endfunc 0
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function ExtractStrTokens(u$,stIdx,num)
+  dim st$
+  while num>0
+    tlen = ExtractStrToken(u$,st$)
+    if tlen == 0 then
+      exitfunc 3
+    endif
+    if StrGetChr(st$,0)==0x22 then
+      tlen=tlen-2
+      st$=mid$(st$,1,tlen)
+    endif
+    s$[stIdx]=st$
+    num=num-1
+    stIdx = stIdx+1
+  endwhile
+endfunc 0
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+sub PrintAsHex(p$)
+  dim slen : slen=strlen(p$)
+  dim a$
+  dim offset : offset=0
+  dim blocklen
+  dim maxstr : maxstr=sysinfo(1004)/2
+  while slen > 0
+    if slen > maxstr then
+      blocklen = maxstr
+    else
+      blocklen = slen
+    endif
+    a$=mid$(p$,offset,blocklen)
+    print StrHexize$(a$)
+    offset = offset+ blocklen
+    slen = slen - blocklen
+  endwhile
+endsub
+
+//-------------------------------------------------------------------------
+//#CMD#//  stop
+//-------------------------------------------------------------------------
+function _stop()
+  stop
+endfunc 0
+
+//-------------------------------------------------------------------------
+//#CMD#//  i2c open  #INTfreqhz# #INTnflags# #INThndlIdx#
+//#CMD#//  i2c close #INThndlIdx#
+//#CMD#//  i2c rd8   #INTslaveAddr# #INTRegAddr#
+//#CMD#//  i2c wr8   #INTslaveAddr# #INTRegAddr# #INTvalue#
+//#CMD#//  i2c rd16   #INTslaveAddr# #INTRegAddr#
+//#CMD#//  i2c wr16   #INTslaveAddr# #INTRegAddr# #INTvalue#
+//#CMD#//  i2c rd32   #INTslaveAddr# #INTRegAddr#
+//#CMD#//  i2c wr32   #INTslaveAddr# #INTRegAddr# #INTvalue#
+//#CMD#//  i2c wrrd  #INTslaveAddr# #HEXwrite# #INTreadLen#
+//-------------------------------------------------------------------------
+function _i2c()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"open")==0 then
+    //extract 3 (#INTfreqhz# #INTnflags# #INThndlIdx#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=I2cOpen(i[1],i[2],handle[i[3]])
+    if rc==0 then
+      print "\n";integer.h' i[0]
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"close")==0 then
+    //extract 1 (#INThndlIdx#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    I2cClose(handle[i[1]])
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"rd8")==0 then
+    //extract 2 (#INTslaveAddr# #INTRegAddr#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=I2cReadReg8(i[1],i[2],i[0])
+    if rc==0 then
+      print "\n";integer.h' i[0]
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"wr8")==0 then
+    //extract 3 (#INTslaveAddr# #INTRegAddr# #INTvalue#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc I2cWriteReg8(i[1],i[2],i[3])
+  endif
+  //=================================================
+  if strcmp(tkn$,"rd16")==0 then
+    //extract 2 (#INTslaveAddr# #INTRegAddr#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=I2cReadReg16(i[1],i[2],i[0])
+    if rc==0 then
+      print "\n";integer.h' i[0]
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"wr16")==0 then
+    //extract 3 (#INTslaveAddr# #INTRegAddr# #INTvalue#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc I2cWriteReg16(i[1],i[2],i[3])
+  endif
+  //=================================================
+  if strcmp(tkn$,"rd32")==0 then
+    //extract 2 (#INTslaveAddr# #INTRegAddr#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=I2cReadReg32(i[1],i[2],i[0])
+    if rc==0 then
+      print "\n";integer.h' i[0]
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"wr32")==0 then
+    //extract 3 (#INTslaveAddr# #INTRegAddr# #INTvalue#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc I2cWriteReg32(i[1],i[2],i[3])
+  endif
+  //=================================================
+  if strcmp(tkn$,"wrrd")==0 then
+    //extract 1 (#INTslaveAddr# ) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    //extract 1 (#HEXwrite# ) and store starting at s$[1]
+    rc = ExtractStrTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    s$[1]=StrDehexize$(s$[1])
+    //extract 1 (#INTreadLen# ) and store starting at i[2]
+    rc = ExtractIntTokens(urtcmd$,2,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=I2cWriteRead(i[1],s$[1],s$[0],i[2])
+    if rc==0 then
+      print "\n": PrintAsHex(s$[0])
+    endif
+    exitfunc rc
+  endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  spi open  #INTmode# #INTfreqhz# #INTnflags# #INThndlIdx#
+//#CMD#//  spi close #INThndlIdx#
+//#CMD#//  spi rd    #INTstrIdx# #INTlength#
+//#CMD#//  spi wr    #HEXwrdata#
+//#CMD#//  spi wrrd  #HEXwrdata# #INTstrIdx#
+//-------------------------------------------------------------------------
+function _spi()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"open")==0 then
+    //extract 4 (#INTmode# #INTfreqhz# #INTnflags# #INThndlIdx#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,4)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=SpiOpen(i[1],i[2],i[3],handle[i[4]])
+    if rc==0 then
+      print "\n";integer.h' i[0]
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"close")==0 then
+    //extract 1 (#INThndlIdx#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    SpiClose(handle[i[1]])
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"rd")==0 then
+    //extract 2 (#INTstrIdx# #INTlength#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=SpiRead(s$[i[1]],i[2])
+    if rc==0 then
+      print "\n": PrintAsHex(s$[i[1]])
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"wr")==0 then
+    //extract 1 (#HEXdata#) and store starting at i[1]
+    rc = ExtractStrTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    s$[1]=StrDehexize$(s$[1])
+    exitfunc SpiWrite(s$[1])
+  endif
+  //=================================================
+  if strcmp(tkn$,"wrrd")==0 then
+    //extract 1 (#HEXwrite# ) and store starting at s$[1]
+    rc = ExtractStrTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    s$[1]=StrDehexize$(s$[1])
+    //extract 1 (#INTstrIdx# ) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=SpiReadWrite(s$[1],s$[i[1]])
+    if rc==0 then
+      print "\n":PrintAsHex(s$[i[1]])
+    endif
+    exitfunc rc
+  endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  gpio setfunc #INTsionum# #INTfunc# #INTsubfunc#
+//#CMD#//  gpio setfuncex  #INTsionum# #INTfunc# #HEXstr#
+//#CMD#//  gpio rd      #INTsionum#
+//#CMD#//  gpio wr      #INTsionum# #INTvalue#
+//#CMD#//  gpio cfgpwm  #INTMinFreq# #INTmaxperiodus#
+//-------------------------------------------------------------------------
+function _gpio()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"setfunc")==0 then
+    //extract 3 (#INTsionum# #INTfunc# #INTsubfunc#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=GpioSetFunc(i[1],i[2],i[3])
+    if rc!=0 then
+      print "\n";integer.h' rc
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"setfuncex")==0 then
+    //extract 2 (#INTsionum# #INTfunc# ) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    //extract 1 (#HEXdata#) and store starting at i[1]
+    rc = ExtractStrTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    s$[1]=StrDehexize$(s$[1])
+    rc=GpioSetFuncEx(i[1],i[2],s$[1])
+    if rc!=0 then
+      print "\n";integer.h' rc
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"rd")==0 then
+    //extract 1 (#INTsionum#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    i[0]=GpioRead(i[1])
+    print "\n";i[0]
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"wr")==0 then
+    //extract 2 ( #INTsionum# #INTvalue#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    GpioWrite(i[1],i[2])
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"cfgpwm")==0 then
+    //extract 2 (#INTMinFreq# #INTmaxperiodus#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    exitfunc GpioConfigPwm(i[1],i[2])
+  endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  misc rdvcc   //read vcc voltage
+//-------------------------------------------------------------------------
+function _misc()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"rdvcc")==0 then
+    rc=ReadPwrSupplyMv()
+    print "\n";rc
+    exitfunc 0
+  endif
+endfunc 5
+
+
+//-------------------------------------------------------------------------
+//#CMD#//  flash open
+//#CMD#//  flash close
+//#CMD#//  flash write   #INToffset# #HEXdata#
+//#CMD#//  flash read    #INToffset# #INTrdlen#
+//#CMD#//  flash erase   #INToffset#
+//-------------------------------------------------------------------------
+function _flash()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"open")==0 then
+    rc=FlashOpen(i[0],i[1])
+    if rc==0 then
+      print "\nTotalSize=";integer.h' i[0];" SectorSize=";integer.h' i[1]
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"close")==0 then
+    FlashClose()
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"read")==0 then
+    //extract 2 (#INToffset# #INTrdlen#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    i[0]=FlashRead(i[1],i[2],s$[0])
+    print "\nLen=";i[0];" : StrLen=";strlen(s$[0]);"\n"
+    PrintAsHex(s$[0])
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"write")==0 then
+    //extract 1 (#INToffset# ) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    //extract 1 (#HEXdata#) and store starting at s$[1]
+    rc = ExtractStrTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    s$[1]=StrDehexize$(s$[1])
+    rc=FlashWrite(i[1],s$[1],i[0])
+    if rc!=0 then
+      print "\nExitInfo=";i[0]
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"erase")==0 then
+    //extract 1 (#INToffset#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=FlashErase(i[1])
+    exitfunc rc
+  endif
+endfunc 5
+
+//-------------------------------------------------------------------------
+//#CMD#//  charge read
+//#CMD#//  charge reset
+//#CMD#//  charge scale #INTprescaler#   //0..7 to give 2^n
+//-------------------------------------------------------------------------
+function _charge()
+  dim chrg
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"read")==0 then
+    rc=I2cReadReg16(0x64,0x02,i[0])
+    if rc==0 then
+      chrg = ((i[0]&0xFF)<<8) + ((i[0]>>8)&0xFF)
+      print "\n";chrg
+    endif
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"reset")==0 then
+    i[0]=0
+    exitfunc I2cWriteReg16(0x64,0x02,i[0])
+  endif
+  //=================================================
+  if strcmp(tkn$,"scale")==0 then
+    //extract 1 (#INTprescaler#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    if i[1]<0 then
+      i[1]=0
+    elseif i[1]>7 then
+      i[1]=7
+    endif
+    rc=I2cWriteReg8(0x64,0x01,i[1])
+    exitfunc rc
+  endif
+endfunc 5
+
+//==============================================================================
+//==============================================================================
+function OnUartCmd() as integer
+  dim i
+  rc=1 //assume there is an error
+  tlen = ExtractStrToken(urtcmd$,tkn$) //get first token
+  if tlen == 0 then
+    rc=0
+  elseif tlen > 0 then
+
+    if strcmp(tkn$,"stop")==0 then
+      rc = _stop()
+
+    elseif strcmp(tkn$,"i2c")==0 then
+      rc = _i2c()
+
+    elseif strcmp(tkn$,"spi")==0 then
+      rc = _spi()
+
+    elseif strcmp(tkn$,"gpio")==0 then
+      rc = _gpio()
+
+    elseif strcmp(tkn$,"flash")==0 then
+      rc = _flash()
+
+    elseif strcmp(tkn$,"charge")==0 then
+      rc = _charge()
+
+    elseif strcmp(tkn$,"misc")==0 then
+      rc = _Misc()
+
+    endif
+  endif
+  // send a response back to the user
+  UartRsp(rc)
+endfunc 1
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+//==============================================================================
+function HandlerUartRxCmd() as integer
+  dim nMatch
+
+  if urts < 0 then
+    //uart parser is suspended
+    exitfunc 1
+  endif
+
+  //check if CR has been received
+  nMatch=UartReadMatch(stRsp$,13)
+  if nMatch!=0 then
+    //CR exists in the input buffer
+    urtcmd$ = strsplitleft$(stRsp$,nMatch)
+    exitfunc OnUartCmd()
+  endif
+endfunc 1
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+#define NFC_MSGIN_NFCSTOPPED                (0)
+#define NFC_MSGIN_NFCFIELDOFF               (2)
+#define NFC_MSGIN_NFCFIELDON                (3)
+#define NFC_MSGIN_NFCTAGREAD                (7)
+//==============================================================================
+function HandlerNfc(msgid) as integer
+  print "\nEVNFC "
+  select(msgid)
+  case NFC_MSGIN_NFCSTOPPED
+    print "STOPPED"
+  case NFC_MSGIN_NFCFIELDOFF
+    print "FIELD OFF"
+  case NFC_MSGIN_NFCFIELDON
+    print "FIELD ON"
+  case NFC_MSGIN_NFCTAGREAD
+    print "TAG READ"
+  case else
+  endselect
+endfunc 1
+
+'//------------------------------------------------------------------------------
+'// Error handler
+'//------------------------------------------------------------------------------
+Sub HandlerOnError()
+  print "\nONERROR Handler called"
+EndSub
+
+//******************************************************************************
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+OnError next HandlerOnError
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVUARTRX                 call HandlerUartRxCmd
+OnEvent  EVNFC                    call HandlerNfc
+
+//------------------------------------------------------------------------------
+// Initialise Services and then wait for events
+//------------------------------------------------------------------------------
+
+//==============================================================================
+//==============================================================================
+sub Startup()
+endsub
+
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+Startup()
+
+//Send user prompt for uart based command interface
+print "\n\r";BleGetDeviceName$();"\n\r"
+//Send an OK response
+UartRsp(0)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+WaitEvent
+
+
