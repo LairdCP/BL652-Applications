@@ -1,0 +1,14 @@
+//Example :: FlashRead.sb
+//Flash API only works with the MX25R4035F or MX25R8035F
+
+DIM rc, nTotalSize, nSectorSize, nOffset, nReadLen, data$
+//open the flash memory in raw mode
+rc = FlashOpen(nTotalSize,nSectorSize)
+IF rc == 0 THEN
+    PRINT "\nOpened flash successfully"
+ENDIF
+data$ = ""
+nOffset = 4088 : nReadLen = 4
+rc = FlashRead(nOffset,nReadLen,data$)
+PRINT "\nRead flash data: "
+PRINT "\ndata=";StrHexize$(data$);" nReadLen=";nReadLen

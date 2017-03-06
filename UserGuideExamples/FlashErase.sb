@@ -1,0 +1,15 @@
+//Example :: FlashErase.sb
+//Flash API only works with the MX25R4035F or MX25R8035F
+
+DIM rc, nOffset, nTotalSize, nSectorSize
+//open the flash memory in raw mode
+rc = FlashOpen(nTotalSize,nSectorSize)
+IF rc == 0 THEN
+    PRINT "\nOpened flash successfully"
+ENDIF
+// Erase flash at offset 4088
+nOffset = 4088
+rc = FlashErase(nOffset)
+IF rc == 0 THEN
+    PRINT "\nFlash erased successfully"
+ENDIF
