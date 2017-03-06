@@ -1,0 +1,12 @@
+//Example :: FlashClose.sb
+//Flash API only works with the MX25R4035F or MX25R8035F
+
+DIM rc, nTotalSize, nSectorSize
+//open the flash memory in raw mode
+rc = FlashOpen(nTotalSize,nSectorSize)
+IF rc == 0 THEN
+    PRINT "\nOpened flash successfully"
+ENDIF
+// Close access to the flash
+FlashClose()
+PRINT "\nClosed flash"

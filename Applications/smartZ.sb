@@ -1341,14 +1341,15 @@ sub _hciCfg()
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         elseif strcmp(tkn$, "version")==0 then
             //Display version information
-            dim fw, X, Y, Z
+            dim fw, W, X, Y, Z
             fw = SYSINFO(3)
-            X = (fw >> 24) & 0xFF
-            Y = (fw >>  8) & 0xFFFF
-            Z = (fw      ) & 0xFF
+			W = (fw >> 24) & 0xFF
+			X = (fw >> 18) & 0x3F
+			Y = (fw >>  6) & 0xFFF
+			Z =  fw  & 0x3F
             print "\nApp Version: smartZ Version ";mjVersion;".";mnVersion;"\n"
             print "Device Name: ";BleGetDeviceName$();"\n"
-            print "Firmware: 28.";X;".";Y;".";Z;"\n"
+            print "Firmware: ";W;".";X;".";Y;".";Z;"\n"
             print "Manufacturer: Laird Technologies\n"
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
