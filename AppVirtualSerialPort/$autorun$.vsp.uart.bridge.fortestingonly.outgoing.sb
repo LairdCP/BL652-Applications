@@ -373,38 +373,6 @@ FUNCTION HndlrUartRxVSP()
 ENDFUNC 1
 
 //==============================================================================
-//UART data received
-//==============================================================================
-FUNCTION HndlrUartRxVSPex()
-    dim uLen, bytesWaiting, newData$
-    IF BufferState == 0 && ModemStat == 1 then
-        //Get number of bytes waiting in actual Uart RX Buffer before reading
-        bytesWaiting = UartInfo(3)
-
-        //Read data that has arrived through via the UART
-        uLen = UartReadN(u$, 20)
-
-        //Get the most recently received data
-        newData$ = Right$(u$, bytesWaiting)
-
-        IF uLen > 0 then
-            if StrCmp(newData$,"^")==0 then
-                //Parse the ^ entry
-                if SwitchToCmd() == 1 then
-                    print "\n"
-                    //Switch to command mode
-                    rc = SendMsgApp(0,CMD_MODE)
-                endif
-            else
-                rc = BLEGATTCWRITE(BleHandle, RXHandle, u$)
-                BufferState = 1
-                StrShiftLeft(u$,uLen)
-            endif
-        ENDIF
-    ENDIF
-ENDFUNC 1
-
-//==============================================================================
 //BLE connection timed out
 //==============================================================================
 FUNCTION HndlrConnTO()

@@ -29,12 +29,24 @@
 // -------------------
 // Application Version
 // -------------------
-#define AppVer                 "1.01"                             //Application version
-#define AppUpdated             "30/Nov/2016"                      //Application last updated
+#define AppVer                 "1.22"                             //Application version
+#define AppUpdated             "24/Feb/2017"                      //Application last updated
 //
 // -------------------
 // Application History
 // -------------------
+//
+// 1.22 "24/Feb/2017"
+//    In _Bridge() call hndlrBridge() too and flush is no longer both rx&tx but onlu
+//    single direction outwards
+//
+// 1.20 "23/Feb/2017"
+//    Bug Fix: If a disconnection happens for any reason while the modemOut characteristic
+//             value is 0 (because the other end told us not to send data) and all buffers
+//             are full, then the local uart RTS which is also deasserted is never reasserted.
+//             Solution is to call UartFlush() and BleVspFlush() on the disconnect event.
+//             [[[ See case BLE_EVBLEMSGID_DISCONNECT in handler function HndlrBleMsg() ]]]
+//
 // 1.01 "30/Nov/2016"
 //    Bug Fix: DeviceNameConfigMinLen was bing used instead of LoginPswrdConfigMinLen
 //             when checking for password. However, since that value is 1 it is 
@@ -63,8 +75,9 @@
 // it will fall into configuration mode so that the application can be configured
 // using a text command api as described below and the new configuration is 
 // automatically saved in non-volatile memory.
+// ^^^^^^^^^^^^^^^^^^^
 //
-// (To reset configuration, enter config mode, enter the command 'exit' which will
+// (To reset configuration, enter config mode by sending the command 'exit' which will
 //  result in the module entering the native command mode and then enter the
 //  command   AT&F 0xFFFFFFFE and the non-volatile data and bonding data will be 
 //  deleted and automatically reset and re-enter the application)
@@ -93,7 +106,7 @@
 // the Login Password be changed via command "cfg$ wr 1 newpassword"
 //
 // In a similar manner it is also recommended that the 'exit' command is 
-// disabled in a similar manner.
+// disabled.
 //
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //  DEBUGGING :: Upper 16 bits of the compilation bitmask
@@ -118,15 +131,15 @@
 // It is possible to use two digital output pins to indicate that there is
 // a connection and that the connection is encrypted.
 // 
-// The config key 9 is used to specify a SIO pin number (0..31) which is will
+// The config key 9 is used to specify a SIO pin number (0..31) which will
 // be set to 1 when there is a connection and 0 when there isn't. If the 
 // config key is set to -1, then it is not enabled. Please be careful not to
-// allocate a pin that is being used for UART activity
+// allocate a pin that is being used for the 4 UART lines RX/TX/CTS/RTS
 // 
 // The config key 10 is used to specify a SIO pin number (0..31) which is will
 // be set to 1 when the connection is encrypted and 0 when there isn't. If the 
 // config key is set to -1, then it is not enabled. Please be careful not to
-// allocate a pin that is being used for UART activity
+// allocate a pin that is being used for the 4 UART lines RX/TX/CTS/RTS
 // 
 // Note that if both keys are set to the same pin number, then it implies that
 // when encrypted VSP operation is required then that SIO pin will go high 
@@ -140,23 +153,47 @@
 //   Outputs the mac address of the module
 //   
 // bridge
-//   Use this command to exot config mode and into bridge mode so that if there 
+//   Use this command to exit config mode and into bridge mode so that if there 
 //   is a connection, then any data arriving over the uart is conveyed to the 
 //   peer and vice-versa any data coming over the air is output from the uart
 //   
 // cfg rd #INTid
 //   Outputs the current integer value of configuration key #INTid
-//     All the keys are described below
-// 
-// cfg$ rd #INTid
-//   Outputs the current string value of configuration key #INTid
-//     All the keys are described below
+//     All the keys are described below in the 'cfg wr' command
 //   
 // cfg wr #INTid #INTval
 //   Writes new value #INTval to the integer configuration key #INTid.
 //   If the value is invalid then it will be rejected. An OK response
 //   implies it was accepted.
-//     All the keys are described below
+//     All the keys are as follows :-
+//         ---------------------------
+//         0: BT address append format to the advertised device name 
+//              0 = BT Address not included 
+//              1-7 = Last X bytes, which means 2X Charactes as they are converted to hex
+//         1: TX Power in dBm
+//         2: Disconnect time (if device does not encrypt connection - VSP flag must be set to encrypted) in ms
+//         3: Advertising interval (lower will raise the power consumption)
+//         4: Minimum connection interval in microseconds
+//         5: Maximum connection interval in microseconds
+//         6: UART baud rate
+//         7: UART Tx buffer length (0 == default)
+//         8: UART Rx buffer length (0 == default)
+//         9: Action of CONN pin (-1 for no gpio indication, otherwise the GPIO selected)
+//        10: Action of ENCR pin (-1 for no gpio indication, otherwise the GPIO selected)
+//        11: UUID of Tx characteristic (sibling of Base UUID)
+//        12: UUID of Rx characteristic (sibling of Base UUID)
+//        13: UUID of Modem-In characteristic (sibling of Base UUID)
+//              Set to 0 to disable (it will also disable MdmIn)
+//        14: UUID of Modem-Out characteristic (sibling of Base UUID)
+//              Set to 0 to disable (it will also disable MdmOut)
+//        15: Length of VSP Tx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
+//        16: Length of VSP Rx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
+//        17: VSP Service Encryption setting, Bit 0: Enable(1)/Disable(0), Bit 1: (MITM(1)/NoMITM(0)
+//        ----------------------------
+// 
+// cfg$ rd #INTid
+//   Outputs the current string value of configuration key #INTid
+//     All the keys are described below in the 'cfg$ wr' command
 // 
 // cfg$ wr #INTid #STRval
 //   Writes new value #STRval to the integer configuration key #INTid.
@@ -164,7 +201,12 @@
 //   implies it was accepted.
 //   The string value #STRval, must be delimited with double quotes "
 //   if the string contains whitespace
-//     All the keys are described below
+//     All the keys are as follows :-
+//         ----------------------------
+//         0: Login Password (Must NOT be > 19 because \r is added and we want to be 20 max)
+//         1: Advertised name of device
+//         2: VSP Service UUID
+//         ----------------------------
 // 
 // client
 //   If in a connection, then the mac address of the peer is output, otherwise 
@@ -182,8 +224,8 @@
 // erase
 //   If the appropriate SIO pin is high, then the application will be deleted
 //   and the module will be reset resulting it advertising so that it can be
-//   connected to and over a non-encrypted virtual serial port service a new
-//   application can be downloaded over the air
+//   connected to and over a non-encrypted virtual serial port service so that 
+//   a new application can be downloaded over the air
 // 
 // exit
 //   Abort the application and enter the native command mode of the module
@@ -202,7 +244,10 @@
 //   Outputs the value returned by SYSINFO$(#INTid)
 //   
 // ver
-//   Outputs the application version info
+//   Outputs the abbreviated application version info
+//   
+// verx
+//   Outputs the full application version info
 //   
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Integer Configuration Keys (for commands "cfg rd" and "cfg wr")
@@ -313,7 +358,7 @@
 //   0x00000002 : LED1: connection status (on = connected)
 //   0x00000004 : LED2: Operation mode (ON = app config mode)
 //   0x00000008 : LED2: flashes if fatal error occured
-//   0x00000010 : Not used
+//   0x00000010 : Flush Buffers on Disconnect
 //   0x00000020 : Allow config mode over UART
 //   0x00000040 : Allow config mode over VSP
 //   0x00000080 : Allow 'exit' command in command mode
@@ -322,104 +367,106 @@
 //   0x80000000 : Enable debugging messages
 //   0x00010000 : Enable Asserts printed out of UART
 //   ======================================================
-#set $cmpif, 0x000000E0  //Allow configuration over UART & VSP & 'exit' command
+#set $cmpif, 0x000000E0  //Allow configuration over UART & VSP & 'exit' command 
+//#set $cmpif, 0x000000F0  //Allow configuration over UART & VSP & 'exit' command & Flush on disconnect
 //#set $cmpif, 0x000000A0  //Allow configuration over UART only & 'exit' command
 //#set $cmpif, 0x00000040  //Allow configuration over UART only
 //#set $cmpif, 0x0000FFFF  //All Features + NO debug messages
 //#set $cmpif, 0xFFFFFFFF  //All Features + all debug messages
+//#set $cmpif, 0x00000000  //Allow configuration over UART & VSP & 'exit' command
 //
 //******************************************************************************
 // Definitions
 //******************************************************************************
 
-//Default selection if the BT address is appended to the advertised device name 
+//0:BT address append format to the advertised device name 
 //   0 = BT Address not included 
 //   1-7 = Last X bytes, which means 2X Charactes as they are converted to hex
 #define DevNameFormatConfigDef   0      //0
     #define DevNameFormatConfigMin   0
     #define DevNameFormatConfigMax   7
-//Default TX Power in dBm
+//1:TX Power in dBm
 #define TxPowerConfigDef         4      //1
     #define TxPowerConfigMin         -20
     #define TxPowerConfigMax         4
-//Default disconnect time (if device does not encrypt connection - VSP flag must be set to encrypted) in ms
+//2:Disconnect time (if device does not encrypt connection - VSP flag must be set to encrypted) in ms
 #define EncrDisconToutConfigDef  8000      //2
     #define EncrDisconToutConfigMin  1000
     #define EncrDisconToutConfigMax  20000
-//Default Advertising interval (lower will raise the power consumption)
+//3:Advertising interval (lower will raise the power consumption)
 #define AdvertIntvlConfigDef     250      //3
     #define AdvertIntvlConfigMin     20
     #define AdvertIntvlConfigMax     10240
-//Default Minimum connection interval
+//4:Minimum connection interval in microseconds
 #define MinConnIntConfigDef      7500      //4
     #define MinConnIntConfigMin      7500
     #define MinConnIntConfigMax      3998750
-//Default Maximum connection interval
+//5:Maximum connection interval in microseconds
 #define MaxConnIntConfigDef       40000      //5
     #define MaxConnIntConfigMin      7500
     #define MaxConnIntConfigMax      3998750
-//Default UART baud rate
+//6:UART baud rate
 #define UARTSpeedConfigDef_BL600  9600        //6
 #define UARTSpeedConfigDef_BL652  115200      //6
     #define UARTSpeedConfigMin       1200
     #define UARTSpeedConfigMax       1000000
-//Default UART Tx buffer length
+//7:UART Tx buffer length (0 == default)
 #define UARTTxBufConfigDef       0      //7
     #define UARTTxBufConfigMin       0
     #define UARTTxBufConfigMax       1024
-//Default UART Rx buffer length
+//8:UART Rx buffer length (0 == default)
 #define UARTRxBufConfigDef       0      //8
     #define UARTRxBufConfigMin       0
     #define UARTRxBufConfigMax       1024
-//Default action of CONN pin (-1 for no gpio indication, otherwise the GPIO selected)
+//9:Action of CONN pin (-1 for no gpio indication, otherwise the GPIO selected)
 #define CONNPinConfigDef         29      //9
     #define CONNPinConfigMin         -1
     #define CONNPinConfigMax         31
-//Default action of ENCR pin (-1 for no gpio indication, otherwise the GPIO selected)
+//10:Action of ENCR pin (-1 for no gpio indication, otherwise the GPIO selected)
 #define ENCRPinConfigDef         30      //10
     #define ENCRPinConfigMin         -1
     #define ENCRPinConfigMax         31
-//Default UUID of Tx characteristic (sibling of Base UUID)
+//11:UUID of Tx characteristic (sibling of Base UUID)
 #define VspTxUUIDConfigDef       0x2000      //11
     #define VspTxUUIDConfigMin       1
     #define VspTxUUIDConfigMax       0xFFFF
-//Default UUID of Rx characteristic (sibling of Base UUID)
+//12:UUID of Rx characteristic (sibling of Base UUID)
 #define VspRxUUIDConfigDef       0x2001      //12
     #define VspRxUUIDConfigMin       1
     #define VspRxUUIDConfigMax       0xFFFF
-//Default UUID of Modem-In characteristic (sibling of Base UUID)
-//Set to 0 to disable (it will also disable MdmIn)
+//13:UUID of Modem-In characteristic (sibling of Base UUID)
+//   Set to 0 to disable (it will also disable MdmIn)
 #define VspMdmInUUIDConfigDef    0x2003      //13
     #define VspMdmInUUIDConfigMin    0
     #define VspMdmInUUIDConfigMax    0xFFFF
-//Default UUID of Modem-Out characteristic (sibling of Base UUID)
-//Set to 0 to disable (it will also disable MdmOut)
+//14:UUID of Modem-Out characteristic (sibling of Base UUID)
+//   Set to 0 to disable (it will also disable MdmOut)
 #define VspMdmOutUUIDConfigDef   0x2002      //14
     #define VspMdmOutUUIDConfigMin   0
     #define VspMdmOutUUIDConfigMax   0xFFFF
-//Default length of Tx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
+//15:Length of VSP Tx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
 #define VspTxBufConfigDef        384      //15
     #define VspTxBufConfigMin        0
     #define VspTxBufConfigMax        1024
-//Default length of Rx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
+//16:Length of VSP Rx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
 #define VspRxBufConfigDef        384      //16
     #define VspRxBufConfigMin        0
     #define VspRxBufConfigMax        1024
-//Default VSP Service Encryption setting, Bit 0: Enable(1)/Disable(0), Bit 1: (MITM(1)/NoMITM(0)
+//17:VSP Service Encryption setting, Bit 0: Enable(1)/Disable(0), Bit 1: (MITM(1)/NoMITM(0)
 #define VspEncryptConfigDef      0      //17
     #define VspEncryptConfigMin      0
     #define VspEncryptConfigMax      3
 
-//Default Login Password (Must NOT be > 19 because \r is added and we want to be 20 max)
+//0:Login Password (Must NOT be > 19 because \r is added and we want to be 20 max)
 #define LoginPswrdConfigDef      "@command_mode@"   //0
     #define LoginPswrdConfigMinLen   8
     #define LoginPswrdConfigMaxLen   19
-//Default advertised name of device
+//1:Advertised name of device
 #define DeviceNameConfigDef_BL652    "LAIRD BL652"   //1
 #define DeviceNameConfigDef_BL600    "LAIRD BL600"   //1
     #define DeviceNameConfigMinLen    1
     #define DeviceNameConfigMaxLen    12
-//VSP default
+//2:VSP Service UUID
 #define VspServiceUUIDConfigDef  "569a1101b87f490c92cb11ba5ea5167c"    //2
     #define VspServiceUUIDConfigMinLen   32
     #define VspServiceUUIDConfigMaxLen   32
@@ -540,7 +587,7 @@ dim CONNPin, ENCRpin
 
 //Holds the timeout value that will disconnect a device that connects but doesn't 
 //encrypt the connection within the time (if the encryption flag is enabled)
-dim DisconnectTime
+dim DisconnectTime   //if 0 then encryption via cfg 17 is not requested
 
 //temporary variables used by the command parser
 dim i[NUM_OF_I_PARAMS]      // index 0 used for return values
@@ -1172,6 +1219,14 @@ endsub
 #cmpif 0x80000000 : endsub
 
 //------------------------------------------------------------------------------
+// Function for bridging data between the VSP service and the UART
+//------------------------------------------------------------------------------
+function HndlrBridge()
+    //Pass data between UART and VSP service
+    BleVspUartBridge()
+endfunc 1
+
+//------------------------------------------------------------------------------
 // Function to handle Ble event messages
 //------------------------------------------------------------------------------
 #define BLE_EVBLEMSGID_CONNECT                  0   //nCtx = connection handle
@@ -1239,6 +1294,10 @@ function HndlrBleMsg(nMsgId, nCtx)
                 //Cancel disconnect timer
                 TimerCancel(0)
             endif
+            //Flush uart RX buffer so that local RTS is asserted
+            #cmpif 0x00000010 : UartFlush(1)
+            //Flush VSP TX buffer so that we can send more data
+            #cmpif 0x00000010 : BleVspFlush(2)
         endif
         
     case BLE_EVBLEMSGID_ENCRYPTED
@@ -1280,14 +1339,6 @@ function HndlrBleMsg(nMsgId, nCtx)
     case else        
     endselect
     
-endfunc 1
-
-//------------------------------------------------------------------------------
-// Function for bridging data between the VSP service and the UART
-//------------------------------------------------------------------------------
-function HndlrBridge()
-    //Pass data between UART and VSP service
-    BleVspUartBridge()
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -1371,22 +1422,26 @@ function _reset()
 endfunc 0
 
 //------------------------------------------------------------------------------
-//##CMD##  ver
+//##CMD##  ver     //abreviated
+//##CMD##  verx    //full
 //------------------------------------------------------------------------------
-function _ver(byref bufferStr$)        
-    bufferStr$ = "\nVSP Version " + AppVer + " updated " + AppUpdated + " on "
-    if (DevID == BL600_DEV_ID) then
-        //Running on BL600
-        bufferStr$ = bufferStr$ + "BL600 " + GetVersion$( 6,6,14,6)            
-    elseif (DevID == BL652_DEV_ID) then
-        //Running on BL652
-        bufferStr$ = bufferStr$ + "BL652 " + GetVersion$( 8,6,12,6)
-    elseif (DevID == BT900_DEV_ID) then
-        //Running on BL652
-        bufferStr$ = bufferStr$ + "BT900 " + GetVersion$( 6,6,14,6)
-    else
-        //Unknown module
-        bufferStr$ = bufferStr$ + "Unknown"
+function _ver(byref bufferStr$, ful)  //ful!=0 for the full
+    bufferStr$ = "\nVSP Version " + AppVer
+    if ful != 0 then
+      bufferStr$ = bufferStr$ + "\nUpdated " + AppUpdated + " on "
+      if (DevID == BL600_DEV_ID) then
+          //Running on BL600
+          bufferStr$ = bufferStr$ + "BL600 " + GetVersion$( 6,6,14,6)            
+      elseif (DevID == BL652_DEV_ID) then
+          //Running on BL652
+          bufferStr$ = bufferStr$ + "BL652 " + GetVersion$( 8,6,12,6)
+      elseif (DevID == BT900_DEV_ID) then
+          //Running on BL652
+          bufferStr$ = bufferStr$ + "BT900 " + GetVersion$( 6,6,14,6)
+      else
+          //Unknown module
+          bufferStr$ = bufferStr$ + "Unknown"
+      endif
     endif
 endfunc 0
 
@@ -1435,6 +1490,10 @@ sub _bridge()
     ONEVENT EVUARTTXEMPTY CALL HndlrBridge
     
     #cmpif 0x80000000 : DbgMsg("BRIDGE MODE")
+    
+    //start bridging cached data (Feb 2017)
+    rc=HndlrBridge()
+    
 endsub
 
 //------------------------------------------------------------------------------
@@ -1616,7 +1675,11 @@ function ParseCommand(byref CommandStr$, byref rspBuf$)
             
         elseif strcmp(tkn$,"ver")==0 then
             //output platform and version information
-            rc = _ver(bufferStr$)
+            rc = _ver(bufferStr$,0)
+            
+        elseif strcmp(tkn$,"verx")==0 then
+            //output platform and version information
+            rc = _ver(bufferStr$,1)
             
         elseif (strcmp(tkn$, "addr") == 0) then
             //Output module Bluetooth address
