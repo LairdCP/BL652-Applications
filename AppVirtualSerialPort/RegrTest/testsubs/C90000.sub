@@ -20,7 +20,20 @@ SUBTITLE "Test:[vFileName].0.1: Server Config and reset both sides"
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 SET vPort "0"
-#include "ResetConfigs.sbr"  //Clear configs
+
+// Change AT+CFG 100 so that VSP pin is not required and it is permanently enabled
+#include "DTRoff.sbr"
+#include "ResetViaBreak.sbr"
+SENDCMD [vPort] "at&f 0xFFFFFFFE\r"
+WAITRESPEX 5000 [vPort] "FFS Erased, Rebooting..."
+WAITRESPEX 5000 [vPort] "\n00\r"
+SENDCMD [vPort] "AT+CFG 100 1\r"  //enable VSP mode
+WAITRESPEX 5000 [vPort] "\n00\r"
+SENDCMD [vPort] "ATZ\r"
+WAITRESPEX 5000 [vPort] "\n00\r"
+#include "DTRon.sbr"
+
+SET vPort "0"
 #include "EnterCmdMode.sbr"  //Enter Command Mode
 
 PRINT "Set Device Name"
@@ -84,6 +97,9 @@ WAITRESPEX 5000 [vPortC] "[cMACADDRSq] *** \22[vTemp0]\22"
 
 SENDCMD [vPortS] "AT I 0\r"
 WAITRESPEX 5000 [vPortS] "[cATI0]"
+WAITRESPEX 5000 [vPortS] "\n00\r"
+
+SENDCMD [vPortS] "AT&F*\r"
 WAITRESPEX 5000 [vPortS] "\n00\r"
 
 PRINT "************************************************************"

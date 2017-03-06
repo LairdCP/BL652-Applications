@@ -1,5 +1,6 @@
 //###############################################################################
-// PlatformConfig.sub  :: 
+// PlatformConfig.sub  ::
+// Copy this file and rename to PlatformConfig.sub for your platform
 //###############################################################################
 
 PRINT "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
@@ -11,18 +12,18 @@ PRINT "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //===============================================================================
 // DUT (VSP server) - $autorun$.vsp.uart.bridge.configurable.incoming.sb
 //===============================================================================
-CONST cComPortS           "18"
+CONST cComPortS           "7"
 CONST cBaudS              "115200,N,8,1,,0"  //ModemStatus triggering disabled
-CONST cMACADDRS           "0016A40B1626"     //Use AT I 4
-CONST cMACADDRSq          "00[cMACADDRS]"
+CONST cMACADDRS           "F158CAE77A2B"     //Use AT I 4
+CONST cMACADDRSq          "01[cMACADDRS]"
 
 //===============================================================================
 // VSP Client       - $autorun$.vsp.uart.bridge.configurable.outgoing.sb
 //===============================================================================
-CONST cComPortC           "31"
+CONST cComPortC           "8"
 CONST cBaudC              "115200,N,8,1,,0"  //ModemStatus triggering disabled
-CONST cMACADDRC           "0016A40B1623"     //Use AT I 4
-CONST cMACADDRCq          "00[cMACADDRC]"
+CONST cMACADDRC           "E56EF79190E8"     //Use AT I 4
+CONST cMACADDRCq          "01[cMACADDRC]"
 
 
 
