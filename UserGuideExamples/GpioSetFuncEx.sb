@@ -8,3 +8,5 @@ PRINT GpioSetFuncEx(3,3,"")
 PRINT GpioSetFuncEx(23,3,"\16\0C\03")
 //SIO17 (LED0) digital out, initial output high
 PRINT GpioSetFuncEx(17,2,"\01")
+//SIO26 digital out, PWM
+PRINT GpioSetFuncEx(26,2,"\01")
