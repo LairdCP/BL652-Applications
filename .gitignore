@@ -17,3 +17,5 @@
 
 StringPlayer*.exe
 AppVirtualSerialPort/$autorun$.vsp.uart.bridge.configurable.incoming-*.sb
+ATinterface/$autorun$.AT.interface.0*.sb
+ATinterface/$TEMP$.vsp.uart.bridge.configurable.incoming.sb
