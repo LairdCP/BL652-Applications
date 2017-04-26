@@ -1,0 +1,71 @@
+//Example :: EvConnParamReq.sb
+
+// In order to get the expected output, this application should be run against
+// a peripheral device. The peripheral device should request new connection 
+// parameters upon connection, which in turn will trigger EVCONNPARAMREQ on 
+// this device.
+
+// This is the target Bluetooth device to connect to, 7 bytes in hex
+#define BTAddr "000016A4B75202"
+
+// BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE        		14  //nCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL   		15  //nCtx = connection handle
+
+DIM rc
+
+//==============================================================================
+// This handler is called when there is a BLE message
+//==============================================================================
+FUNCTION HndlrBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) 
+    SELECT nMsgId
+        CASE BLE_EVBLEMSGID_CONNECT
+            PRINT "\nBLE Connection ";integer.h' nCtx;"\n"
+        CASE BLE_EVBLEMSGID_DISCONNECT
+            PRINT "\nDisconnected ";nCtx;"\n"
+        CASE BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+			// The connection parameter has been updated. Read connection parameters
+			dim intrvl,sprvto,slat
+			rc= BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
+			print "--- Param Updated \n"
+			print "- interval:";intrvl;" supervision timeout:";sprvto;" latency:";slat;"\n"
+		CASE BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
+			print "--- Param Update Failed\n"
+			print "- interval:";intrvl;" supervision timeout:";sprvto;" latency:";slat;"\n"
+        CASE ELSE
+            PRINT "\nUnknown Ble Msg"
+    ENDSELECT
+ENDFUNC 1
+
+//==============================================================================
+// This handler is called when peripheral requests new parameter
+//==============================================================================
+function HandlerParamReq(BYVAL hConn AS INTEGER, BYVAL intrvlmin AS INTEGER, BYVAL intrvlmax AS INTEGER, BYVAL sprvto AS INTEGER, BYVAL slat AS INTEGER)
+
+    print "--- Param Request \n"
+	print "- intervalmin:";intrvlmin;" intervalmax:";intrvlmax;" supervision timeout:";sprvto;" latency:";slat;"\n"
+	// Accept the peripheral's request by changing the connection's conn parameters
+	rc = BleSetCurConnParms(hConn, intrvlmin, intrvlmax, sprvto, slat)
+
+endfunc 1
+
+//==============================================================================
+// Program starts here
+//==============================================================================
+// Disable auto accept so that we get an event when peripheral requests
+// new connection parameteres. Set to 0 to re-enable auto accept
+rc = BleConnectConfig(8,1)
+// Connect to peripheral
+DIM addr$ : addr$ = BTAddr
+addr$ = StrDehexize$(addr$)
+rc = BleConnect(addr$, 5000, 7500, 7700, 500000)
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+ONEVENT  EVCONNPARAMREQ		CALL HandlerParamReq
+
+WAITEVENT

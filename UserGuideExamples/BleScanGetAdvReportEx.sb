@@ -1,0 +1,41 @@
+//Example :: BleScanGetAdvReportEx.sb
+DIM rc
+
+'//Scan for 5 seconds with no filtering
+rc = BleScanStart(5000, 0)
+
+IF rc==0 THEN
+    PRINT "\nScanning"
+ELSE
+    PRINT "\nError: "; INTEGER.H'rc
+ENDIF
+
+'//This handler will be called when scanning times out
+FUNCTION HndlrScanTO()
+    PRINT "\nScan timeout"
+ENDFUNC 0
+
+'//This handler will be called when an advert is received
+FUNCTION HndlrAdvRpt()
+    DIM nAdvType, periphAddr$, advData$, nDiscarded, nRssi, nChannel
+    
+    '//Read all cached advert reports
+    rc=BleScanGetAdvReportEx(nAdvType, periphAddr$, advData$, nDiscarded, nRssi, nChannel)
+    WHILE (rc == 0)
+		PRINT "\n\nAdvert Type: "; nAdvType
+        PRINT "\nPeer Address: "; StrHexize$(periphAddr$)
+        PRINT "\nAdvert Data: ";StrHexize$(advData$)
+        PRINT "\nNo. Discarded Adverts: ";nDiscarded
+        PRINT "\nRSSI: ";nRssi
+		PRINT "\nChannel: ";nChannel
+        rc=BleScanGetAdvReportEx(nAdvType, periphAddr$, advData$, nDiscarded, nRssi, nChannel)
+    ENDWHILE
+
+    PRINT "\n\n --- No more adverts in cache"
+ENDFUNC 1
+       
+
+ONEVENT EVBLE_SCAN_TIMEOUT CALL HndlrScanTO
+ONEVENT EVBLE_ADV_REPORT   CALL HndlrAdvRpt
+
+WAITEVENT
