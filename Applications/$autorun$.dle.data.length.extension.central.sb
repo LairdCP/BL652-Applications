@@ -31,24 +31,21 @@
 // Definitions
 //******************************************************************************
 
-#define ENABLE_DATA_LENGTH_EXTENSION			1
-
-// Set this to 0 to disable all debugging messages
-#define ENABLE_DEBUG_PRINTS             1
+#define ENABLE_DATA_LENGTH_EXTENSION    1
 
 // Hardcoded GATT attributes of remote BL652 running $autorun$.dle.peripheral.sb
-#define REMOTE_RX_VALUE_HANDLE			19
-#define REMOTE_TX_VALUE_HANDLE			16
-#define REMOTE_MODEMIN_VALUE_HANDLE		24
-#define REMOTE_MODEMOUT_VALUE_HANDLE	21
-#define REMOTE_TX_CCCD_HANDLE			17
-#define REMOTE_MODEMOUT_CCCD_HANDLE		22
+#define REMOTE_RX_VALUE_HANDLE			21
+#define REMOTE_TX_VALUE_HANDLE			23
+#define REMOTE_MODEMIN_VALUE_HANDLE		18
+#define REMOTE_MODEMOUT_VALUE_HANDLE	16
+#define REMOTE_TX_CCCD_HANDLE			19
+#define REMOTE_MODEMOUT_CCCD_HANDLE		24
 
 //******************************************************************************
 // Global Variable Declarations
 //******************************************************************************
 dim rc								//Result code
-dim BleHandle						//Ble Connection Handle
+dim ConnectionID						//Ble Connection Handle
 dim Mode : Mode = 0					//Current program mode: 0 = connecting, 1 = connected, find modem in characteristic, 2 = find modem out characteristic, 3 = find RX characteristic, 4 = find TX characteristic, 5 = find modem out descriptor, 6 = find TX descriptor, 7 = enable modem out notIFications, 8 = enable TX, 9 = enable modem in status
 dim MIHandle      					//Modem In handle (IF one exists)
 dim MOHandle						//Modem Out handle (IF one exists)
@@ -85,6 +82,14 @@ nAttributeLength = 20				// The default attribute length on the BL652 is 20
 //******************************************************************************
 
 //------------------------------------------------------------------------------
+// Register Error Handler as early as possible
+//------------------------------------------------------------------------------
+sub HandlerOnErr()
+    print "\n OnErr - ";GetLastError();"\n"
+endsub
+onerror next HandlerOnErr
+
+//------------------------------------------------------------------------------
 // Assert to check that a resultCode is 0 which means success
 //------------------------------------------------------------------------------
 SUB AssertRC(rc, tag)
@@ -95,29 +100,38 @@ ENDSUB
 
 //-------------------------------------------------------------------------------
 // Definitions for attribute values needed to achieve Data Length Extension
-#define ATTRIBUTE_MTU_KEY_ID					211
-#define ATTRIBUTE_DATA_LENGTH_KEY_ID			212
-#define ATTRIBUTE_MTU_MAXIMUM					247
-#define ATTRIBUTE_DATA_LENGTH_MAXIMUM			244
-#define BLE_MAX_PACKET_LENGTH					251
+#define ATTRIBUTE_MTU_KEY_ID                    211	// CFG ID 211
+#define ATTRIBUTE_DATA_LENGTH_KEY_ID            212	// CFG ID 212
+#define USE_STRINT_IN_EVENTS_KEY_ID             213	// CFG ID 213
+#define ENABLE_HIGH_BANDWIDTH_KEY_ID            214	// CFG ID 214
+
+#define ATTRIBUTE_DATA_LENGTH_MAXIMUM           244 // Gatt Server Attribute Maximum Length - Range:20-244
+#define ATTRIBUTE_MTU_MAXIMUM                   247 // Attribut Maximum Trnasmission Unit - Range:23-247
+#define BLE_MAX_PACKET_LENGTH                   251 // BLE Maximum packet length - Range: 27:251
+#define USE_STRING_IN_EVENTS                    1	// 0: use EVATTRNOTIFY, 1: use EVATTRNOTIFYEX (See user manual)
+#define BLE_ENABLE_HIGH_BANDWIDTH               1	// 0: 3 packets/interval (default), 1: 6 packets/interval
+
 //-------------------------------------------------------------------------------
 // This function is used to configure the BL652 to use the maximum Attribute
-// Transmission Unit (MTU), maximum Attribute Data Length, and the maximum
-// packet length
+// Transmission Unit (MTU), and the maximum packet length
 //-------------------------------------------------------------------------------
 FUNCTION DataLengthExtension()
 
-	// Get current maximum ATT_MTU and attribute data length
-	rc = NvCfgKeyGet(ATTRIBUTE_MTU_KEY_ID, nAttributeMTU)
-	rc = NvCfgKeyGet(ATTRIBUTE_DATA_LENGTH_KEY_ID, nAttributeLength)
+    // Get current attribute MTU and attribute data length values
+    rc = NvCfgKeyGet(ATTRIBUTE_MTU_KEY_ID, nAttributeMTU)
+    rc = NvCfgKeyGet(ATTRIBUTE_DATA_LENGTH_KEY_ID, nAttributeLength)
 
 	// Check if these are the values needed to achieve DLE
-	IF  (nAttributeMTU != ATTRIBUTE_MTU_MAXIMUM) || (nAttributeLength != ATTRIBUTE_DATA_LENGTH_MAXIMUM) THEN
+	IF  (nAttributeMTU != ATTRIBUTE_MTU_MAXIMUM) THEN
 		// Change the Attribute MTU to be the maximum allowed by the BL652 (247)
 		rc = NvCfgKeySet(ATTRIBUTE_MTU_KEY_ID, ATTRIBUTE_MTU_MAXIMUM)
 		// Change the Attribute Data Length to be the maximum allowed by the BL652 (244)
 		rc = NvCfgKeySet(ATTRIBUTE_DATA_LENGTH_KEY_ID, ATTRIBUTE_DATA_LENGTH_MAXIMUM)
-		// Reset the module so that the data is overwritten
+		// Allow data to be thrown in messages (i.e. Use EVATTRNOTIFYEX instead of EVATTRNOTIFY)
+		rc = NvCfgKeySet(USE_STRINT_IN_EVENTS_KEY_ID, USE_STRING_IN_EVENTS)
+		// Change the bandwidth configuration to HIGH (6 packets per interval)
+		rc = NvCfgKeySet(ENABLE_HIGH_BANDWIDTH_KEY_ID, BLE_ENABLE_HIGH_BANDWIDTH)
+        // Reset the module so that the data is overwritten
 		Reset(0)
 	ENDIF
 
@@ -131,168 +145,26 @@ ENDFUNC 0
 // Initiate connection to remote device
 //-------------------------------------------------------------------------
 FUNCTION _connect()
-	DIM addr$
+
+	DIM addr$, nMinConnInterval, nMaxConnInterval
 	addr$ = BTAddr
     addr$ = StrDehexize$(addr$)
 
+IF ENABLE_DATA_LENGTH_EXTENSION==1 THEN
+    // For packet length extension, the optimum connection interval is 28750 us
+    nMinConnInterval = 28000
+    nMaxConnInterval = 29000
+ELSE
+    // For default packet length, the optimum connection interval is 7500 us
+    nMinConnInterval = 7500
+    nMaxConnInterval = 7700
+ENDIF
+
     //Connect to target device
-    rc = BLECONNECT(addr$, 5000, 7500, 7700, 500000)
+    rc = BLECONNECT(addr$, 5000, nMinConnInterval, nMaxConnInterval, 500000)
 	print "\n## Connecting: ";StrHexize$(addr$);"\n"
-ENDFUNC rc
 
-//------------------------------------------------------------------------------
-//UART data received
-//------------------------------------------------------------------------------
-FUNCTION HndlrUartRxVSP()
-    DIM uLen
-    IF BufferState == 0 && ModemStat == 1 then
-
-        //Read data that has arrived through via the UART
-        uLen = UartReadN(u$, nAttributeLength)
-
-        IF uLen > 0 then
-            rc = BLEGATTCWRITE(BleHandle, RXHandle, u$)
-            BufferState = 1
-            StrShiftLeft(u$,uLen)
-        ENDIF
-    ENDIF
-ENDFUNC 1
-
-//------------------------------------------------------------------------------
-//BLE connection timed out
-//------------------------------------------------------------------------------
-FUNCTION HndlrConnTO()
-    print "## Connection attempt timed out.\n"
-ENDFUNC 1
-
-//------------------------------------------------------------------------------
-//Characteristic written
-//------------------------------------------------------------------------------
-FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
-
-    IF (Mode == 7) THEN
-        //Enable TX notIFications
-        Mode = 8
-        Val$ = "\01\00"
-        rc = BLEGATTCWRITE(BleHandle, TXCCCDHandle, Val$)
-    ELSEIF (Mode == 8) THEN
-        //Write to Modem In
-		Mode = 9
-		Val$ = "\01"
-		BufferFull = 0
-		rc = BLEGATTCWRITE(BleHandle, MIHandle, Val$)
-    ELSEIF (Mode == 9) THEN
-        //Now ready to send data
-        BufferFull = 0
-        BufferState = 0
-        Mode = 10
-        u$ = ""
-        RecBuf$ = ""
-		// Now that everything is setup, Requst maximum MTU
-		rc = BleGattcAttributeMtuRequest(BleHandle)
-    ELSEIF (Mode == 10) THEN
-        //UART data was written
-        BufferState = 0
-        rc = HndlrUartRxVSP()
-    ENDIF
-ENDFUNC 1
-
-//------------------------------------------------------------------------------
-//Received BLE notification
-//------------------------------------------------------------------------------
-FUNCTION HndlrAttrNotify()
-    DIM nCtx, Hndl, Data$, discard, UartSent, arc
-    arc = BLEGATTCNOTIFYREAD(nCtx, Hndl, Data$, discard)
-    while (arc == 0)
-        IF (Hndl == MOHandle) then
-            //Modem Out changed
-            Val$ = "\01"
-            IF (strcmp(Val$, Data$) == 0) then
-                ModemStat = 1
-                rc = HndlrUartRxVSP()
-            ELSE
-                ModemStat = 0
-            ENDIF
-        ELSEIF (Hndl == TXHandle) then
-            //Data
-            IF BufferFull == 0 then
-                UartSent = UARTWRITE(Data$)
-                IF UartSent != strlen(Data$) then
-                    STRSHIFTLEFT(Data$, UartSent)
-                    RecBuf$ = Data$
-
-                    //NotIFy that we cannot accept more data
-                    Val$ = "\00"
-                    BufferFull = 1
-                    rc = BLEGATTCWRITE(BleHandle, MIHandle, Val$)
-                ENDIF
-            ELSE
-                //Buffer is full
-                RecBuf$ = RecBuf$ + Data$
-            ENDIF
-        ENDIF
-        Data$ = ""
-        arc = BLEGATTCNOTIFYREAD(nCtx, Hndl, Data$, discard)
-    endwhile
-ENDFUNC 1
-
-//------------------------------------------------------------------------------
-//UART transmit buffer empty
-//------------------------------------------------------------------------------
-FUNCTION HndlrUartTxEmpty()
-    DIM UartSent
-    IF (strlen(RecBuf$) > 0) then
-        UartSent = UARTWRITE(RecBuf$)
-        IF (UartSent == strlen(RecBuf$)) then
-            //Cleared - notify
-            RecBuf$ = ""
-            Val$ = "\01"
-            BufferFull = 0
-            rc = BLEGATTCWRITE(BleHandle, MIHandle, Val$)
-        ELSE
-            //Not cleared so shift
-            STRSHIFTLEFT(RecBuf$, UartSent)
-        ENDIF
-    ELSE
-        BufferFull = 0
-    ENDIF
-ENDFUNC 1
-
-//------------------------------------------------------------------------------
-//BLE characteristics data changed
-//------------------------------------------------------------------------------
-FUNCTION HndlrAttrRead(nCtx, Hndl, Stat)
-    DIM Data$, discard, UartSent, nAhndl, nOfst
-    rc = BleGattcReadData(Hndl,nAhndl,nOfst,Data$)
-    IF (Hndl == MOHandle) then
-        //Modem Out changed
-        Val$ = "\01"
-        IF (strcmp(Val$, Data$) == 0) then
-            ModemStat = 1
-            rc = HndlrUartRxVSP()
-        ELSE
-            ModemStat = 0
-        ENDIF
-    ELSEIF (Hndl == TXHandle) then
-        //Data
-        IF BufferFull == 0 then
-            UartSent = UARTWRITE(Data$)
-            IF UartSent != strlen(Data$) then
-                STRSHIFTLEFT(Data$, UartSent)
-                RecBuf$ = Data$
-
-                //Notify that we cannot accept more data
-                Val$ = "\00"
-                BufferFull = 1
-                rc = BLEGATTCWRITE(BleHandle, MIHandle, Val$)
-            ENDIF
-        ELSE
-            //Buffer is full
-            RecBuf$ = RecBuf$ + Data$
-        ENDIF
-    ENDIF
-    Data$ = ""
-ENDFUNC 1
+ENDFUNC 0
 
 //------------------------------------------------------------------------------
 // This shows the cuttent connection parameters
@@ -303,8 +175,124 @@ SUB ShowConnParms(nConnHandle)
 	print "## ConnParms :: Interval=";intrvl;",SuperTout=";sprvto;",SlaveLatency=";slat;"\n"
 ENDSUB
 
+//******************************************************************************
+// Event Handlers
+//******************************************************************************
+
 //------------------------------------------------------------------------------
-// Function to handle Ble event messages
+// EVUARTRX - UART data received
+//------------------------------------------------------------------------------
+FUNCTION HndlrUartRxVSP()
+
+    DIM uLen, DataToSend$
+
+    IF BufferState == 0 && ModemStat == 1 then
+        //Read data that has arrived through via the UART
+        uLen = UartReadN(u$, nAttributeLength)
+		//print "Uart data\n"
+		// Ensure that we only read nAttribureLength
+		DataToSend$ = Left$(u$, nAttributeLength)
+
+        IF uLen > 0 then
+        rc = BLEGATTCWRITECMD(ConnectionID, RXHandle, DataToSend$)
+            if rc!= 0 then
+                //PRINT "Send fAILED\n"
+                BufferState = 1
+            else
+                //PRINT "Send Succeeded\n"
+				StrShiftLeft(u$,uLen)
+			endif
+        ENDIF
+    ENDIF
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVBLE_CONN_TIMEOUT - BLE connection timed out
+//------------------------------------------------------------------------------
+FUNCTION HndlrConnTO()
+
+    print "## Connection attempt timed out.\n"
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVATTRWRITE - Remote characteristic written
+//------------------------------------------------------------------------------
+FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
+
+    IF (Mode == 7) THEN
+        //Enable TX notIFications
+        Mode = 8
+        Val$ = "\01\00"
+        rc = BLEGATTCWRITE(ConnectionID, TXCCCDHandle, Val$)
+    ELSEIF (Mode == 8) THEN
+        //Write to Modem In
+		Mode = 9
+		Val$ = "\01"
+		BufferFull = 0
+		rc = BLEGATTCWRITE(ConnectionID, MIHandle, Val$)
+		//print "Char Txx Handle written "
+    ELSEIF (Mode == 9) THEN
+        //Now ready to send data
+        BufferFull = 0
+        BufferState = 0
+        Mode = 10
+        u$ = ""
+        RecBuf$ = ""
+		// Now that everything is setup, Requst maximum MTU
+		rc = BleGattcAttributeMtuRequest(ConnectionID)
+    ELSEIF (Mode == 10) THEN
+        //UART data was written
+        BufferState = 0
+        rc = HndlrUartRxVSP()
+    ENDIF
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVATTRNOTIFYEX - Received BLE notification
+//------------------------------------------------------------------------------
+FUNCTION HndlrAttrNotify()
+
+    DIM nCtx, Hndl, Data$, discard, UartSent, arc
+    arc = BLEGATTCNOTIFYREAD(nCtx, Hndl, Data$, discard)
+    while (arc == 0)
+        IF (Hndl == TXHandle) then
+            PRINT Data$
+        ENDIF
+        Data$ = ""
+        arc = BLEGATTCNOTIFYREAD(nCtx, Hndl, Data$, discard)
+    endwhile
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVATTRNOTIFYEX - Received BLE notification
+//------------------------------------------------------------------------------
+FUNCTION HndlrAttrNotifyEx(BYVAL hConn AS INTEGER, BYVAL hAttr AS INTEGER,BYVAL nType AS INTEGER, BYVAL nLength AS INTEGER,BYVAL data$ AS STRING)
+
+	IF (hAttr == TXHandle) then
+        // Just print data that we got
+        PRINT Data$
+	ENDIF
+	Data$ = ""
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVNOTIFYBUF - Buffer fro BleGattcWriteCmd has been emptied
+//------------------------------------------------------------------------------
+FUNCTION HndlrNtfyBuf()
+
+	BufferState = 0
+    // Buffer emptied after GattcWriteCmd, go send more data
+	rc = HndlrUartRxVSP()
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVBLEMSG - Function to handle Ble event messages
 //------------------------------------------------------------------------------
 #define BLE_EVBLEMSGID_CONNECT                  0   //nCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT               1   //nCtx = connection handle
@@ -326,35 +314,37 @@ FUNCTION HndlrBleMsg(nMsgId, nCtx)
 
     select nMsgId
     case BLE_EVBLEMSGID_CONNECT
-        //Opening the GATT client only when connected to save memory
-        rc = BleGattcOpen(256, 0)
-        BleHandle = nCtx
         print "## Connected!\n"
+        ConnectionID = nCtx
+        ShowConnParms(ConnectionID)
+        // Opening the GATT client only when connected to save memory
+        rc = BleGattcOpen(4096, 0)
+        Mode = 7    // This is checked in HndlrAttrWrite to move forward in state machine
 		// Enable modem out notifications
 		Val$ = "\01\00"
-		Mode = 7
-		rc = BLEGATTCWRITE(BleHandle, MOCCCDHandle, Val$)
+		rc = BLEGATTCWRITE(ConnectionID, MOCCCDHandle, Val$)
 
     case BLE_EVBLEMSGID_DISCONNECT
         print " ## Disconnected!\n"
         BleGattcClose()
 
     case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
-		ShowConnParms(nCtx)
+		ShowConnParms(ConnectionID)
 
     case else
     endselect
+
 ENDFUNC 1
 
 //------------------------------------------------------------------------------
-// This handler is called when there is an event that the attribute MTU has changed
+// EVATTRIBUTEMTU - This handler is called when there is an event that the attribute MTU has changed
 //------------------------------------------------------------------------------
 FUNCTION HandlerAttrMTUchng(BYVAL hCOnn AS INTEGER, BYVAL nSize AS INTEGER)
     print "## Attribute MTU Changed - Size=";nSize;"\n"
 ENDFUNC 1
 
 //------------------------------------------------------------------------------
-// This handler is called when the packet length is changed
+// EVPACKETLENGTH - This handler is called when the packet length is changed
 //------------------------------------------------------------------------------
 FUNCTION HandlerPacketLength(BYVAL hConn, BYVAL Tx_Octets, BYVAL Tx_Time, BYVAL Rx_Octets, BYVAL Rx_Time)
     print "## Packet Length Changed - Tx=";Tx_Octets;" Rx=";Tx_Octets;"\n"
@@ -366,7 +356,7 @@ ENDFUNC 1
 
 // Close UART and open at 921600 baud rate
 UartClose()
-rc = UartOpen(921600, 0, 0, "CN81H")
+rc = UartOpen(1000000, 1024, 256, "CN81H")
 
 // Enable Data Length Extension
 IF ENABLE_DATA_LENGTH_EXTENSION==1 THEN
@@ -379,18 +369,18 @@ rc = _connect()
 //------------------------------------------------------------------------------
 // Enable synchronous event handlers
 //------------------------------------------------------------------------------
-// Generic BLE events
-ONEVENT EVATTRWRITE        CALL HndlrAttrWrite
-ONEVENT EVATTRNOTIFY       CALL HndlrAttrNotify
-ONEVENT EVATTRREAD         CALL HndlrAttrRead
-ONEVENT EVBLEMSG           CALL HndlrBleMsg
-ONEVENT EVBLE_CONN_TIMEOUT CALL HndlrConnTO
 // UART events
-ONEVENT EVUARTRX           CALL HndlrUartRxVSP
-ONEVENT EVUARTTXEMPTY      CALL HndlrUartTxEmpty
+ONEVENT EVUARTRX            CALL HndlrUartRxVSP
+// Generic BLE events
+ONEVENT EVATTRWRITE         CALL HndlrAttrWrite
+ONEVENT EVBLEMSG            CALL HndlrBleMsg
+ONEVENT EVBLE_CONN_TIMEOUT  CALL HndlrConnTO
+ONEVENT EVATTRNOTIFY        CALL HndlrAttrNotify        // Used if AT+CFG 213=0
+ONEVENT EVATTRNOTIFYEX      CALL HndlrAttrNotifyEx      // Used if AT+CFG 213=1
 // Data Length Extension events
-ONEVENT EVATTRIBUTEMTU     CALL HandlerAttrMTUchng
-ONEVENT EVPACKETLENGTH     CALL HandlerPacketLength
+ONEVENT EVATTRIBUTEMTU      CALL HandlerAttrMTUchng
+ONEVENT EVPACKETLENGTH      CALL HandlerPacketLength
+ONEVENT EVNOTIFYBUF         CALL HndlrNtfyBuf
 
 //------------------------------------------------------------------------------
 // Wait for a synchronous event.
