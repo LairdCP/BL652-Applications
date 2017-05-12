@@ -60,7 +60,7 @@ rc = BleSecMngrIoCap(3)
 
 // Start advertising
 IF BleAdvertStart(0,addr$,25,60000,0)==0 THEN	  
-    PRINT "## Adverts Started\n"
+    PRINT "## Adverts Started\n"					
 	PRINT "## Make a connection to the BL652\n"
 ELSE											
     PRINT "## Advertisement not successful\n"

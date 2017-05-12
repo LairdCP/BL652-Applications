@@ -2,9 +2,9 @@
 
 DIM hMyChar,rc,at$,conHndl
 
-//==============================================================================
+//------------------------------------------------------------------------------
 // Initialise and instantiate service, characteristic, start adverts
-//==============================================================================
+//------------------------------------------------------------------------------
 FUNCTION OnStartup()
     DIM rc, hSvc, attr$, adRpt$, addr$, scRpt$ : attr$="Hi"
     
@@ -24,17 +24,17 @@ FUNCTION OnStartup()
     rc=BleAdvertStart(0,addr$,20,300000,0)
 ENDFUNC rc
 
-//==============================================================================
+//------------------------------------------------------------------------------
 // Close connections so that we can run another app without problems
-//==============================================================================
+//------------------------------------------------------------------------------
 SUB CloseConnections()
     rc=BleDisconnect(conHndl)
     rc=BleAdvertStop()
 ENDSUB
 
-//==============================================================================
+//------------------------------------------------------------------------------
 // Ble event handler
-//==============================================================================
+//------------------------------------------------------------------------------
 FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
     conHndl=nCtx
     IF nMsgID==1 THEN
@@ -45,23 +45,41 @@ FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
     ENDIF
 ENDFUNC 1
 
-//==============================================================================
-// New char value handler
-//==============================================================================
+//------------------------------------------------------------------------------
+// AUTHVAL - The remote has written to the characteristic using WRITE (write with response)
+//------------------------------------------------------------------------------
 FUNCTION HndlrAuthVal(BYVAL connHandle, BYVAL charHandle, BYVAL readWrite) 
     DIM s$
     IF charHandle == hMyChar THEN
         IF readWrite!=0 THEN
             rc=BleAuthorizeChar(connHandle, charHandle, 3)  //Grant access
             rc=BleCharValueRead(hMyChar,s$)
-            PRINT "\nNew Char Value: ";s$
+            PRINT "\nAuthenticated char written using Write with response."
+			PRINT "\nNew Char Value: ";s$
         ENDIF
     ENDIF
-    CloseConnections()
 ENDFUNC 1
 
-ONEVENT  EVAUTHVAL CALL HndlrAuthVal
-ONEVENT  EVBLEMSG  CALL HndlrBleMsg
+//------------------------------------------------------------------------------
+// AUTHVALEX - The remote has written to the characteristic using WRITE_CMD (write without response)
+//------------------------------------------------------------------------------
+FUNCTION HndlrAuthValEx(BYVAL connHandle, BYVAL charHandle, BYVAL offset, BYVAL length, BYVAL data$ AS STRING) 
+    DIM s$
+	IF charHandle == hMyChar THEN
+		// We are OK with this connection handle, so write the characteristic
+		rc = BleCharValueWriteEx(charHandle, offset, data$)
+		rc=BleCharValueRead(hMyChar,s$)
+		PRINT "\nAuthenticated char written using Write without response."
+		PRINT "\nNew Char Value: ";s$
+    ENDIF
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+ONEVENT  EVBLEMSG		CALL HndlrBleMsg
+ONEVENT  EVAUTHVAL		CALL HndlrAuthVal
+ONEVENT  EVAUTHVALEX	CALL HndlrAuthValEx
 
 IF OnStartup()==0 THEN
     rc = BleCharValueRead(hMyChar,at$)
@@ -71,7 +89,4 @@ ELSE
     PRINT "\nFailure OnStartup"
 ENDIF
 
-
 WAITEVENT
-
-PRINT "\nExiting..."

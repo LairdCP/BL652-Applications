@@ -1,13 +1,9 @@
 //Example :: BleGattcNotifyRead.sb
 //
-// Server created using BleGattcTblNotifyRead.sub invoked in _OpenMcp.scr
-// using Nordic Usb Dongle PC10000
-//
 // Charactersitic at handle 15 has notify   (16==cccd)
 // Charactersitic at handle 18 has indicate (19==cccd)
 
 DIM rc,at$,conHndl,uHndl,atHndl
-
 
 //==============================================================================
 // Initialise and instantiate service, characteristic, start adverts
@@ -74,20 +70,38 @@ function HandlerAttrWrite(cHndl,aHndl,nSts) as integer
 endfunc 0
 
 '//==============================================================================
+'// Thrown when AT+CFG 213 = 0
 '//==============================================================================
 function HandlerAttrNotify() as integer
   dim chndl,aHndl,att$,dscd
-    print "\nEVATTRNOTIFY Event"
+    print "\nEVATTRNOTIFY Event \n"
   rc=BleGattcNotifyRead(cHndl,aHndl,att$,dscd)
   print "\n  BleGattcNotifyRead()"
   if rc==0 then
-    print " cHndl=";cHndl
-    print " attrHndl=";aHndl
-    print " data=";StrHexize$(att$)
-    print " discarded=";dscd
+    print " Connection Handle=";cHndl
+    print " Characteristic Handle=";aHndl
+    print " Data=";StrHexize$(att$)
+    print " Discarded=";dscd
   else
     print " failed with ";integer.h' rc
   endif
+endfunc 1
+
+'//==============================================================================
+'// Thrown when AT+CFG 213 = 1
+'//==============================================================================
+function HandlerAttrNotifyEx(BYVAL hConn, BYVAL hChar, BYVAL nType, BYVAL nLen, BYVAL Data$) as integer
+
+	print "\nEVATTRNOTIFYEX Event :: "
+	if nType == 1 then
+		print "Notification\n"
+	elseif nType == 2 then
+		print "Indication\n"
+	endif
+
+	print " Connection Handle=";hConn
+    print " Characteristic Handle=";hChar
+    print " Data=";Data$
 endfunc 1
 
 //==============================================================================
@@ -95,7 +109,8 @@ endfunc 1
 //==============================================================================
 ONEVENT  EVBLEMSG           CALL HndlrBleMsg
 OnEvent  EVATTRWRITE        call HandlerAttrWrite
-OnEvent  EVATTRNOTIFY       call HandlerAttrNotify
+OnEvent  EVATTRNOTIFY       call HandlerAttrNotify   // Thrown when AT+CFG 213 = 0
+OnEvent  EVATTRNOTIFYEX     call HandlerAttrNotifyEx // Thrown when AT+CFG 213 = 1
 
 IF OnStartup()==0 THEN
     PRINT "\nAdvertising, and Gatt Client is open\n"

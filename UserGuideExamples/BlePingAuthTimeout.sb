@@ -1,0 +1,74 @@
+//Example :: BlePingAuthTimeout.sb
+
+// Ensure that the remote device is advertising
+
+// Set BLE_PING_TIMEOUT to a value more than (2*connection interval)
+// for the feature to work. Otherwise the event will be triggered 
+// because two connection events are required for a packet to be 
+// sent back and forth.
+#define BLE_PING_TIMEOUT	10000
+#define BTAddr 				"000016A4B75204"
+	
+// Variable declaration
+DIM hndl, rc, intrvl,sprvto,slat, pingTO
+
+//------------------------------------------------------------------------------
+// Function to handle Ble event messages
+//------------------------------------------------------------------------------
+#define BLE_EVBLEMSGID_CONNECT                  0   //nCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT               1   //nCtx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                18  //nCtx = connection handle
+//------------------------------------------------------------------------------
+FUNCTION HandlerBleMsg(nMsgId, nCtx)
+
+    select nMsgId
+    case BLE_EVBLEMSGID_CONNECT
+        print "## Connected!\n"
+		// Read connection interval
+		rc = BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
+		print "## Connection Interval=";intrvl;"\n"
+		// Pair to the remote device
+		rc = BlePair(nCtx, 0)
+
+    case BLE_EVBLEMSGID_DISCONNECT
+        print "## Disconnected!\n"
+        BleGattcClose()
+
+    case BLE_EVBLEMSGID_ENCRYPTED
+		print "## Encrypted Connection!\n"
+		// Start LE Ping Authenticated Timeout
+		pingTO = BLE_PING_TIMEOUT
+		rc = BlePingAuthTimeout(nCtx, pingTO)
+		if rc == 0 then
+			print "## Ping auth timeout enabled :: Timeout=";pingTO;"\n"
+		endif
+
+    case else
+    endselect
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// This handler is called when the LE Ping authentication has timed out with no response
+//------------------------------------------------------------------------------
+function  HandlerLePingTimeout(BYVAL hConn AS INTEGER)
+	print "## LE Ping Timeout : ";integer.h' hConn;"\n"
+	// Disconnect as this is not safe, check timeout is more than 2*connection interval
+	rc = BleDisconnect(hConn)
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVBLEMSG                 call HandlerBleMsg
+OnEvent  EVBLE_PING_AUTH_TIMEOUT  call HandlerLePingTimeout
+
+//Connect to remote device
+DIM addr$
+addr$ = BTAddr
+addr$ = StrDehexize$(addr$)
+rc = BleConnect(addr$, 5000, 27000, 30000, 500000)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+//------------------------------------------------------------------------------
+WaitEvent

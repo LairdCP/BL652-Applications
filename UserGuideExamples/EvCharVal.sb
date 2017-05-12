@@ -59,8 +59,24 @@ FUNCTION HandlerCharVal(BYVAL charHandle, BYVAL offset, BYVAL len)
     CloseConnections()
 ENDFUNC 1
 
-ONEVENT  EVCHARVAL CALL HandlerCharVal
-ONEVENT  EVBLEMSG  CALL HndlrBleMsg
+//==============================================================================
+// New char value handler
+//==============================================================================
+FUNCTION HandlerCharValue(BYVAL nConnHandle, BYVAL charHandle, BYVAL offset, BYVAL len, BYVAL Data$)
+    DIM s$
+    IF charHandle == hMyChar THEN
+        PRINT "\n";len;" byte(s) have been written to char value attribute from offset ";offset
+        PRINT "\nData written is :";Data$;" - Connection Handle=";integer.h' nConnHandle
+
+		rc=BleCharValueRead(hMyChar,s$)
+        PRINT "\nNew Char Value: ";s$
+    ENDIF
+    CloseConnections()
+ENDFUNC 1
+
+ONEVENT  EVCHARVAL   CALL HandlerCharVal	// This event is thrown if AT+CFG 213 = 0
+ONEVENT  EVCHARVALUE CALL HandlerCharValue	// This event is thrown if AT+CFG 213 = 1
+ONEVENT  EVBLEMSG    CALL HndlrBleMsg
 
 IF OnStartup()==0 THEN
     rc = BleCharValueRead(hMyChar,at$)
