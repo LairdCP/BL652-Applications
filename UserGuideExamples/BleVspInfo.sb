@@ -11,5 +11,6 @@ PRINT "\nRx buffer capacity: "; BleVSpInfo(1)
 PRINT "\nTx buffer capacity: "; BleVSpInfo(2)
 PRINT "\nBytes waiting to be read from rx buffer: "; BleVSpInfo(3)
 PRINT "\nFree space in tx buffer: "; BleVSpInfo(4)
+PRINT "\nTx/Rx Characteristic Size: "; BleVSpInfo(5)	// Changed using AT+CFG 212 xx
 BleVspClose()
 PRINT "\nVsp State: "; BleVSpInfo(0)
