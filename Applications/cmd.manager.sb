@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier:ISC
 //
-//TODO: Isolate carrat checking thing into its own function so that you can use it across apps easily
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // +++++                                                                      ++
 // +++++  When UwTerminal downloads the app it will store it as a filenname   ++
@@ -456,6 +455,14 @@
 //    - Changes whether OOB pairing is preferred or not
 //
 // -----------------------------------------------------------------------------
+// ble pair lescpref #INTLESCPREF#
+//    - Security Manager related
+//    - This will result in BleSecMngrLescPairingPref() being called
+//    - valid values for #INTLESCPREF# are
+//         0     LESC pairing is not preferred
+//         1     LESC pairing is preferred
+//
+// -----------------------------------------------------------------------------
 // ble bond stats
 //    - Get the classic BT bonding manager database statistics.
 //
@@ -633,6 +640,10 @@
 #define BLE_EVBLEMSGID_POWER_FAILURE_WARNING            19   //msgCtx = current supply voltage
 #define BLE_EVBLEMSGID_UNENCRYPTED                      20   //msgCtx = connection handle
 #define BLE_EVBLEMSGID_DEVICENAME_WRITE                 21   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_OOB_AVAILABLE_REQEST             25 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTHENTICATION_FAILED            26 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_LESC_PAIRING                     27 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_LESC_OOB_REQUEST                 28 // msgCtx = connection handle
 
 
 //APP RUN MODES
@@ -1715,6 +1726,7 @@ endfunc 5
 //#CMD#//  ble pair bondreq    #INTbondreq#
 //#CMD#/   ble pair accept     #INTconnHandle# #INTaccept#
 //#CMD#/   ble pair oobpref    #INTprefoob#
+//#CMD#/   ble pair lesc       #INTLESCPref#
 //#CMD#//  ble pair            #INTconnHandle# #INTenablebonding#
 //-------------------------------------------------------------------------
 function _BlePair()
@@ -1812,6 +1824,15 @@ function _BlePair()
 
     endif
 
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if strcmp(tkn$,"lesc")==0 then
+        //extract 1 (#INTLESCPreferred#) and store starting at i[1]
+        rc = ExtractIntTokens(urtcmd$,1,1)
+        if rc != 0 then
+            exitfunc rc
+        endif
+        exitfunc BleSecMngrLescPairingPref(i[1])
+	endif
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //Store the connection handle
     i[1] = StrValDec(tkn$)
@@ -2389,8 +2410,17 @@ function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as intege
   case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
     DbgMsgVal(" +++ Auth Key Request, type=",nCtx)
 
+  case   BLE_EVBLEMSGID_AUTHENTICATION_FAILED
+    DbgMsgVal(" +++ Auth Failed ", nCtx)
+
   case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
     ShowConnParms(nCtx)
+
+  case BLE_EVBLEMSGID_LESC_PAIRING
+    DbgMsgVal(" +++ LESC pairing", nCtx)
+
+  case BLE_EVBLEMSGID_LESC_OOB_REQUEST
+    DbgMsgVal(" +++ LESC OOB Request ", nCtx)
 
   case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
     DbgMsg(" ??? Conn Parm Negotiation FAILED")
