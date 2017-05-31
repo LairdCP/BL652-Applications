@@ -1,0 +1,208 @@
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Copyright (c) 2017, Laird                                                  ++
+//                                                                            ++
+// Permission to use, copy, modify, and/or distribute this software for any   ++
+// purpose with or without fee is hereby granted                              ++
+//                                                                            ++
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES   ++
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF           ++
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR    ++
+// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES     ++
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN      ++
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR ++
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.                ++
+//                                                                            ++
+// SPDX-License-Identifier:ISC                                                ++
+//                                                                            ++
+// <description>                                                              ++
+//                                                                            ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app to the module it will be saved    ++
+// +++++  as a file with filename $autorun$ which means it will run           ++
+// +++++  automatically on reset.                                             ++
+// +++++  The File System can be queried using the command AT+DIR             ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// This file is included in "$autorun$.low.power.vsp.uart.bridge.sb" and 
+// provides custom behavior for the low power vsp to uart bridge. This file
+// contains function and subroutines that are depicted in red colour in
+// the state machine diagram shown in "LowPowerVspUartBridge.pdf"
+//
+// The custom behaviour in this file is designed to provide messages to the
+// host via the uart which consist the following:-
+//
+// \n!CL!\r    Uart is closed while there is no ble connection
+// \n!OP!\r    Uart is opened while there is no ble connection
+// \n^OP^\r    Uart is opened while there is a ble connection
+// \n^CL^\r    Uart is closed while there is a ble connection
+// \n^CO^\r    A Ble connection has been established
+// \n!DI!\r    A Ble connection has disconnected
+//
+// Examination of the messages shows that the character ! is used when there is
+// no ble connection and the character ^ is ised when there is a connection so
+// a useful way to infer connection status.
+// Also \n is the linefeed chr (0x0A) and \r is the carriage return chr (0x0D)
+// 
+// In addition, the functionality is customised for the BL652 devkit so that
+// LED0 is configured to be ON when the UART is open and OFF when closed and
+// LED1 is configured to be ON when there is BLE connection
+//
+//
+// Warning: An incmoming uart character will result in the uart being opened
+// automatically and that character will be lost, unless the baudate is very low
+//
+//
+// THE READER IS FREE TO DELETE THE CONTENT OF ANY OR ALL THE FUNCTIONS
+// AND SUBROUTINES PROVIDED IN THIS FILE TO CREATE THIER OWN BEHAVIOUR
+//
+//
+//******************************************************************************
+
+//******************************************************************************
+// Custom Definitions
+//******************************************************************************
+
+#define MSG_UART_OPEN_NOCONN                  "\n!OP!\r"
+#define MSG_UART_CLOSE_NOCONN                 "\n!CL!\r"
+#define MSG_UART_CLOSE_CONN                   "\n^CL^\r"
+#define MSG_UART_OPEN_CONN                    "\n^OP^\r"
+#define MSG_CONNECT                           "\n^CN^\r"
+#define MSG_DISCONNECT                        "\n!DI!\r"
+
+//******************************************************************************
+// Custom Global Variable Declarations
+//******************************************************************************
+
+
+//******************************************************************************
+// Custom helper Function and Subroutine definitions
+//******************************************************************************
+
+//******************************************************************************
+// Callbacks that are called when significant events occur
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Called very early on startup AFTER the Uart has been opened
+//------------------------------------------------------------------------------
+sub OnInitGPIO()
+endsub
+
+//------------------------------------------------------------------------------
+// Called when startup is done, and UartOpen() has opened successfully and
+// state variable curState has been set to STATE_IDLE_UART_OPEN
+//------------------------------------------------------------------------------
+sub OnStartupDone()
+
+  //**************************************************************************
+  //*** Using LED0 to indicate state of uart open (ON) / close (OFF)
+  //*** USING LED1 to indicate state of BLE connection (ON for connected)
+  //**************************************************************************
+  rc=gpiosetfunc(17,2,0)  //Sets LED 0 to digital out low
+    #cmpif 0x00000003 : AssertRC(rc, 50950)
+  rc=gpiosetfunc(19,2,0)  //Sets LED 1 to digital out low
+    #cmpif 0x00000003 : AssertRC(rc, 50970)
+  rc=gpiosetfunc(3,2,0)   //Disables the temperature sensor
+    #cmpif 0x00000003 : AssertRC(rc, 50990)
+  //**************************************************************************
+
+endsub
+
+//------------------------------------------------------------------------------
+// Called after adverts have been started
+//------------------------------------------------------------------------------
+sub OnAdvertStart()
+endsub
+
+//------------------------------------------------------------------------------
+// Called after adverts have been stopped
+//------------------------------------------------------------------------------
+sub OnAdvertStopped()
+endsub
+
+//------------------------------------------------------------------------------
+// Called just before closing the uart to save power where fConn is 0 if there
+// is no BLE connection and 1 means there is a connection.
+// Returns 0 to allow closing, otherwise a timeout in milliseconds to extend
+// the timer. If a negative value is supplied, then the default value of
+// UART_IDLE_TIMEOUT_MS is used
+//------------------------------------------------------------------------------
+function OnUartClosing(fConn)
+  if fConn then
+    print MSG_UART_CLOSE_CONN   //^CL^
+  else
+    print MSG_UART_CLOSE_NOCONN   //!CL!
+  endif
+endfunc 0 // 0 means allow closure of uart
+
+//------------------------------------------------------------------------------
+// Called after uart is actually closed
+//------------------------------------------------------------------------------
+sub OnUartClose()
+  // hVspConn will be INVALID_CONN_HANDLE if not in a connection
+  
+  //****************USING LED0 TO INDICATE STATE OF UART OPEN/CLOSE***********
+  gpiowrite(17,0)  //Sets LED 0 to low
+  //**************************************************************************  
+  
+endsub
+
+//------------------------------------------------------------------------------
+// Called on uart is opened. The parameter ==0 when no connection, and 1 when 
+// in a BLE connected state
+//------------------------------------------------------------------------------
+sub OnUartOpen(fConn)
+
+  if fConn then
+    print MSG_UART_OPEN_CONN  //^OP^
+
+    //****************USING LED0 TO INDICATE STATE OF UART OPEN/CLOSE***********
+    gpiowrite(17,1)  //Sets LED 0 to high
+    //**************************************************************************  
+  
+  else
+    print MSG_UART_OPEN_NOCONN  //!OP!
+
+    //****************USING LED0 TO INDICATE STATE OF UART OPEN/CLOSE***********
+    gpiowrite(17,1)  //Sets LED 0 to high
+    //**************************************************************************  
+  endif
+  
+endsub
+
+//------------------------------------------------------------------------------
+// Called when uart data has arrived when there is no connection, and uartRx$
+// contains the data. After exit it will be deleted from the variable
+//------------------------------------------------------------------------------
+sub OnUartRxNoConn(byref uartRx$)
+endsub
+
+//------------------------------------------------------------------------------
+// Called on connection, the connection handle is supplied
+//------------------------------------------------------------------------------
+sub OnConnect(hConn)
+  print MSG_CONNECT   //^CN^
+  
+  //****************USING LED1 TO INDICATE CONNECTION STATE*******************
+  gpiowrite(19,1)  //Sets LED 0 to high
+  //**************************************************************************
+endsub
+
+//------------------------------------------------------------------------------
+// Called on disconnection, the connection handle is supplied
+//------------------------------------------------------------------------------
+sub OnDisconnection(hConn)
+  print MSG_DISCONNECT   //!DI!
+  
+  //****************USING LED1 TO INDICATE CONNECTION STATE*******************
+  gpiowrite(19,0)  //Sets LED 0 to low
+  //**************************************************************************
+endsub
+
+
+//******************************************************************************
+// Custom Handler definitions
+//******************************************************************************
+
