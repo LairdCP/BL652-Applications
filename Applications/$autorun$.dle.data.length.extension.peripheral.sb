@@ -33,21 +33,20 @@
 // Global Variable Declarations
 //******************************************************************************
 
-dim rc                          	// Result code variable (used for checking if a function completed successfully or not)
-dim BaseUUID                    	// Base UUID for the VSP service which other UUIDs will be siblings of
+dim rc                              // Result code variable (used for checking if a function completed successfully or not)
+dim BaseUUID                        // Base UUID for the VSP service which other UUIDs will be siblings of
 
-dim svcID                          	// VSP Service ID
-dim TXchar                         	// TX characteristic
-dim RXchar                         	// RX characteristic
-dim MOchar                         	// Modem Out characteristic
-dim MIchar                         	// Modem In characteristic
-dim MIval                          	// Modem In value
+dim svcID                           // VSP Service ID
+dim TXchar                          // TX characteristic
+dim RXchar                          // RX characteristic
+dim MOchar                          // Modem Out characteristic
+dim MIchar                          // Modem In characteristic
+dim MIval                           // Modem In value
 
-dim ConnectionID                	// Holds the connection ID of the VSP client (if one is connected)
-dim RecBuf$ : RecBuf$ = ""         	// VSP receive buffer
-dim UARTBlocked : UARTBlocked = 0  	// When set to 1 will not read data from the UART
-dim SendData$                      	// Data from the UART waiting to be sent out
-dim BufferFull : BufferFull = 0
+dim ConnectionID                    // Holds the connection ID of the VSP client (if one is connected)
+dim RecBuf$ : RecBuf$ = ""          // VSP receive buffer
+dim UARTBlocked : UARTBlocked = 0   // When set to 1 will not read data from the UART
+dim UartData$                       // Data from the UART waiting to be sent out
 
 
 dim nBleMaxPacketLength : nBleMaxPacketLength = 27  //Default maximum packet length on BL652
@@ -128,7 +127,7 @@ ENDFUNC 0
 //------------------------------------------------------------------------------
 FUNCTION BleStartAdverts()
 
-	DIM nMinConnInterval, nMaxConnInterval
+    DIM nMinConnInterval, nMaxConnInterval
 
 IF ENABLE_DATA_LENGTH_EXTENSION==1 THEN
     // For packet length extension, the optimum connection interval is 28750 us
@@ -140,13 +139,13 @@ ELSE
     nMaxConnInterval = 7700
 ENDIF
 
-	// Register GAP service with device name and connection intervals
-	dim DevName$ : DevName$ = "LAIRD_BL652"
-	rc = BleGapSvcInit(DevName$, 0, 0, nMinConnInterval, nMaxConnInterval, 4000000,  0)
+    // Register GAP service with device name and connection intervals
+    dim DevName$ : DevName$ = "LAIRD_BL652"
+    rc = BleGapSvcInit(DevName$, 0, 0, nMinConnInterval, nMaxConnInterval, 4000000,  0)
 
-	// Start Ble adverts
-	dim Addr$ : Addr$ = ""
-	rc = BleAdvertStart(0, Addr$, 250, 0, 0)
+    // Start Ble adverts
+    dim Addr$ : Addr$ = ""
+    rc = BleAdvertStart(0, Addr$, 250, 0, 0)
 
 ENDFUNC 0
 
@@ -257,21 +256,24 @@ endfunc 1
 //------------------------------------------------------------------------------
 FUNCTION HndlrUartRx()
 
-    dim RdLen
+    dim RdLen, DataToSend$
 
     IF UARTBlocked == 0 THEN
-		RdLen = UARTREADN(SendData$, nAttributeLength)
-		// If there is data, send it as notifications
-		IF RdLen > 0 THEN
-			rc = BLECHARVALUENOTIFY(TXchar, SendData$)
-			IF rc != 0 THEN	
-				// We couldn't send, just keep it saved in SendData$
-				UARTBlocked = 1
-			ELSE
-                // Shift SendData by the amount that was written
-				StrShiftLeft(SendData$,RdLen)
-			ENDIF
-		ENDIF
+        RdLen = UARTREADN(UartData$, nAttributeLength)
+        // Ensure that we only read nAttribureLength
+        DataToSend$ = Left$(UartData$, nAttributeLength)
+
+        // If there is data, send it as notifications
+        IF RdLen > 0 THEN
+            rc = BLECHARVALUENOTIFY(TXchar, DataToSend$)
+            IF rc != 0 THEN
+                // We couldn't send, just keep it saved in DataToSend$
+                UARTBlocked = 1
+            ELSE
+                // Shift UartData by the amount that was written
+                StrShiftLeft(UartData$,RdLen)
+            ENDIF
+        ENDIF
     ENDIF
 
 ENDFUNC 1
@@ -282,8 +284,8 @@ ENDFUNC 1
 FUNCTION HndlrNtfyBuf()
 
     IF UARTBlocked == 1 THEN
-		UARTBlocked = 0
-		rc = HndlrUartRx()
+        UARTBlocked = 0
+        rc = HndlrUartRx()
     ELSE
         //Check for UART data
         rc = HndlrUartRx()
@@ -299,9 +301,9 @@ FUNCTION HndlrCharVal(charHandle, offset, len)
     dim Rd$, arc, SLen, SWritten
 
     arc = BleCharValueRead(charHandle, Rd$)
-	IF charHandle == RXchar THEN
-		PRINT Rd$
-	ENDIF
+    IF charHandle == RXchar THEN
+        PRINT Rd$
+    ENDIF
 
 ENDFUNC 1
 
@@ -310,7 +312,7 @@ ENDFUNC 1
 //------------------------------------------------------------------------------
 FUNCTION HndlrCharValue(nConnHandle, charHandle, offset, len, BYVAL Rd$ AS STRING)
 
-	// Just print the data that we got from the char
+    // Just print the data that we got from the char
     IF charHandle == RXchar THEN
         PRINT Rd$
     ENDIF
@@ -337,7 +339,7 @@ ENDFUNC 1
 
 // Close UART and open at 921600 baud rate
 UARTClose()
-rc = UartOpen(1000000, 1024, 256, "CN81H")
+rc = UartOpen(1000000, 2048, 800, "CN81H")
 
 // Enable Data Length Extension
 IF ENABLE_DATA_LENGTH_EXTENSION==1 THEN
@@ -357,8 +359,8 @@ rc = BleStartAdverts()
 ONEVENT EVUARTRX        CALL HndlrUartRx
 // Generic BLE events
 ONEVENT EVBLEMSG        CALL HndlrBleMsg
-ONEVENT EVCHARVAL	    CALL HndlrCharVal			// Used if AT+CFG 213=0
-ONEVENT EVCHARVALUE     CALL HndlrCharValue			// Used if AT+CFG 213=1
+ONEVENT EVCHARVAL       CALL HndlrCharVal           // Used if AT+CFG 213=0
+ONEVENT EVCHARVALUE     CALL HndlrCharValue         // Used if AT+CFG 213=1
 ONEVENT EVNOTIFYBUF     CALL HndlrNtfyBuf
 // Data Length Extenstion events
 ONEVENT EVATTRIBUTEMTU  CALL HandlerAttrMTUchng
