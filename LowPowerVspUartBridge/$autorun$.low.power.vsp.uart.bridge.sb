@@ -67,8 +67,19 @@
 //    --Called when uart data has arrived when there is no connection
 //                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //
-//  OnConnect(hConn) 
-//    --Called on connection, hConn == the connection handle
+//  OnConnect(hConn,intrvl,sprvto,slat) 
+//    --Called on connection 
+//            hConn  = the connection handle
+//            intrvl = connection interval in microseconds
+//            sprvto = link supervision timeout in microseconds
+//            slat   = slave latency
+//
+//  OnConnParmChange(hConn,intrvl,sprvto,slat)
+//    --Called on conn parm change 
+//            hConn  = the connection handle
+//            intrvl = connection interval in microseconds
+//            sprvto = link supervision timeout in microseconds
+//            slat   = slave latency
 //
 //  OnDisconnection(hConn)  
 //    --Called on disconnection, the connection handle can be found in hVspConn
@@ -109,32 +120,15 @@
 //******************************************************************************
 
 //******************************************************************************
-// Compiler/Debug options
-//******************************************************************************
-//
-// ======================================================
-// Conditional Compile Masks (they can be additive)
-// ------------------------------------------------------
-//
-// Higher 16 bits used for feature set
-//   0x00000000 : 
-//
-// Lower 16 bits used for debugging
-//   0x00000001 : Enable debugging messages
-//   0x00000002 : Enable Asserts printed out of UART
-//   0x00000004 : Enable DbgXXX messages
-//   0x00000008 : Enable Conn Parameters display
-//
-// ======================================================
-//#set $cmpif, 0xFFFFFFFF  //All Features + RunOnDevkit + all debug messages
-#set $cmpif, 0xFFFF0000  //All Features + RunOnDevkit +  No debug messages
-
-
-//******************************************************************************
 // Version History
 //******************************************************************************
 //
-#define APP_VERSION                                   "v1.10"
+#define APP_VERSION                                   "v1.20"
+//
+//v1.20 (13 Jun 2017)
+//  - Improved customisation so that customer does not need to alter this file
+//    but the customisation one
+//  - Added the OnConnParmChange callback 
 //
 //v1.10 (31 May 2017)
 //  Improved the wakeup and callback mechanism
@@ -145,56 +139,6 @@
 //******************************************************************************
 // Definitions
 //******************************************************************************
-
-//Size of VSP buffers (0 uses default)
-#define VSP_TX_BUFLEN                                 512  
-#define VSP_RX_BUFLEN                                 512  
-
-//Size of Uart buffers (0 uses default)
-#define UART_TX_BUFLEN                                512  
-#define UART_RX_BUFLEN                                512  
-
-//Baudrate to use when uart is open
-#define UART_BAUDRATE                                 115200
-
-//Device name to advertise
-#define DEVICENAME                                    "LPVSP_LAIRD"
-//This defines the maximum devicename in adverts
-#define MAX_DEVICENAME_LEN_IN_ADVERTS                 5
-
-//between 0 and 0xFFFF, 0 means the appearance ad will not be added to adverts
-#define APPEARANCE                                    0
-
-//Minimum connection interval in microseconds
-#define MIN_CONN_INTERVALus                           30000
-//Maximum connection interval in microseconds
-#define MAX_CONN_INTERVALus                           50000
-//Slave latency -- number of conn events that can be missed
-#define SLAVE_LATENCY                                 0
-//Connection supervisory timeout (6 seconds) - max 32 seconds
-#define CONN_SUP_TIMEOUTus                            6000000
-
-//Advertise type (0==Connectable, 1==do_not_use,  2&3 ==Not Connectable)
-#define ADVERT_TYPE                                   0
-//Advertising interval -- higher the number, lower the current consumption
-//Recommended range 20 to 10000 
-#define ADV_INTERVAL_MS                               200
-//Advertise timeout (0==forever)
-#define ADV_TIMEOUT_MS                                0
-
-//The uart will be closed if this time elapses without uart traffic
-//Set in range 100 to as large as you want
-#define UART_IDLE_TIMEOUT_MS                          5000
-
-//Input Pin which is toggled to re-open the uart  (NOTE: This default is for BL652)
-//State of input pin to wake up
-#define UART_REOPEN_SIONUM                            UART_SIONUM_RX    //UART_RX (on BL652)
-#define UART_REOPEN_STATE_CHANGE                      UART_REOPEN_TRANSITION_LO_to_HI
-    //=========================================================================
-    //Note: On BL652,if you want to use UART_CTS (driven by Host's RTS) to wakeup then
-    //      UART_REOPEN_SIONUM        ==  UART_SIONUM_CTS
-    //      UART_REOPEN_STATE_CHANGE  ==  UART_REOPEN_TRANSITION_HI_to_LO
-    //=========================================================================
 
 //******************************************************************************
 // Definitions
@@ -270,82 +214,6 @@
 #define BLE_EVBLEMSGID_LESC_OOB_REQUEST                 28   //msgCtx = connection handle */
 
 //******************************************************************************
-// Debugging related (conditionally compile based on "#set $cmpif" line above)
-//******************************************************************************
-
-//------------------------------------------------------------------------------
-// Assert to check that a resultCode is 0 which means success
-//------------------------------------------------------------------------------
-#cmpif 0x00000003 : sub AssertRC(rc, tag)
-#cmpif 0x00000003 :     if (rc != 0) then
-#cmpif 0x00000003 :         print "\n## Assert Error ";integer.h' rc;" @ tag ";tag;"\r\n"
-#cmpif 0x00000003 :     endif
-#cmpif 0x00000003 : endsub
-
-//------------------------------------------------------------------------------
-// Assert to check that the value is as per specified
-//------------------------------------------------------------------------------
-#cmpif 0x00000003 : sub Assert(v1,v2,tag)
-#cmpif 0x00000003 :     if (v1 != v2) then
-#cmpif 0x00000003 :         print "\n## Assert Error ";v1;"!=";v2;"@ tag ";tag;"\r\n"
-#cmpif 0x00000003 :     endif
-#cmpif 0x00000003 : endsub
-
-//------------------------------------------------------------------------------
-// Assert to check that the value is as per specified
-//------------------------------------------------------------------------------
-#cmpif 0x00000003 : sub AssertNE(v1,v2,tag)
-#cmpif 0x00000003 :     if (v1 == v2) then
-#cmpif 0x00000003 :         print "\n## Assert Error ";v1;"!=";v2;"@ tag ";tag;"\r\n"
-#cmpif 0x00000003 :     endif
-#cmpif 0x00000003 : endsub
-
-//------------------------------------------------------------------------------
-// Assert to check that the value is as per specified
-//------------------------------------------------------------------------------
-#cmpif 0x00000003 : sub AssertBound(v,vl,vh,tag)
-#cmpif 0x00000003 :     if (v < vl) then
-#cmpif 0x00000003 :         print "\n## Assert Error ";v;"<";vl
-#cmpif 0x00000003 :     elseif (v > vh) then
-#cmpif 0x00000003 :         print "\n## Assert Error ";v;">";vh
-#cmpif 0x00000003 :     else
-#cmpif 0x00000003 :         exitsub
-#cmpif 0x00000003 :     endif
-#cmpif 0x00000003 :     print " @ tag ";tag;"\r\n"
-#cmpif 0x00000003 : endsub
-
-//------------------------------------------------------------------------------
-#cmpif 0x00000004 : dim dbgmsg$  //use this to create a message for DbgMsg() 
-//------------------------------------------------------------------------------
-#cmpif 0x00000004 : sub DbgMsg(byval msg$ as string)
-#cmpif 0x00000004 :     print "\n## ";msg$
-#cmpif 0x00000004 : endsub
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-#cmpif 0x00000004 : sub DbgMsgVal(byval msg$ as string, byval vl as integer)
-#cmpif 0x00000004 :     print "\n## ";msg$;" ";vl
-#cmpif 0x00000004 : endsub
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-#cmpif 0x00000004 : sub DbgMsgVal$(byval msg$ as string, byref vl$ as string)
-#cmpif 0x00000004 :     print "\n## ";msg$;" ";vl$
-#cmpif 0x00000004 : endsub 
-
-//------------------------------------------------------------------------------
-// This shows the cuttent connection parameters
-//------------------------------------------------------------------------------
-#cmpif 0x00000008 : sub ShowConnParms(nCtx)
-#cmpif 0x00000008 :   dim intrvl,sprvto,slat,rc1
-#cmpif 0x00000008 :   rc1 = BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
-#cmpif 0x00000008 :   AssertRC(rc1, 2890)
-#cmpif 0x0000000B :   if rc1==0 then
-#cmpif 0x00000008 :     print "\n## Conn :: Interval=";intrvl;",Supervision Tout=";sprvto;",Slave Latency=";slat
-#cmpif 0x00000008 :   endif
-#cmpif 0x00000008 : endsub
-
-//******************************************************************************
 // Global Variable Declarations
 //******************************************************************************
 
@@ -368,21 +236,12 @@ dim uartRecBuf$ : uartRecBuf$ = ""
 //Contains the connection handle of the vsp connection
 dim hVspConn : hVspConn = INVALID_CONN_HANDLE
 
+//Idle timeout
+dim idleTimeoutMs
 
 //******************************************************************************
 // Function and Subroutine definitions
 //******************************************************************************
-
-//------------------------------------------------------------------------------
-// Change state
-//------------------------------------------------------------------------------
-sub NewState( nState )
-  if nState != curState then
-    #cmpif 0x00000004 : sprint #dbgmsg$, "NewState = "; nState
-    #cmpif 0x00000004 : DbgMsg(dbgmsg$)
-    curstate = nState
-  endif
-endsub
 
 //##############################################################################
 //#####                                                                    #####
@@ -394,6 +253,17 @@ endsub
 #include "custom.low.power.vsp.uart.bridge.sb"
 //
 //##############################################################################
+
+//------------------------------------------------------------------------------
+// Change state
+//------------------------------------------------------------------------------
+sub NewState( nState )
+  if nState != curState then
+    #cmpif 0x00000004 : sprint #dbgmsg$, "NewState = "; nState
+    #cmpif 0x00000004 : DbgMsg(dbgmsg$)
+    curstate = nState
+  endif
+endsub
 
 //------------------------------------------------------------------------------
 // Close the uart if rx/tx buffers are empty
@@ -426,7 +296,8 @@ function UartCloseConditional()
 endfunc fClosed
 
 //------------------------------------------------------------------------------
-// Reopen the uart
+// Reopen the uart and if it was closed
+// unconditionally restarts the idle timer
 //------------------------------------------------------------------------------
 sub UartReOpen()
   if UartInfo(0)==0 then
@@ -439,7 +310,16 @@ sub UartReOpen()
     rc=UartOpen(UART_BAUDRATE,UART_TX_BUFLEN,UART_RX_BUFLEN,"CN81H")
       #cmpif 0x00000003 : AssertRC(rc, 3870)
       
+    if hVspConn == INVALID_CONN_HANDLE then
+      OnUartOpen(0)  //Do your custom stuff in this function 
+    else
+      OnUartOpen(1)  //Do your custom stuff in this function 
+    endif
+          
   endif  
+  
+  //Start the uart inactivity timer
+  TimerStart(STATE_TIMER,idleTimeoutMs,0)
 endsub
 
 //------------------------------------------------------------------------------
@@ -520,37 +400,46 @@ endsub
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 sub _OnConnect(hConn)
+  dim intrvl,sprvto,slat
+  
   hVspConn = hConn
   
-  OnAdvertStopped() //Do your custom stuff in this function 
-  
-  if curState== STATE_IDLE_UART_CLOSE then
-    UartReOpen()
-    OnUartOpen(1)  //Do your custom stuff in this function 
-  endif
+  UartReOpen()
   
   NewState(STATE_CONN_UART_OPEN)
   
-  OnConnect(hConn)
+  OnAdvertStopped() //Do your custom stuff in this function 
+  
+  rc = BleGetCurConnParms(hConn,intrvl,sprvto,slat)
+  
+  OnConnect(hConn,intrvl,sprvto,slat)
   //Start the uart inactivity timer
-  TimerStart(STATE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+  TimerStart(STATE_TIMER,idleTimeoutMs,0)
+endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub _OnConnParmChg(hConn)
+  dim intrvl,sprvto,slat  
+  rc = BleGetCurConnParms(hConn,intrvl,sprvto,slat)
+  if rc==0 then  
+    UartReOpen()
+    OnConnParmChange(hConn,intrvl,sprvto,slat)
+    //Start the uart inactivity timer
+    TimerStart(STATE_TIMER,idleTimeoutMs,0)        
+    //Change state - destination is same from both places
+    NewState(STATE_CONN_UART_OPEN)    
+  endif
 endsub
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 sub StateTmrOnTimeout( nTmrExtMsec, nextState )
-  if nTmrExtMsec<0 then
+  if nTmrExtMsec<UART_IDLE_TIMEOUT_MS then
     nTmrExtMsec = UART_IDLE_TIMEOUT_MS
   endif
-  if nTmrExtMsec==0 then
-    if UartCloseConditional() then
-      OnUartClose()
-    endif
-    NewState(nextState)
-  else
-    //Start the uart inactivity timer
-    TimerStart(STATE_TIMER,nTmrExtMsec,0)
-  endif
+  TimerStart(STATE_TIMER,nTmrExtMsec,0)
+  NewState(nextState)
 endsub
 
 //******************************************************************************
@@ -563,18 +452,30 @@ endsub
 function HndlrTmrState()
   dim nTmrExtMsec
   
-  select curState
-  case STATE_IDLE_UART_OPEN
-    nTmrExtMsec=OnUartClosing(0)
-    StateTmrOnTimeout(nTmrExtMsec,STATE_IDLE_UART_CLOSE)
-    
-  case STATE_CONN_UART_OPEN
-    nTmrExtMsec=OnUartClosing(1) 
-    StateTmrOnTimeout(nTmrExtMsec,STATE_CONN_UART_CLOSE)
-  
-  case else
-  endselect
+  //If in the meantime the timer was restarted do nothing
+  if TimerRunning(STATE_TIMER) == 0 then
+    //timer was not restarted so action this
+    select curState
+    case STATE_IDLE_UART_OPEN
+      //Start state timer
+      nTmrExtMsec=OnUartClosing(0)
+      StateTmrOnTimeout(nTmrExtMsec,STATE_IDLE_UART_CLOSE)
 
+    case STATE_CONN_UART_OPEN
+      //Start state timer
+      nTmrExtMsec=OnUartClosing(1) 
+      StateTmrOnTimeout(nTmrExtMsec,STATE_CONN_UART_CLOSE)
+      
+    case STATE_IDLE_UART_CLOSE,STATE_CONN_UART_CLOSE
+      //the buffers have to empty and transmit register should be empty too
+      if UartCloseConditional() then
+        OnUartClose()
+      endif
+      //remain in the same state
+
+    case else
+    endselect
+  endif
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -593,7 +494,6 @@ function HndlrUartRx()
     
   case STATE_IDLE_UART_CLOSE
     UartReOpen()
-    OnUartOpen(0)  //Do your custom stuff in this function 
     NewState(STATE_IDLE_UART_OPEN)
     //Data received from UART when there is no connection
     dontcare = UARTReadN(uartRecBuf$, MAX_UART_READ_LEN)
@@ -605,7 +505,6 @@ function HndlrUartRx()
     
   case STATE_CONN_UART_CLOSE
     UartReOpen()
-    OnUartOpen(1)  //Do your custom stuff in this function 
     NewState(STATE_CONN_UART_OPEN)
     //Pass data between UART and VSP service
     BleVspUartBridge()
@@ -618,7 +517,7 @@ function HndlrUartRx()
   endselect
   
   //Start the uart inactivity timer
-  TimerStart(STATE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+  TimerStart(STATE_TIMER,idleTimeoutMs,0)
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -628,7 +527,6 @@ function HndlrVspRx()
   select curState
   case STATE_CONN_UART_CLOSE
     UartReOpen()
-    OnUartOpen(1)  //Do your custom stuff in this function 
     NewState(STATE_CONN_UART_OPEN)
     //Pass data between UART and VSP service
     BleVspUartBridge()
@@ -641,7 +539,7 @@ function HndlrVspRx()
   endselect
   
   //Start the uart inactivity timer
-  TimerStart(STATE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+  TimerStart(STATE_TIMER,idleTimeoutMs,0)
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -655,8 +553,9 @@ function HndlrBleMsg(nMsgId, nCtx)
   case BLE_EVBLEMSGID_DISCONNECT
     //Disconnected see HndlrDisCon
 
-  #cmpif 0x00000004 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
-  #cmpif 0x00000004 :   ShowConnParms(nCtx)
+  case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+    //There has been a change in the connection parameters
+    _OnConnParmChg(nCtx)
 
   case else        
     #cmpif 0x00000004 : DbgMsgVal("Unprocessed nMsgId",nMsgId)
@@ -669,20 +568,9 @@ endfunc 1
 function HndlrDisCon(hndl as integer, rsn as integer)
   #cmpif 0x00000004 : DbgMsg("Disconnect")
 
-  select curState
-  case STATE_CONN_UART_CLOSE
-    UartReOpen()
-    OnUartOpen(1)  //Do your custom stuff in this function 
-    OnDisconnection(hndl) //Do your custom stuff in this function 
-
-  case STATE_CONN_UART_OPEN
-    OnDisconnection(hndl) //Do your custom stuff in this function 
-
-  case else
-  endselect
-
-  //Start the uart inactivity timer
-  TimerStart(STATE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+  UartReOpen()
+  
+  OnDisconnection(hndl) //Do your custom stuff in this function 
 
   hVspConn = INVALID_CONN_HANDLE
 
@@ -698,15 +586,15 @@ endfunc 1
 function HndlrUartTxEmpty()
   select curState
   case STATE_IDLE_UART_CLOSE, STATE_CONN_UART_CLOSE
-    if UartCloseConditional() then
-      OnUartClose()
-    endif
+    //Start the uart inactivity timer
+    TimerStart(STATE_TIMER,UART_MAX_CHARACTER_TIMEOUT_MS,0)
+    //remain in this state
   
   case STATE_CONN_UART_OPEN
     //Pass data between UART and VSP service
     BleVspUartBridge()
     //Start the uart inactivity timer
-    TimerStart(STATE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+    TimerStart(STATE_TIMER,idleTimeoutMs,0)
     
   case else
   endselect
@@ -719,15 +607,13 @@ function HndlrDetectPinRx()
   
   select curState
   case STATE_IDLE_UART_CLOSE
-    OnUartOpen(0)
     //Start the uart inactivity timer
-    TimerStart(STATE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+    TimerStart(STATE_TIMER,idleTimeoutMs,0)
     NewState(STATE_IDLE_UART_OPEN)
 
   case STATE_CONN_UART_CLOSE
-    OnUartOpen(1)
     //Start the uart inactivity timer
-    TimerStart(STATE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+    TimerStart(STATE_TIMER,idleTimeoutMs,0)
     NewState(STATE_CONN_UART_OPEN)
 
   case else
@@ -739,6 +625,15 @@ endfunc 1
 // Equivalent to main() in C
 //******************************************************************************
 
+//------------------------------------------------------------------------------
+// Late global variables initialisation
+//------------------------------------------------------------------------------
+idleTimeoutMs = UART_IDLE_TIMEOUT_MS
+#cmpif 0x0000FFFF : idleTimeoutMs = 60000   //If debug printing then make timeout a minute
+
+//------------------------------------------------------------------------------
+// Register event handlers
+//------------------------------------------------------------------------------
 OnEvent EVTMR0                  call HndlrTmrState
 OnEvent EVBLEMSG                Call HndlrBleMsg
 OnEvent EVDISCON                call HndlrDisCon
@@ -763,7 +658,7 @@ InitAndConfigVsp()
 //Initialise and configure Adverts
 InitAndConfigAdv()
 //Start the uart inactivity timer
-TimerStart(STATE_TIMER,UART_IDLE_TIMEOUT_MS,0)
+TimerStart(STATE_TIMER,idleTimeoutMs,0)
 
 NewState(STATE_IDLE_UART_OPEN)
 OnStartupDone()  //Do your custom stuff in this function

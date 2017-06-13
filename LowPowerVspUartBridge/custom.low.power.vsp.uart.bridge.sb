@@ -39,6 +39,7 @@
 // \n^CL^\r    Uart is closed while there is a ble connection
 // \n^CO^\r    A Ble connection has been established
 // \n!DI!\r    A Ble connection has disconnected
+// \n^PA x,y,z^\r   Ble connection parameter change
 //
 // Examination of the messages shows that the character ! is used when there is
 // no ble connection and the character ^ is ised when there is a connection so
@@ -61,15 +62,164 @@
 //******************************************************************************
 
 //******************************************************************************
+// Compiler/Debug options
+//******************************************************************************
+//
+// ======================================================
+// Conditional Compile Masks (they can be additive)
+// ------------------------------------------------------
+//
+// Higher 16 bits used for feature set
+//   0x00000000 : 
+//
+// Lower 16 bits used for debugging
+//   0x00000001 : Enable debugging messages
+//   0x00000002 : Enable Asserts printed out of UART
+//   0x00000004 : Enable DbgXXX messages
+//   0x00000008 : Enable Conn Parameters display
+//
+// ======================================================
+//#set $cmpif, 0xFFFFFFFF  //All Features + RunOnDevkit + all debug messages
+#set $cmpif, 0xFFFF0000  //All Features + RunOnDevkit +  No debug messages
+
+
+//******************************************************************************
 // Custom Definitions
 //******************************************************************************
 
-#define MSG_UART_OPEN_NOCONN                  "\n!OP!\r"
-#define MSG_UART_CLOSE_NOCONN                 "\n!CL!\r"
-#define MSG_UART_CLOSE_CONN                   "\n^CL^\r"
-#define MSG_UART_OPEN_CONN                    "\n^OP^\r"
-#define MSG_CONNECT                           "\n^CN^\r"
-#define MSG_DISCONNECT                        "\n!DI!\r"
+//the following are state related messages so that uart host can follow what
+//in happening in the module
+#define MSG_UART_OPEN_NOCONN                          "\n!OP!\r"
+#define MSG_UART_CLOSE_NOCONN                         "\n!CL!\r"
+#define MSG_UART_CLOSE_CONN                           "\n^CL^\r"
+#define MSG_UART_OPEN_CONN                            "\n^OP^\r"
+#define MSG_CONNECT                                   "\n^CN^\r"
+#define MSG_DISCONNECT                                "\n!DI!\r"
+#define MSG_CONN_PARM_START                           "\n^PA "
+#define MSG_CONN_PARM_END                             "^\r"
+
+
+//Size of VSP buffers (0 uses default)
+#define VSP_TX_BUFLEN                                 512  
+#define VSP_RX_BUFLEN                                 512  
+
+//Size of Uart buffers (0 uses default)
+#define UART_TX_BUFLEN                                512  
+#define UART_RX_BUFLEN                                512  
+
+//Baudrate to use when uart is open
+#define UART_BAUDRATE                                 115200
+
+//Device name to advertise
+#define DEVICENAME                                    "LPVSP_LAIRD"
+//This defines the maximum devicename in adverts
+#define MAX_DEVICENAME_LEN_IN_ADVERTS                 5
+
+//between 0 and 0xFFFF, 0 means the appearance ad will not be added to adverts
+#define APPEARANCE                                    0
+
+//Minimum connection interval in microseconds
+#define MIN_CONN_INTERVALus                           30000
+//Maximum connection interval in microseconds
+#define MAX_CONN_INTERVALus                           50000
+//Slave latency -- number of conn events that can be missed
+#define SLAVE_LATENCY                                 0
+//Connection supervisory timeout (6 seconds) - max 32 seconds
+#define CONN_SUP_TIMEOUTus                            6000000
+
+//Advertise type (0==Connectable, 1==do_not_use,  2&3 ==Not Connectable)
+#define ADVERT_TYPE                                   0
+//Advertising interval -- higher the number, lower the current consumption
+//Recommended range 20 to 10000 
+#define ADV_INTERVAL_MS                               200
+//Advertise timeout (0==forever)
+#define ADV_TIMEOUT_MS                                0
+
+//The uart will be closed if this time elapses without uart traffic
+//Set in range 100 to as large as you want
+#define UART_IDLE_TIMEOUT_MS                          5000
+
+//When waiting to close uart we wait a maximum of this time to actually close it
+#define UART_MAX_WAIT_CLOSE_TIMEOUT_MS                1000
+
+//wait for the last character to be sent out
+#define UART_MAX_CHARACTER_TIMEOUT_MS                 20
+
+//Input Pin which is toggled to re-open the uart  (NOTE: This default is for BL652)
+//State of input pin to wake up
+#define UART_REOPEN_SIONUM                            UART_SIONUM_RX    //UART_RX (on BL652)
+#define UART_REOPEN_STATE_CHANGE                      UART_REOPEN_TRANSITION_LO_to_HI
+    //=========================================================================
+    //Note: On BL652,if you want to use UART_CTS (driven by Host's RTS) to wakeup then
+    //      UART_REOPEN_SIONUM        ==  UART_SIONUM_CTS
+    //      UART_REOPEN_STATE_CHANGE  ==  UART_REOPEN_TRANSITION_HI_to_LO
+    //=========================================================================
+
+
+
+//******************************************************************************
+// Debugging related (conditionally compile based on "#set $cmpif" line above)
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Assert to check that a resultCode is 0 which means success
+//------------------------------------------------------------------------------
+#cmpif 0x00000003 : sub AssertRC(rc, tag)
+#cmpif 0x00000003 :     if (rc != 0) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";integer.h' rc;" @ tag ";tag;"\r\n"
+#cmpif 0x00000003 :     endif
+#cmpif 0x00000003 : endsub
+
+//------------------------------------------------------------------------------
+// Assert to check that the value is as per specified
+//------------------------------------------------------------------------------
+#cmpif 0x00000003 : sub Assert(v1,v2,tag)
+#cmpif 0x00000003 :     if (v1 != v2) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";v1;"!=";v2;"@ tag ";tag;"\r\n"
+#cmpif 0x00000003 :     endif
+#cmpif 0x00000003 : endsub
+
+//------------------------------------------------------------------------------
+// Assert to check that the value is as per specified
+//------------------------------------------------------------------------------
+#cmpif 0x00000003 : sub AssertNE(v1,v2,tag)
+#cmpif 0x00000003 :     if (v1 == v2) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";v1;"!=";v2;"@ tag ";tag;"\r\n"
+#cmpif 0x00000003 :     endif
+#cmpif 0x00000003 : endsub
+
+//------------------------------------------------------------------------------
+// Assert to check that the value is as per specified
+//------------------------------------------------------------------------------
+#cmpif 0x00000003 : sub AssertBound(v,vl,vh,tag)
+#cmpif 0x00000003 :     if (v < vl) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";v;"<";vl
+#cmpif 0x00000003 :     elseif (v > vh) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";v;">";vh
+#cmpif 0x00000003 :     else
+#cmpif 0x00000003 :         exitsub
+#cmpif 0x00000003 :     endif
+#cmpif 0x00000003 :     print " @ tag ";tag;"\r\n"
+#cmpif 0x00000003 : endsub
+
+//------------------------------------------------------------------------------
+#cmpif 0x00000004 : dim dbgmsg$  //use this to create a message for DbgMsg() 
+//------------------------------------------------------------------------------
+#cmpif 0x00000004 : sub DbgMsg(byval msg$ as string)
+#cmpif 0x00000004 :     print "\n## ";msg$
+#cmpif 0x00000004 : endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x00000004 : sub DbgMsgVal(byval msg$ as string, byval vl as integer)
+#cmpif 0x00000004 :     print "\n## ";msg$;" ";vl
+#cmpif 0x00000004 : endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x00000004 : sub DbgMsgVal$(byval msg$ as string, byref vl$ as string)
+#cmpif 0x00000004 :     print "\n## ";msg$;" ";vl$
+#cmpif 0x00000004 : endsub 
 
 //******************************************************************************
 // Custom Global Variable Declarations
@@ -180,14 +330,31 @@ sub OnUartRxNoConn(byref uartRx$)
 endsub
 
 //------------------------------------------------------------------------------
-// Called on connection, the connection handle is supplied
+// Called on connection, the connection handle is supplied along with ...
+// intrvl = connection interval in microseconds
+// sprvto = link supervision timeeout in microseconds
+// slat   = slave latency
 //------------------------------------------------------------------------------
-sub OnConnect(hConn)
+sub OnConnect(hConn,intrvl,sprvto,slat)
   print MSG_CONNECT   //^CN^
   
   //****************USING LED1 TO INDICATE CONNECTION STATE*******************
   gpiowrite(19,1)  //Sets LED 0 to high
   //**************************************************************************
+endsub
+
+//------------------------------------------------------------------------------
+// Called when the connection parameters have changed
+//   hConn  = connection handle
+//   intrvl = connection interval in microseconds
+//   sprvto = link supervision timeeout in microseconds
+//   slat   = slave latency
+//------------------------------------------------------------------------------
+sub OnConnParmChange(hConn,intrvl,sprvto,slat)      
+  #cmpif 0x00000008 : print "\n## Conn :: Interval=";intrvl;",Supervision Tout=";sprvto;",Slave Latency=";slat
+
+  print MSG_CONN_PARM_START;intrvl;",";sprvto;",";slat;MSG_CONN_PARM_END  //^PA x,y,z^
+  
 endsub
 
 //------------------------------------------------------------------------------
