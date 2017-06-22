@@ -1,0 +1,4418 @@
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Copyright (c) 2017, Laird                                                  ++
+//                                                                            ++
+// Permission to use, copy, modify, and/or distribute this software for any   ++
+// purpose with or without fee is hereby granted, provided that the above     ++
+// copyright notice and this permission notice appear in all copies.          ++
+//                                                                            ++
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES   ++
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF           ++
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR    ++
+// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES     ++
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN      ++
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR ++
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.                ++
+//                                                                            ++
+// SPDX-License-Identifier:ISC                                                ++
+//                                                                            ++
+// <description>                                                              ++
+//                                                                            ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app to the module it will be saved    ++
+// +++++  as a file with filename $autorun$ which means it will run           ++
+// +++++  automatically on reset.                                             ++
+// +++++  The File System can be queried using the command AT+DIR             ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// -------------------
+// Application Version
+// -------------------
+#define AppVer                 "1.00"                             //Application version
+//
+// -------------------
+// Application History
+// -------------------
+//
+//
+//  1.00 "22/June/2017"
+//    BL652 First public deployment via the BL652 apps repository in github
+//
+//  0.20 "1/June/2017"
+//    Througput 127kbps bi-directional (total 254kbps) without data lenght
+//    extension, SRreg100 enhanced with extra bit to allow 6 packets per 
+//    connection interval. By default that bit is set to give 6 pkts
+//
+//  0.10 "24/May/2017"
+//    Initial Release. @7.5ms conn interval
+//       Throughput : 10.5kbps  Client->Server
+//                    64kbps    Server->Client
+//
+//******************************************************************************
+//:/ Usage Guide
+//:/ -----------
+//:/
+//:/ See user guide at
+//:/  https://assets.lairdtech.com/home/brandworld/files/User%20Guide%20-%20BL652%20AT%20Interface%20Application.pdf
+//:/
+//******************************************************************************
+// Compiler/Debug options
+//******************************************************************************
+//
+//   ======================================================
+//   Conditional Compile Masks (they can be additive)
+//   ------------------------------------------------------
+//
+// Higher 16 bits used for feature set
+//   0x00000000 : 
+//
+// Lower 16 bits used for debugging
+//   0x00000001 : Enable debugging messages
+//   0x00000002 : Enable Asserts printed out of UART
+//   0x00000004 : Enable DbgXXX messages
+//   0x00000008 : Enable Conn Parameters display
+//   0x00004000 : Enable S Register interface debugging
+//   0x00008000 : Enable arg parsing prints
+//
+//   0x00010000 : Include Verbose Code for setting defaults
+//   0x00020000 : Enable TableMap command AT+GCTM
+//   0x00040000 : Use BleGattcWrite for outgoing data
+//   0x00080000 : Use BleGattcWriteCmd for outgoing data
+//   ======================================================
+//#set $cmpif, 0xFFFEFFFF  //All Features - VerboseDefRegisterCreation + all debug messages
+//#set $cmpif, 0xFFFF0000  //All Features + No debug messages
+//#set $cmpif, 0xFFFE0000  //All Features + No debug messages - VerboseDefRegisterCreation
+//#set $cmpif, 0xFFF60000  //All Features + No debug messages - VerboseDefRegisterCreation + BleGattcWrite
+#set $cmpif, 0xFFFA0000  //All Features + No debug messages - VerboseDefRegisterCreation + BleGattcWriteCmd
+
+
+//#set $cmpif, 0xFFFE8000  //All Features + No debug messages - VerboseDefRegisterCreation
+
+//
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+//The following can be modified by the customer to customise
+//------------------------------------------------------------------------------
+#define ATI_RESPONSE_0                            "BL652"
+#define ATI_RESPONSE_10                           "Laird,(c)2017"
+
+
+//------------------------------------------------------------------------------
+//The following can be modified by the customer to customise - but with care
+//------------------------------------------------------------------------------
+//Maximum allowable size of strings (1024 maximum (for BL652) or 512 maximum (for BL600))
+#define MaxCmdStringSize                          144 
+
+//Maximum allowable size of the advertised device name (additional characters will be clipped off)
+//Do NOT set larger than 20
+#define MaxDevNameSize                            20
+
+//The following pin will flash if nvflash fails, set to -1 to disable
+#define NvFlashFailPin                            19  //GPIO for LED2 (DVK-BL652)
+
+//These are min/max connection intervals as peripheral, so basically accepts
+//whatever the master provides
+#define CONN_INTERVAL_MIN_ASPERIPH_US             7500
+#define CONN_INTERVAL_MAX_ASPERIPH_US             999000
+
+//This defines the maximum number of characteristics we can manage
+#define MAX_CHARACTISTICS                         24
+
+//This defines the maximum number of connections
+#define MAX_CONNECTIONS                           8
+
+//------------------------------------------------------------------------------
+//It is NOT recommened that the following be modified 
+//------------------------------------------------------------------------------
+
+//This defines the maximum number of uuid handles
+#define MAX_UUID_HANDLES                          16
+
+//This defines the maximum number of elements in metadata array
+#define MAX_METADATA_HANDLES                      4
+
+//Maximum comma seperated arguments allowed in an AT command
+#define MAX_ARGS_IN_ATCMD                         10
+
+//ASCII characters
+#define CHR_ASCII_SPACE                           0x20
+
+//Invalid connection handle
+#define INVALID_CONN_HANDLE                       0
+
+//Invalid uuid handle
+#define INVALID_UUID_HANDLE                       -1
+
+//Index for the handle for the VSP connection
+#define HCONN_VSP                                 0
+
+//Timer used for encryption timeout               
+#define TMRNUM_ENCR_WAIT                          0
+#define TMRNUM_DATA_PUMP                          1
+
+//Maximum length of attibute length in 
+#define MAX_ATTIBUTE_LEN                          250
+
+//Only check for carets in uar buffer if there is at least this
+//much space in the vsp tx buffer
+#define MIN_SPACE_IN_VSPTXBUF_TO_CHECK_FOR_CARETS  20
+
+//AT Command letter
+#define ATCMD_EMPTY                               0
+#define ATCMD_D                                   0x44
+#define ATCMD_F                                   0x46
+#define ATCMD_I                                   0x49
+#define ATCMD_S                                   0x53
+#define ATCMD_W                                   0x57
+#define ATCMD_X                                   0x58
+#define ATCMD_Z                                   0x5A
+#define ATCMD_PERCENT                             0x25
+#define ATCMD_AMPERSAND                           0x26
+#define ATCMD_PLUS                                0x2B
+ 
+//Start of 8-Bit Register mapping
+#define SREGNUM_START_8BIT                        100
+#define SREGNUM_START_16BIT                       200
+#define SREGNUM_START_32BIT                       300
+#define SREGNUM_START_STR                         0
+ 
+//AT Response Error
+#define RSP_SUSPEND                               -1
+#define RSP_OK                                    0
+#define RSP_ERROR_INVALID_S_REG                   1
+#define RSP_ERROR_VALUE_OUT_OF_RANGE              2
+//#define RSP_ERROR_NOT_RINGING                     3
+//#define RSP_ERROR_NOT_CONNECTED                   4
+#define RSP_ERROR_SYNTAX_ERROR                    5
+//#define RSP_ERROR_EMPTY_STRING                    6
+//#define RSP_ERROR_DEVCLASS_STORE                  7
+//#define RSP_ERROR_INVALID_DEVCLASS                8
+#define RSP_ERROR_INVALID_ADDRESS                 9
+//#define RSP_ERROR_NAME_SET                        10
+//#define RSP_ERROR_PSSTORE_WRITE                   11
+//#define RSP_ERROR_PSSTORE_READ                    12
+//#define RSP_ERROR_NOT_IDLE                        13
+#define RSP_ERROR_INCORRECT_MODE                  14
+#define RSP_ERROR_UNKNOWN_CMD                     15
+//#define RSP_ERROR_ALREADY_PAIRING                 16
+//#define RSP_ERROR_PS_NOT_SAFE                     20
+//#define RSP_ERROR_LINKKEY_CACHE_EMPTY             21
+//#define RSP_ERROR_LINKKEY_DATABASE_FULL           22
+//#define RSP_ERROR_HEAP_FULL                       23
+//#define RSP_ERROR_SAME_ADDRESS                    24
+//#define RSP_ERROR_DSR_NOT_ASSERTED                25
+//#define RSP_ERROR_INVALID_LICENSE                 26
+//#define RSP_ERROR_INQUIRY_OUT_OF_MEMORY           27
+//#define RSP_ERROR_PIN_CODE_TOO_LONG               28
+//#define RSP_ERROR_INVALID_RING_COUNT              29
+//#define RSP_ERROR_ADCRESULT                       30
+//#define RSP_ERROR_ANALOG_IS_OUTPUT                31
+//#define RSP_ERROR_ANALOG_IS_INPUT                 32
+#define RSP_ERROR_VALUE_NOT_VALID                 33
+//#define RSP_ERROR_ATD_L_AND_R                     34
+//#define RSP_ERROR_INVALID_MAJDEVCLASS             35
+//#define RSP_ERROR_PAIRING_IN_PROGRESS             36
+//#define RSP_ERROR_INVALID_SNIFF_VALUE             37
+//#define RSP_ERROR_GET_FNAME                       38
+//#define RSP_ERROR_MODE_CHANGE_FAIL                39
+//#define RSP_ERROR_7BIT_REQUIRES_PARITY            40
+//#define RSP_ERROR_STREAM_ERROR                    41
+//#define RSP_ERROR_STREAM_PENDING                  42
+//#define RSP_ERROR_UNKNOWN_AG_CMD                  43
+//#define RSP_ERROR_BUSY_TRY_LATER                  44
+//#define RSP_ERROR_NOT_ALLOWED                     45
+#define RSP_ERROR_GPIO_NOT_AVAILABLE                46
+#define RSP_ERROR_TOOFEWARGS                        47
+#define RSP_ERROR_TOOMANYARGS                       48
+#define RSP_ERROR_INVALID_HEXSTR                    49
+#define RSP_ERROR_SAVE_FAIL                         50
+#define RSP_ERROR_RESTORE_FAIL                      51
+#define RSP_ERROR_VSP_OPENFAIL                      52
+#define RSP_ERROR_ADV_TYPE                          53
+#define RSP_ERROR_INVALID_UUID                      54
+#define RSP_ERROR_SVC_NOTENDED                      55
+#define RSP_ERROR_CHAR_NOTENDED                     56
+#define RSP_ERROR_SVC_NOTSTARTED                    57
+#define RSP_TOO_MANY_CHARACTERISTICS                58
+#define RSP_ERROR_CHAR_NOTSTARTED                   59
+
+#define RSP_ERROR_TO_BE_CODED                       99
+
+//AT Responses for VSP connect ( starts at 80 because HSI reason is up to 64 )
+#define CONN_OK                                     0
+#define CONN_ERROR_BLECONNECT                       80
+#define CONN_ERROR_INVALID_ADDRESS                  81
+#define CONN_ERROR_CMDPINSTATE                      82
+#define CONN_ERROR_TOOMANYCONNECTIONS               83
+#define CONN_ERROR_TIMEOUT                          84
+#define CONN_ERROR_OUTOFMEM                         85
+#define CONN_ERROR_UNENCRYPTED                      86
+#define CONN_ERROR_NOVSPSERVICE                     87
+#define CONN_ERROR_PAIRUI                           88
+#define CONN_ERROR_USER_DISCON                      90
+#define CONN_ERROR_AUTHLINK_REQUIRED                91
+#define CONN_SUSPEND                                -1
+
+//types of adverts
+#define ADV_IND                                     0
+#define ADV_DIRECT_IND                              1
+#define ADV_SCAN_IND                                2
+#define ADV_NONCONN_IND                             3
+
+//Values in curState variable
+#define STATE_INIT                                  0
+#define STATE_IDLE_nonVSP                           10
+#define STATE_IDLE_VSP                              20
+#define STATE_SCAN_VSP                              30
+#define STATE_VSP_FAST_CONNECTED                    40
+#define STATE_VSP_CONNECTING                        50
+#define STATE_VSP_WAIT_ENCRYPT                      51
+#define STATE_VSP_GET_HANDLES                       52
+#define STATE_VSP_WRITE_CCCDS                       53
+#define STATE_VSP_PAIRING                           54
+#define STATE_VSP_DISCONNECTING                     55
+#define STATE_nonVSP_CONNECTING                     60
+#define STATE_nonVSP_CONNECTED                      80
+#define STATE_VSP_IN_WAIT_ENCR                      70
+#define STATE_VSP_CARET_CONNECTED                   90
+
+//MsgID for SendMsgApp so that we can serialise processes and also used
+//to invoke functionality which is not compiled yet
+#define MSGAPP_PROCESS_UART                         0
+#define MSGAPP_ENTER_VSPOUT_CONN_STATE              1
+#define MSGAPP_ENTER_VSPIN_CONN_STATE               2
+#define MSGAPP_ENTER_NONVSP_CONN_STATE              3
+#define DONTCARE_CTX                                0
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2    //msgCtx = alert level
+#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3    //msgCtx = alert level
+#define BLE_EVBLEMSGID_SERVICE_ERROR                    4    //msgCtx = resultcode
+#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5    //msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6    //msgCtx = not used
+#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7    //msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8    //msgCtx = not used
+#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9    //msgCtx = passcode to display
+#define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                 11   //msgCtx = 1 for passkey, 2 for 16 byte OOB data
+#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE           12   //msgCtx = new notification state 0=off, 1=on
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE                14   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL           15   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER            16   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_UPDATED_BOND                     17   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                        18   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING            19   //msgCtx = current supply voltage
+#define BLE_EVBLEMSGID_UNENCRYPTED                      20   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE                 21   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE                 21   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_BOND_ADDFAIL                     22   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_SRVCCHNG_IND_SENT                23   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_SRVCCHNG_IND_CNF                 24   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_OOB_AVAILABLE_REQEST             25   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_AUTHENTICATION_FAILED            26   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_LESC_PAIRING                     27   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_LESC_OOB_REQUEST                 28   //msgCtx = connection handle */
+
+//These are ID's used to help with reuse of helper functions
+#define CMD_I_LDSC                                 0
+#define CMD_I_PAIR                                 1
+#define CMD_I_LENC                                 2
+#define CMD_I_GCTM                                 3
+
+#define CMD_IS_NOTIFY                              0
+#define CMD_IS_INDICATE                            1
+#define CMD_IS_LOCALWRITE                          2
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+//Result code variable (used for checking if a function completed successfully or not)
+dim rc
+
+//Don't care value
+dim dontcare
+dim dontcare$
+dim tmpDta$
+
+//Contains current state, see STATE_XXX
+dim curState : curState=STATE_INIT
+//Contains the state as we will need it later before entering a non-idle state
+dim oldIdleState
+
+//UART send/receive buffer (for application command mode)
+dim UARTSndBuf$ : UARTSndBuf$ = ""
+dim UARTRecBuf$ : UARTRecBuf$ = ""
+
+//Terminator for commands in command mode
+dim termStr$ : termStr$ = "\r"
+
+//OK or ERROR response strings
+dim ok$ : ok$ = "\nOK"
+dim er$ : er$ = "\nERROR "
+//If the following is zero then the AT parser is suspended
+dim atParse : atParse=1
+
+//This array is updated by ExtractXxxxx() functions
+dim sArg$[MAX_ARGS_IN_ATCMD]
+//This array is updated if an integer needs to be extracted from sArg$
+dim nArg[MAX_ARGS_IN_ATCMD]
+
+//Holds the timeout value that will disconnect a device that connects but doesn't 
+//encrypt the connection within the time (if the encryption flag is enabled)
+dim encDisconTime   //if 0 then encryption via S102 is not requested
+
+//This is the serice uuid that was submitted to BleVspOpen
+dim handleVspServiceUuid : handleVspServiceUuid=0
+
+//When scanning using AT+BLS, this is the pattern to search for in each advert report
+dim scnPattern$
+//This contains the length of the pattern$ string
+dim scnPatternLen
+//When scanning using AT+BLS, this is the minimum rssi to allow
+dim scnRssi
+
+//these variables are used in the adv_report handler and are defined as globals
+//to improve speed
+dim periphAddr$, advData$, nDiscarded, nRssi, nme$
+
+//This is the most recent i/o capability submitted to the stack
+dim pairIoCapCache
+
+//The following is non-zero if BleVspOpen() was successful and it implies that the 
+//vsp service has been added to the gatt table
+dim vspAdded 
+
+//these are advert and scan reports that will be submitted when not in VSP mode 
+//and advertising
+dim idleAdvRpt$, idleScnRpt$, idleAdvType, idleAdvIntvlMs
+
+//These are the cache for the Scan related parameters
+dim scanIntervalMs, scanWindowMs, scanType
+
+//This is the pin to use to enter command mode when in FAST mode. If <0 then it 
+//implies FAST mode as been disabled
+dim vspCmdModePin
+
+//Total number of connections active
+dim connCount
+
+//this is nonzero if gatt client is open
+dim fGattClient : fGattClient=0
+
+// uuid handles. 
+dim uuidHandles[MAX_UUID_HANDLES]  
+
+//metadata handles
+dim metaHandles[MAX_METADATA_HANDLES+1]
+
+// Connection handles. Index 0 is used for Vsp Connection (as they are mutually exclusive)
+dim connHandles[MAX_CONNECTIONS+1]   
+
+//Char Handles that we manage - only index is sent to host
+dim charHandles[MAX_CHARACTISTICS+1]  //index 0 is never used
+dim numOfChars : numOfChars=0
+
+//Outgoing VSP char/desc query array and array element definition is as per the
+//#defines that follow
+#define VSP_ATTR_INDEX_RX            0
+#define VSP_ATTR_INDEX_TX            1
+#define VSP_ATTR_INDEX_MDMIN         2
+#define VSP_ATTR_INDEX_MDMOUT        3
+#define VSP_ATTR_INDEX_TX_CCCD       4
+#define VSP_ATTR_INDEX_MDMOUT_CCCD   5
+#define VSP_ATTR_MAX_INDEXES         6
+dim vspSvcUuid, hVspCccdUuids[VSP_ATTR_MAX_INDEXES], hVspAttr[VSP_ATTR_MAX_INDEXES]  //nArg[] i used to store CharUuid Handles
+
+// this is the array index into hVspCccdUuids & hVspAttr when querying for attribute handles
+dim vspFindIndex
+
+//If a cccd write results in an error then this contains the status code
+dim vspDisconSts
+//If this is 1 then we are waiting for an ack from the VSP peer
+dim vspAllowTx
+//If this is 1 then we are waiting for an ack from the VSP peer
+dim vspAllowRx
+//This is the maximum attribute length for vsp
+dim vspAttrMaxLen
+//This is used to count the number of ^ in slow mode to drop the connection
+dim vspEscCount
+//This is the tick count when a ^ is recieved in slow mode
+dim vspEscStart
+//This is the max count of receiced ^ chrs to trigger a disconnect
+dim vspEscCountMax 
+//This is the min interval between two ^ to count towards escaping towards a disconnect
+dim vspEscMinIntrvl
+//The following is the escape string that needs to entered vspEscCountMax times to disconnect
+dim vspEscString$
+dim vspEscStringLen
+//This is 1 if we are waiting for an ack after sending data
+#cmpif 0x00040000 : dim vspWaitAck
+
+//This is the advert report prefix
+dim advPrefix$
+
+//Gatt Server use - current service handle being defined, non-0 if in the middle of
+//entering a service
+dim svcHandle : svcHandle=0
+
+//Gatt Server use - current characteristic handle being defined, non-0 if in the middle of
+//entering a characteristic
+dim chrInProg : chrInProg=0
+
+//made this a global variables for various handlers & functions to use so that 
+//code size if reduced
+dim charIdx
+
+//This is used to improve the datapump when sending data out to the slave in vsp mode
+//It is used to start a timer so that BleGattcWriteCmd() can be called again.
+#cmpif 0x00080000 : dim vspPumpToutMs
+
+//******************************************************************************
+// Initialise Global Variable
+//******************************************************************************
+
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Assert to check that a resultCode is 0 which means success
+//------------------------------------------------------------------------------
+#cmpif 0x00000003 : sub AssertRC(rc, tag)
+#cmpif 0x00000003 :     if (rc != 0) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";integer.h' rc;" @ tag ";tag;"\r\n"
+#cmpif 0x00000003 :     endif
+#cmpif 0x00000003 : endsub
+
+//------------------------------------------------------------------------------
+// Assert to check that the value is as per specified
+//------------------------------------------------------------------------------
+#cmpif 0x00000003 : sub Assert(v1,v2,tag)
+#cmpif 0x00000003 :     if (v1 != v2) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";v1;"!=";v2;"@ tag ";tag;"\r\n"
+#cmpif 0x00000003 :     endif
+#cmpif 0x00000003 : endsub
+
+//------------------------------------------------------------------------------
+// Assert to check that the value is as per specified
+//------------------------------------------------------------------------------
+#cmpif 0x00000003 : sub AssertNE(v1,v2,tag)
+#cmpif 0x00000003 :     if (v1 == v2) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";v1;"!=";v2;"@ tag ";tag;"\r\n"
+#cmpif 0x00000003 :     endif
+#cmpif 0x00000003 : endsub
+
+//------------------------------------------------------------------------------
+// Assert to check that the value is as per specified
+//------------------------------------------------------------------------------
+#cmpif 0x00000003 : sub AssertBound(v,vl,vh,tag)
+#cmpif 0x00000003 :     if (v < vl) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";v;"<";vl
+#cmpif 0x00000003 :     elseif (v > vh) then
+#cmpif 0x00000003 :         print "\n## Assert Error ";v;">";vh
+#cmpif 0x00000003 :     else
+#cmpif 0x00000003 :         exitsub
+#cmpif 0x00000003 :     endif
+#cmpif 0x00000003 :     print " @ tag ";tag;"\r\n"
+#cmpif 0x00000003 : endsub
+
+//------------------------------------------------------------------------------
+#cmpif 0x00000004 : dim dbgmsg$  //use this to create a message for DbgMsg() 
+//------------------------------------------------------------------------------
+#cmpif 0x00000004 : sub DbgMsg(byval msg$ as string)
+#cmpif 0x00000004 :     print "\n## ";msg$
+#cmpif 0x00000004 : endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x00000004 : sub DbgMsgVal(byval msg$ as string, byval vl as integer)
+#cmpif 0x00000004 :     print "\n## ";msg$;" ";vl
+#cmpif 0x00000004 : endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x00000004 : sub DbgMsgVal$(byval msg$ as string, byref vl$ as string)
+#cmpif 0x00000004 :     print "\n## ";msg$;" ";vl$
+#cmpif 0x00000004 : endsub 
+
+//------------------------------------------------------------------------------
+// This shows the cuttent connection parameters
+//------------------------------------------------------------------------------
+#cmpif 0x00000008 : sub ShowConnParms(nCtx)
+#cmpif 0x00000008 :   dim intrvl,sprvto,slat
+#cmpif 0x00000008 :   rc = BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
+#cmpif 0x00000008 :   AssertRC(rc, 3820)
+#cmpif 0x00000008 :   if rc==0 then
+#cmpif 0x00000008 :     print "\n## Conn :: Interval=";intrvl;",Supervision Tout=";sprvto;",Slave Latency=";slat
+#cmpif 0x00000008 :   endif
+#cmpif 0x00000008 : endsub
+
+//------------------------------------------------------------------------------
+// Change state
+//------------------------------------------------------------------------------
+sub NewState( nState )
+  if nState != curState then
+    #cmpif 0x00000004 : sprint #dbgmsg$, "NewState = "; nState
+    #cmpif 0x00000004 : DbgMsg(dbgmsg$)
+    curstate = nState
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+// Save state info
+//------------------------------------------------------------------------------
+sub SaveState( byref prState )
+  prState = curstate
+endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub  GetFirmwareVersion(dontcare$)
+  dim val, p,mj,mn,b
+  
+  val=sysinfo(3)
+  b =(val    ) & b'111111
+  mn=(val>> 6) & b'111111111111
+  mj=(val>>18) & b'111111
+  p =(val>>24)
+  
+  sprint #dontcare$,p;".";mj;".";mn;".";b  
+endsub
+
+//------------------------------------------------------------------------------
+// Function that will convert a string to lowercase - insitu
+//------------------------------------------------------------------------------
+sub StrToLower$(byref Text$)
+  //Takes a string and replaces uppercase letters with lowercase letters
+  dim i, chr
+  i = strlen(Text$)-1
+  while (i >= 0)
+    chr = StrGetChr(Text$, i)
+    if (chr >= 65 && chr <= 90) then
+      rc = StrSetChr(Text$, chr+32, i)
+    endif
+    i = i-1
+  endwhile
+endsub
+
+//------------------------------------------------------------------------------
+// Returns the single letter AT command from the string
+//------------------------------------------------------------------------------
+function GetAtCmdLetter(byref cmdStr$) as integer
+  dim drop : drop=0
+  dim retVal
+  
+  while 1
+    retVal = StrGetChr(cmdStr$,drop)
+    if retVal<0 then
+      StrShiftLeft(cmdStr$,drop)
+      exitfunc RSP_OK
+    elseif retVal>CHR_ASCII_SPACE then
+      drop=drop+1
+      StrShiftLeft(cmdStr$,drop)
+      exitfunc retVal
+    endif
+    //this is a whitespace
+    drop=drop+1
+  endwhile
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+// Strip "" from str$ if they exist
+//------------------------------------------------------------------------------
+sub TrimQuotes(str$)
+  dim len 
+  if strgetchr(str$,0)==0x22 then  //check for beginning "
+    len = strlen(str$)
+    if len > 2 then
+      if strgetchr(str$,(len-1))==0x22 then //check for ending "
+        str$ = mid$(str$,1,(len-2))
+      endif
+    elseif len == 2 then
+      str$=""
+    endif
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+// Checks if the string is quoted
+//------------------------------------------------------------------------------
+function IsQuoted(str$)
+  dim len 
+  if strgetchr(str$,0)==0x22 then  //check for beginning "
+    len = strlen(str$)-1
+    if len >= 1 then
+      if strgetchr(str$,len)==0x22 then //check for ending "
+        exitfunc 1
+      endif
+    endif
+  endif
+endfunc 0
+
+//------------------------------------------------------------------------------
+// Non-voltatile storage error handler (if program is set to stop running)
+//------------------------------------------------------------------------------
+sub NvFailure()
+  //Non-volatile storage failure and application set to not continue when this is detected
+  #cmpif 0x00000003 : AssertRC(rc, 2890)
+
+  //Enable LED2 flashing if set to do so
+  rc = 0
+  if NvFlashFailPin >= 0 then
+    rc = GPIOSetFunc(NvFlashFailPin, 2, 3) //Set as frequency output
+    GPIOWrite(NvFlashFailPin, 2)
+    #cmpif 0x00000003 : AssertRC(rc, 2960)
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+// Returns 0 if the value is outside min and max
+//------------------------------------------------------------------------------
+function InRange(newVal,minVal,maxVal) as integer
+  if newVal<minVal then
+    exitfunc 0
+  elseif newVal>maxVal then
+    exitfunc 0
+  endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+// If the config value was different and got updated successfully, then the 
+// variable nUpdated is incremented
+//------------------------------------------------------------------------------
+sub SetConfigKey(keyId, newVal, byref nUpdated)
+  dim curVal
+  rc=NvCfgKeyGet(keyId,curVal)
+  if rc==0 then
+    if newVal != curVal then 
+      rc=NvCfgKeySet(keyId,newVal)
+      if rc==0 then
+        nUpdated=nUpdated+1
+      endif
+    endif
+  endif
+endsub
+
+//******************************************************************************
+//******************************************************************************
+//******************************************************************************
+// Initialisation values for sregister caches ...
+//
+// These values are created by running the application "sreg.defaults.creation.sb"
+// and then copy/pasting it's output here - verbatim.
+//
+// This technique is used to reduce the size of the .uwc file of the main sb file
+//******************************************************************************
+//******************************************************************************
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+//                  100+    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5  6  7  8  9
+#define SREGINIT_VAL8_0  "\09\04\00\03\00\02\08\00\00\FF\03\04\01\88\05\10\00\00\00\00"
+#define SREGINIT_MIN8_0  "\00\EC\00\00\00\01\01\00\00\FF\01\03\00\88\01\07\00\80\80\80"
+#define SREGINIT_MAX8_0  "\0F\04\03\07\7F\1F\7F\04\03\1F\78\10\01\EC\14\10\01\7F\7F\7F"
+//                  120+    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5  6  7  8  9
+#define SREGINIT_VAL8_1  "\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\1D\1E"
+#define SREGINIT_MIN8_1  "\80\80\80\80\80\80\80\80\80\80\80\80\80\80\80\80\80\80\FF\FF"
+#define SREGINIT_MAX8_1  "\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\1F\1F"
+//                  200+    0     1     2     3     4     5     6     7    8     9
+#define SREGINIT_VAL16_0 "\40\1F\FA\00\00\00\00\00\80\01\80\01\70\17\00\00\FA\00\00\02"
+#define SREGINIT_MIN16_0 "\E8\03\14\00\00\00\00\00\00\00\00\00\64\00\00\00\14\00\00\01"
+#define SREGINIT_MAX16_0 "\20\4E\00\28\00\04\00\04\00\04\00\04\00\7D\FF\7F\00\28\00\08"
+//                  210+    0     1     2     3     4     5     6     7    8     9
+#define SREGINIT_VAL16_1 "\FA\00\50\00\28\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
+#define SREGINIT_MIN16_1 "\32\00\28\00\28\00\00\80\00\80\00\80\00\80\00\80\00\80\00\80"
+#define SREGINIT_MAX16_1 "\D0\07\00\28\00\28\FF\7F\FF\7F\FF\7F\FF\7F\FF\7F\FF\7F\FF\7F"
+//                  300+    0           1           2           3          4
+#define SREGINIT_VAL32_0 "\4C\1D\00\00\98\3A\00\00\00\C2\01\00\00\20\00\00\01\20\00\00"
+#define SREGINIT_MIN32_0 "\4C\1D\00\00\4C\1D\00\00\B0\04\00\00\01\00\00\00\01\00\00\00"
+#define SREGINIT_MAX32_0 "\1E\04\3D\00\1E\04\3D\00\40\42\0F\00\FF\FF\00\00\FF\FF\00\00"
+//                  305+    0           1           2           3          4
+#define SREGINIT_VAL32_1 "\03\20\00\00\02\20\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
+#define SREGINIT_MIN32_1 "\01\00\00\00\01\00\00\00\00\00\00\80\00\00\00\80\00\00\00\80"
+#define SREGINIT_MAX32_1 "\FF\FF\00\00\FF\FF\00\00\FF\FF\FF\7F\FF\FF\FF\7F\FF\FF\FF\7F"
+//------------------------------------------------------------------------------
+#include "$LIB$.SRegInterface.sb"
+//******************************************************************************
+//******************************************************************************
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// get node index number from connection handle. If not found 0 will be returned 
+// otherwise a number between 1 and MAX_CONNECTIONS
+//------------------------------------------------------------------------------
+function GetIdxFromHConn(hConn as integer) as integer
+  dim i
+  //search for the address through the node cache which will also unconnected
+  for i = 1 to MAX_CONNECTIONS  //start from index 1 because 0 is dedicated for VspConnection
+    if connHandles[i]==hConn then
+      exitfunc i
+    endif
+  next
+endfunc 0
+
+//------------------------------------------------------------------------------
+// get free node index number for connection handle. If not found 0 will be returned 
+// otherwise a number between 1 and MAX_CONNECTIONS
+//------------------------------------------------------------------------------
+function GetFreeIdx() as integer
+  dim i
+  //search for an empty handle
+  for i = 1 to MAX_CONNECTIONS
+    if connHandles[i]==INVALID_CONN_HANDLE then
+      exitfunc i
+    endif
+  next
+endfunc 0
+
+//------------------------------------------------------------------------------
+// Save a charactertic handle to the managed array so that we can report an
+// index number to the host.
+//------------------------------------------------------------------------------
+function AddCharHandle(charH,byref nIdx) as integer
+  if numOfChars<MAX_CHARACTISTICS then
+    numOfChars = numOfChars+1
+    nIdx = numOfChars
+    charHandles[nIdx]=charH
+    exitfunc RSP_OK
+  endif
+endfunc RSP_TOO_MANY_CHARACTERISTICS
+
+//------------------------------------------------------------------------------
+// get node index number from characteristc handle. If not found 0 will be returned 
+// otherwise a number between 1 and MAX_CHARACTISTICS
+//------------------------------------------------------------------------------
+function GetIdxFromHChar(hChar as integer) as integer
+  dim i
+  //search for the address through the node cache which will also unconnected
+  for i = 1 to MAX_CHARACTISTICS  //start from index 1 because 0 is dedicated for VspConnection
+    if charHandles[i]==hChar then
+      exitfunc i
+    endif
+  next
+endfunc 0
+
+//------------------------------------------------------------------------------
+// The rest of the str$ should be up to 10 arguments seperated by ','
+// returns RSP_OK if ok and 'args' is updated with number of args and the global
+// string array sArg$[] contains the arguments (but not the ',')
+// If any arguments have "" delimitors they are removed
+//------------------------------------------------------------------------------
+function ExtractArgsCSV(str$,byref args, minargs,maxargs)
+  dim tlen, commaExp, chr
+  
+  #cmpif 0x00000003 : AssertBound(minargs,0,MAX_ARGS_IN_ATCMD,2870)  
+  #cmpif 0x00000003 : AssertBound(maxargs,minargs,MAX_ARGS_IN_ATCMD,2880)  
+  
+  args=0
+  commaExp=0  //1 for expected
+  
+  //clear up to maxargs
+  for chr=0 to maxargs
+    sArg$[chr]=""
+  next
+  
+  //special case check if maxargs is 0 and the line is not empty
+  tlen = ExtractStrToken(str$,dontcare$)
+  if tlen>0 then
+    //first argument will not have a preceding comma, unless it is missing
+    if strcmp(dontcare$,",")==0 then
+      //unexpected comma so empty string
+      sArg$[0]=""
+    else
+      //remove delimiting "" quotes
+      TrimQuotes(dontcare$)
+      //save it in the args array
+      sArg$[0]=dontcare$
+      //now extract another token and that could be a comma
+      tlen = ExtractStrToken(str$,dontcare$)
+    endif
+    args=1
+  endif
+  
+  //At this point dontcare$ has to be comma or empty 
+
+  //now parse the string further
+  while tlen>0
+    //check if too many args already encountered
+    if args>=maxargs then
+      exitfunc RSP_ERROR_TOOMANYARGS
+    endif    
+  
+    //this has to be a comma
+    if strcmp(dontcare$,",")==0 then
+      //increment the count
+      sArg$[args]=""
+    else
+      exitfunc RSP_ERROR_SYNTAX_ERROR
+    endif
+    
+    //now extract another token and that should be an arg, a comma, or empty
+    tlen = ExtractStrToken(str$,dontcare$)
+    if tlen>0 then 
+      if strcmp(dontcare$,",")==0 then
+        //got an empty parameter so do nothing here, args count incremented later
+      elseif strcmp(dontcare$,"-")==0 then
+        //looks like there could be a negative number
+        if strlen(str$) > 0 then
+          chr = StrGetChr(str$,0)
+          if (chr>=0x30)&&(chr<=0x39) then
+            //it is a decimal digit
+            tlen = ExtractStrToken(str$,dontcare$)
+            //save it in the args array
+            sArg$[args]="-" + dontcare$
+            //now extract another token and that should be a comma or empty
+            tlen = ExtractStrToken(str$,dontcare$)
+          endif
+        else
+          //there are no more characters
+          sArg$[args]=dontcare$
+          tlen=0
+        endif
+      else
+        //remove delimiting "" quotes
+        TrimQuotes(dontcare$)
+        //save it in the args array
+        sArg$[args]=dontcare$
+        //now extract another token and that should be a comma or empty
+        tlen = ExtractStrToken(str$,dontcare$)
+      endif
+    endif
+    args = args+1
+  endwhile
+
+  //#cmpif 0x00000004 : dim i
+  //#cmpif 0x00000004 : DbgMsgVal ("args=",args)
+  //#cmpif 0x00000004 : for i = 0 to (MAX_ARGS_IN_ATCMD-1)
+  //#cmpif 0x00000004 :   print "\n## sArg$[";i;"]=";sArg$[i]
+  //#cmpif 0x00000004 : next
+
+  //check if too few args parsed  
+  if args < minargs then
+    exitfunc RSP_ERROR_TOOFEWARGS
+  endif
+  
+endfunc RSP_OK
+
+////------------------------------------------------------------------------------
+//// The rest of the str$ should not be up to 10 arguments 
+////------------------------------------------------------------------------------
+//function ExtractArgsStr(str$,byref args, minargs,maxargs)
+//  dim tlen
+//  
+//  #cmpif 0x00000003 : AssertBound(minargs,0,MAX_ARGS_IN_ATCMD,3600)  
+//  #cmpif 0x00000003 : AssertBound(maxargs,minargs,MAX_ARGS_IN_ATCMD,3610)  
+//  
+//  args=0
+//  
+//  //Extract first token
+//  tlen = ExtractStrToken(str$,dontcare$)  
+//  //then loop until max done
+//  while tlen>0
+//    //check if too many args already encountered
+//    if args>=maxargs then
+//      exitfunc RSP_ERROR_TOOMANYARGS
+//    endif    
+//  
+//    //remove delimiting "" quotes
+//    TrimQuotes(dontcare$)
+//    //save it in the args array
+//    sArg$[args]=dontcare$
+//    #cmpif 0x00008000 : print "\narg=";dontcare$
+//    //increment
+//    args=args+1
+//    //now extract another token and that should be a comma or empty
+//    tlen = ExtractStrToken(str$,dontcare$)
+//    
+//  endwhile
+//
+//  //check if too few args parsed  
+//  if args < minargs then
+//    exitfunc RSP_ERROR_TOOFEWARGS
+//  endif
+//  
+//endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function SArgConvertToInt( ndx, defval, mn, mx)
+  dim val
+  
+  #cmpif 0x00000003 : AssertBound(ndx,0,(MAX_ARGS_IN_ATCMD-1),5720)  
+  
+  if strlen(sArg$[ndx])==0 then
+    //not specified so set to default
+    val = defval
+  else
+    //a threshold has been specified so attempt to convert to an integer
+    if ExtractIntToken(sArg$[ndx],val)==0 then
+      exitfunc RSP_ERROR_SYNTAX_ERROR
+    endif
+  endif
+  if (val<mn)||(val>mx) then
+    exitfunc RSP_ERROR_VALUE_NOT_VALID
+  endif
+  nArg[ndx] = val
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+// routine for sending buffered data for the UART
+//------------------------------------------------------------------------------
+sub SendUartData()
+  if (StrLen(UARTSndBuf$) > 0) then
+    //Send UART data
+    rc = UARTWrite(UARTSndBuf$)
+    StrShiftLeft(UARTSndBuf$, rc)
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+// routine for sending buffered data for the UART
+//------------------------------------------------------------------------------
+sub SendUartDataEx(byref appData$)
+  UARTSndBuf$=UARTSndBuf$+appData$
+  if (StrLen(UARTSndBuf$) > 0) then
+    //Send UART data
+    rc = UARTWrite(UARTSndBuf$)
+    StrShiftLeft(UARTSndBuf$, rc)
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub AppendRspEnd(rsp as integer, byref bufferStr$ )
+  dim tmpStr$
+  if rsp == 0 then
+    tmpStr$ = ok$
+  elseif rsp > 99 then
+    sprint #tmpStr$, integer.h' rsp
+    tmpStr$ = er$ + right$(tmpStr$,4)
+  elseif rsp > 0 then
+    sprint #tmpStr$, "0";rsp
+    tmpStr$ = er$ + right$(tmpStr$,2)
+  else
+    atParse=0
+    exitsub
+  endif    
+  bufferStr$ = bufferStr$ + tmpStr$ + "\r"
+  atParse=1
+endsub
+
+//------------------------------------------------------------------------------
+// for valid values of 'rsp' see CONN_xxxx #defines
+//------------------------------------------------------------------------------
+sub GetConnInfoRsp(hConn, byref rsp$, byref intrvl )
+  dim addr$,sprvto,slat
+  
+  rc = BleGetCurConnParms(hConn,intrvl,sprvto,slat)
+  #cmpif 0x00000003 : AssertRC(rc, 8890)  
+
+  rc=BleGetAddrFromConnHandle(hConn,addr$)
+  #cmpif 0x00000003 : AssertRC(rc, 8920)
+
+  sprint #rsp$, StrHexize$(addr$);",";intrvl;",";sprvto;",";slat
+endsub
+
+//------------------------------------------------------------------------------
+// for valid values of 'rsp' see CONN_xxxx #defines
+//------------------------------------------------------------------------------
+sub AppendConnRspEnd(rsp as integer, byref bufferStr$ )
+  dim tmpStr$,info$,intrvl
+  if rsp == 0 then
+    GetConnInfoRsp(connHandles[HCONN_VSP],info$,intrvl)
+    sprint #tmpStr$, "\nCONNECT 0,";info$;"\r"
+    //Set the data pump timer for when BleGattcWriteCmd fails due to lack of buffers
+#cmpif 0x00080000 :     vspPumpToutMs = (intrvl+2500)/1000
+  elseif rsp > 0 then
+    sprint #tmpStr$, "\nNOCARRIER ";rsp;"\r"
+  else
+    atParse=0
+    exitsub
+  endif    
+  bufferStr$ = bufferStr$ + tmpStr$
+  atParse=1
+endsub
+
+//------------------------------------------------------------------------------
+// On non vsp connection, this is used to send the confirming 'connect' message
+//------------------------------------------------------------------------------
+sub SendNonVspConnect(ndx as integer, byref bufferStr$ )
+  dim tmpStr$,info$,intrvl
+  
+  GetConnInfoRsp(connHandles[ndx],info$,intrvl)
+  sprint #tmpStr$, "\nconnect ";ndx;",";info$;"\r"
+  
+  bufferStr$ = bufferStr$ + tmpStr$
+  atParse=1  
+  
+  //Send out data waiting in buffer
+  SendUartData()
+endsub
+
+//------------------------------------------------------------------------------
+// 
+//------------------------------------------------------------------------------
+sub SendRingRsp(hConn as integer, byref bufferStr$ )
+  dim addr$,isTrusted, asCentral, keyInfo, rollAge, rollCount  
+  rc=BleGetAddrFromConnHandle(hConn,addr$)
+  #cmpif 0x00000003 : AssertRC(rc, 8460)
+  
+  isTrusted = BleBondingIsTrusted(addr$, asCentral, keyInfo, rollAge, rollCount)
+  
+  addr$=StrHexize$(addr$)
+  bufferStr$ = bufferStr$ + "\nRING " + addr$
+  
+  if isTrusted then
+    addr$ = ",T\r"
+  else
+    addr$ = ",U\r"
+  endif
+  
+  bufferStr$ = bufferStr$ + addr$
+  
+  //Send out data waiting in buffer
+  SendUartData()
+endsub
+
+//------------------------------------------------------------------------------
+// for valid values of 'rsp' see CONN_xxxx #defines
+//------------------------------------------------------------------------------
+sub SendNonVspDiscon(rsp as integer, ndx as integer, byref bufferStr$ )
+  
+  sprint #dontcare$, "\ndiscon ";ndx;",";rsp;"\r"
+  bufferStr$ = bufferStr$ + dontcare$
+  
+  atParse=1
+  
+  //Send out data waiting in buffer
+  SendUartData()
+endsub
+
+//------------------------------------------------------------------------------
+// This is sent on non_vsp states when scanning times out
+//------------------------------------------------------------------------------
+sub SendScanEnd(byref bufferStr$ )
+  
+  bufferStr$ = bufferStr$ + "\nscanend\r"
+  
+  //Send out data waiting in buffer
+  SendUartData()
+endsub
+
+//------------------------------------------------------------------------------
+// This is sent when a passcode needs to be displayed
+//------------------------------------------------------------------------------
+sub SendDispPassKey(npsky, byref bufferStr$ )
+  dim tmp$
+  
+  sprint #tmp$, "000000";npsky;"\r"
+  
+  bufferStr$ = bufferStr$ + "\nshowcode " + right$(tmp$,7)
+  
+  //Send out data waiting in buffer
+  SendUartData()
+endsub
+
+//------------------------------------------------------------------------------
+// This is sent when a authkey is required and 
+// keytype=1 for passcode (0 to 999999)
+// keytype=2 for 32 hex digit OOB key
+//------------------------------------------------------------------------------
+sub SendAuthKeyReq(keyType, byref bufferStr$ )
+  dim tmp$
+  select keyType
+  case 1
+    tmp$ = "\npasskey?\r"
+  
+  case 2
+    tmp$ = "\noobkey?\r"
+    
+  case else
+    tmp$ = "\nxxkey?\r"
+  endselect
+    bufferStr$ = bufferStr$ + tmp$
+  
+  //Send out data waiting in buffer
+  SendUartData()
+endsub
+
+//------------------------------------------------------------------------------
+// Send 'Encrypt' message
+//------------------------------------------------------------------------------
+sub SendEncryptRsp(ndx, sendMsg, byref bufferStr$ )
+  dim msg$
+  select sendMsg
+  case 1
+    msg$ = "\nENCRYPT\r"
+  
+  case 2
+    sprint #msg$, "\nencrypt ";ndx;"\r"
+  
+  case else
+  endselect  
+  if sendMsg>0 then
+    bufferStr$ = bufferStr$ + msg$
+    //Send out data waiting in buffer
+    SendUartData()
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+//  8-bit S-Registers are 100-199
+// 16-bit S-Registers are 200-299
+// 32-bit S-Registers are 300-399
+//------------------------------------------------------------------------------
+function ATSRegGetValue(regnum, byref rspBuf$)
+  if (regnum >= SREGNUM_START_8BIT) && (regnum<(SREGNUM_START_8BIT+SREG_MAXREGISTERS_8)) then
+    //This is 8-bit register access
+    regnum = regnum-SREGNUM_START_8BIT
+  elseif (regnum >= SREGNUM_START_16BIT) && (regnum<(SREGNUM_START_16BIT+SREG_MAXREGISTERS_16)) then
+    //This is 16-bit register access
+    regnum = regnum+0x10000-SREGNUM_START_16BIT
+  elseif (regnum >= SREGNUM_START_32BIT) && (regnum<(SREGNUM_START_32BIT+SREG_MAXREGISTERS_32)) then
+    //This is 32-bit register access
+    regnum = regnum+0x20000-SREGNUM_START_32BIT
+  else
+    exitfunc RSP_ERROR_INVALID_S_REG    
+  endif
+
+  dim regval$
+  sprint #regval$,SRegGet(regnum)
+  rspBuf$ = rspBuf$ + "\n" + regval$ + "\r"
+  
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function ATSRegSetValue(regnum, regVal)
+  if (regnum >= SREGNUM_START_8BIT) && (regnum<(SREGNUM_START_8BIT+SREG_MAXREGISTERS_8)) then
+    //This is 8-bit register access
+    regnum = regnum-SREGNUM_START_8BIT
+  elseif (regnum >= SREGNUM_START_16BIT) && (regnum<(SREGNUM_START_16BIT+SREG_MAXREGISTERS_16)) then
+    //This is 16-bit register access
+    regnum = regnum+0x10000-SREGNUM_START_16BIT
+  elseif (regnum >= SREGNUM_START_32BIT) && (regnum<(SREGNUM_START_32BIT+SREG_MAXREGISTERS_32)) then
+    //This is 32-bit register access
+    regnum = regnum+0x20000-SREGNUM_START_32BIT
+  else
+    exitfunc RSP_ERROR_INVALID_S_REG    
+  endif
+
+  //check if valid range
+  dim mn,mx
+  mn=SRegGetRange(regnum,mx)
+  if (regVal<mn) || (regVal>mx) then
+    exitfunc RSP_ERROR_VALUE_OUT_OF_RANGE    
+  endif  
+
+  SRegSet(regnum,regVal)
+  
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function ATSRegGetRange(regnum, byref rspBuf$)
+  if (regnum >= SREGNUM_START_8BIT) && (regnum<(SREGNUM_START_8BIT+SREG_MAXREGISTERS_8)) then
+    //This is 8-bit register access
+    regnum = regnum-SREGNUM_START_8BIT
+  elseif (regnum >= SREGNUM_START_16BIT) && (regnum<(SREGNUM_START_16BIT+SREG_MAXREGISTERS_16)) then
+    //This is 16-bit register access
+    regnum = regnum+0x10000-SREGNUM_START_16BIT
+  elseif (regnum >= SREGNUM_START_32BIT) && (regnum<(SREGNUM_START_32BIT+SREG_MAXREGISTERS_32)) then
+    //This is 32-bit register access
+    regnum = regnum+0x20000-SREGNUM_START_32BIT
+  else
+    exitfunc RSP_ERROR_INVALID_S_REG    
+  endif
+
+  dim regval$,mn,mx
+  mn=SRegGetRange(regnum,mx)
+  sprint #regval$,mn;"..";mx
+  rspBuf$ = rspBuf$ + "\n" + regval$ + "\r"
+  
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+// String S-Registers start at 0
+//------------------------------------------------------------------------------
+function ATSRegGetValueStr(regnum, byref rspBuf$)
+
+  if (regnum >= SREGNUM_START_STR) && (regnum<(SREGNUM_START_STR+SREG_MAXREGISTERS_STR)) then
+    dontcare$=SRegGetStr$((regnum-SREGNUM_START_STR))
+    rspBuf$ = rspBuf$ + "\n" + StrEscape$(dontcare$) + "\r"
+    exitfunc RSP_OK
+  endif
+
+endfunc RSP_ERROR_INVALID_S_REG
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function ATSRegSetValueStr(regnum, regVal$)
+
+  if (regnum >= SREGNUM_START_STR) && (regnum<(SREGNUM_START_STR+SREG_MAXREGISTERS_STR)) then
+    //check if valid range
+    dim mn,mx,len
+    
+    regnum = regnum - SREGNUM_START_STR
+    
+    //get the valid min/max for this register
+    mn=SRegGetStrSizeRange(regnum,mx)
+    //de-escape the string
+    StrDeEscape(regVal$)  //ensure escaped characters are converted to single binary values
+
+    //check for valid length
+    len=strlen(regVal$)
+    if (len<mn) || (len>mx) then
+      exitfunc RSP_ERROR_VALUE_OUT_OF_RANGE    
+    endif
+    
+    //perform further checking
+    select regnum
+    case CfgIdStr_VspServiceUUID128
+      //this must only contain hex characters
+      dontcare$=strdehexize$(regVal$)
+      if strlen(dontcare$) != 16 then
+        exitfunc RSP_ERROR_INVALID_HEXSTR
+      endif
+      
+    case else    
+    endselect
+    
+    SRegSet$(regnum, regVal$)
+    exitfunc RSP_OK
+    
+  endif
+
+endfunc RSP_ERROR_INVALID_S_REG
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function ATSRegGetLenRangeStr(regnum, byref rspBuf$)
+  if (regnum >= SREGNUM_START_STR) && (regnum<(SREGNUM_START_STR+SREG_MAXREGISTERS_STR)) then
+    dim tmp$,mn,mx
+    mn=SRegGetStrSizeRange((regnum-SREGNUM_START_STR),mx)
+    sprint #tmp$,mn;",";mx
+    rspBuf$ = rspBuf$ + "\n" + tmp$ + "\r"
+    exitfunc RSP_OK
+  endif
+endfunc RSP_ERROR_INVALID_S_REG
+
+//------------------------------------------------------------------------------
+//if advertising then return non-zero
+//------------------------------------------------------------------------------
+function IsAdvertising()
+  if (sysinfo(2016) & 0x1) then
+    exitfunc 1
+  endif
+endfunc 0
+
+//------------------------------------------------------------------------------
+//if scanning then return non-zero
+//------------------------------------------------------------------------------
+function IsScanning()
+  if (sysinfo(2016) & 0x8) then
+    exitfunc 1
+  endif
+endfunc 0
+
+//------------------------------------------------------------------------------
+//if advertising in progress stop it
+//------------------------------------------------------------------------------
+sub AdvertsStop()
+  #cmpif 0x00000004 : DbgMsg("Called AdvertsStop()")
+  if IsAdvertising() then
+    rc=BleAdvertStop()
+    #cmpif 0x00000003 : AssertRC(rc, 9280)
+    #cmpif 0x00000004 : DbgMsg("Adverts Stopped")
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+//if scanning in progress stop it
+//------------------------------------------------------------------------------
+sub ScanningStop()
+  #cmpif 0x00000004 : DbgMsg("Called ScanningStop()")
+  if IsScanning() then
+    rc=BleScanStop()
+    #cmpif 0x00000003 : AssertRC(rc, 9490)
+    #cmpif 0x00000004 : DbgMsg("Scanning Stopped")
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+//Stop & restart scanning
+//------------------------------------------------------------------------------
+function ScanningStart(tout, filter$, rsi)
+  ScanningStop()  
+  rc = BleScanStart( tout, 0)  
+  #cmpif 0x00000008 :   AssertRC(rc, 10310)
+  
+  //Set up the filtering parameters for the scan reporting
+  if rc==0 then
+    scnPattern$   = filter$
+    scnPatternLen = strlen(filter$)
+    scnRssi       = rsi
+  endif
+
+  #cmpif 0x00000004 : if rc==0 then
+  #cmpif 0x00000004 :       DbgMsg("Scanning Started")
+  #cmpif 0x00000004 :    DbgMsgVal("  Scan Tout (sec)=",tout)
+  #cmpif 0x00000004 :   DbgMsgVal$("  Scan Pattern   =",filter$)
+  #cmpif 0x00000004 :    DbgMsgVal("  Scan Rssi (dBm)=",rsi)
+  #cmpif 0x00000004 : else
+  #cmpif 0x00000004 :   DbgMsg("Failed to start Scanning")
+  #cmpif 0x00000004 : endif  
+  
+endfunc rc
+
+//------------------------------------------------------------------------------
+// Load VSP service defaults into sArg$[] and nArg[] to set things up as follows
+//   sArg$[0] = 
+//   nArg[1]  = TxBufLen
+//   nArg[2]  = RxBufLen
+//   nArg[3]  = VspServiceUuid
+//   nArg[4]  = RxUUID
+//   nArg[5]  = TxUUID
+//   nArg[6]  = MdmInUUID
+//   nArg[7]  = MdmOutUUID
+//   nArg[8]  = EncryptionReq (bit 0 set to encrypt, 1 set for MITM)
+//------------------------------------------------------------------------------
+sub VspGetDefs()
+  dim tmpStr$
+  
+  //Get Tx & Rx buffer sizes
+  nArg[1] = SRegGet( CfgId_VspTxBufSize )
+  nArg[2] = SRegGet( CfgId_VspRxBufSize)
+
+  //Get UUID handles for Service and the 4 Characteristics
+  tmpStr$ = SRegGetStr$( CfgIdStr_VspServiceUUID128)
+  tmpStr$ = StrDehexize$(tmpStr$)
+  nArg[3] = BleHandleUuid128(tmpStr$)  //VspServiceUuid
+  nArg[4] = BleHandleUuidSibling(nArg[3], SRegGet(CfgId_VspRxUUID))
+  nArg[5] = BleHandleUuidSibling(nArg[3], SRegGet(CfgId_VspTxUUID))
+  nArg[6] = BleHandleUuidSibling(nArg[3], SRegGet(CfgId_VspMdmInUUID))
+  nArg[7] = BleHandleUuidSibling(nArg[3], SRegGet(CfgId_VspMdmOutUUID))
+
+  //Get EncryptionReq
+  nArg[8] = SRegGet( CfgId_Encrypt)
+endsub
+
+//------------------------------------------------------------------------------
+// Open VSP service using sArg$[] and nArg[] as per VspGetDefs()
+//------------------------------------------------------------------------------
+function VspOpen()
+  dim vspFlags
+  
+  //Update vsp flags variable
+  if ((nArg[8] & 0x1) == 0x1 ) then
+    //Connection encryption is enabled, get timer value
+    encDisconTime = SRegGet( CfgId_EncrDisconToutMs)
+    if ((nArg[8] & 0x2) == 0x2 ) then
+      //MITM required
+      vspFlags = 0x0C
+    else
+      //MITM not required
+      vspFlags = 0x08
+    endif
+  else
+    //VSP encryption is disabled, disable timer
+    encDisconTime = 0
+    vspFlags = 0
+  endif
+
+  //save the service uuid handle so that we can use it when creating the advert report
+  handleVspServiceUuid = nArg[3]
+
+  //Open the VSP service with the provided configuration
+  rc = BleVSPOpenEx(nArg[1], nArg[2], vspFlags, nArg[3], nArg[4], nArg[5], nArg[6], nArg[7])
+  #cmpif 0x00000003 : AssertRC(rc, 10640)
+  if rc==0 then
+    vspAdded = 1
+  endif
+endfunc rc
+
+//------------------------------------------------------------------------------
+// Create a generic minimal advert
+//------------------------------------------------------------------------------
+sub GenAdvCreateCommit(byref advRpt$, byref scRpt$)
+  dim flgsAD, nAppearance
+  
+  flgsAD      = SRegGet( CfgId_VspFlagsAD )
+  nAppearance = SRegGet( CfgId_Appearance)
+  
+  rc = BleAdvRptInit(advRpt$, flgsAD, nAppearance, MaxDevNameSize)
+    #cmpif 0x00000003 : AssertRC(rc, 10900)
+
+  rc = BleScanRptInit(scRpt$)
+    #cmpif 0x00000003 : AssertRC(rc, 10930)
+
+endsub
+
+//------------------------------------------------------------------------------
+// The advert report for the VSP service
+//------------------------------------------------------------------------------
+sub VspAdvCreateCommit()
+  //Add device name to advert report and service UUID to scan report
+  dim advRpt$, scRpt$
+  
+  GenAdvCreateCommit(advRpt$, scRpt$)
+  
+    #cmpif 0x00000003 : AssertNE(handleVspServiceUuid,0,10950)
+  rc = BleAdvRptAddUuid128(scRpt$, handleVspServiceUuid)
+    #cmpif 0x00000003 : AssertRC(rc, 10970)
+
+  rc = BleAdvRptsCommit(advRpt$, scRpt$)
+    #cmpif 0x00000003 : AssertRC(rc, 11000)
+endsub
+
+//------------------------------------------------------------------------------
+// Ble advertising for central devices to connect to for VSP service
+//------------------------------------------------------------------------------
+sub VspStartAdverts()
+  dim Addr$
+  Addr$ = ""
+
+  rc = BleAdvertStart(0, Addr$, SRegGet(CfgId_VspAdvertIntvlMs), 0, 0)
+    #cmpif 0x00000003 : AssertRC(rc, 11110)
+    #cmpif 0x00000004 : DbgMsg("Vsp Adverts Started")
+endsub
+
+//------------------------------------------------------------------------------
+// Create minimal idle advert/scan reports
+//------------------------------------------------------------------------------
+sub IdleAdvCreate()  
+  GenAdvCreateCommit(idleAdvRpt$, idleScnRpt$)
+endsub
+
+//------------------------------------------------------------------------------
+// Commit the idle mode advert reports
+//------------------------------------------------------------------------------
+sub IdleAdvCommit()  
+  rc = BleAdvRptsCommit(idleAdvRpt$, idleScnRpt$)
+    #cmpif 0x00000003 : AssertRC(rc, 9750)
+endsub
+
+//------------------------------------------------------------------------------
+// Ble advertising for central devices to connect to for VSP service
+//------------------------------------------------------------------------------
+sub IdleStartAdverts( advType, adIntervalMs )
+  dim Addr$
+  Addr$ = ""
+
+  rc = BleAdvertStart(advType, Addr$, idleAdvIntvlMs , 0, 0)
+  #cmpif 0x00000003 : AssertRC(rc, 11110)
+  #cmpif 0x00000004 : DbgMsg("Idle Adverts Started")
+  
+  //save in cache 
+  idleAdvType    = advType
+  idleAdvIntvlMs = adIntervalMs
+  
+endsub
+
+//------------------------------------------------------------------------------
+// Currently only need to initialise the gpio for vspCmdMode Pin in Fast mode
+//------------------------------------------------------------------------------
+sub InitGPIO()
+
+  //cache the command mode pin
+  vspCmdModePin = SRegGet(CfgId_VspCmdModePin)
+  if vspCmdModePin>= 0 then
+    //set it as input with pullup resistor
+    rc=GpioSetFunc(vspCmdModePin,1,2) //pullup resistor
+    #cmpif 0x00000003 : AssertRC(rc, 10040)
+    
+    ////and arrange so that we will get an event each time it goes from 0 to 1
+    //rc=GpioAssignEvent(0,vspCmdModePin,0)
+    
+    //and arrange so that we will get an event each time it goes from 1 to 0
+    rc=GpioAssignEvent(0,vspCmdModePin,1)
+    
+    #cmpif 0x00000003 : AssertRC(rc, 10750)
+  endif  
+
+endsub
+
+//------------------------------------------------------------------------------
+// Common code when returning to one of the idle states
+//------------------------------------------------------------------------------
+sub IdleReturnAction()
+  dim scanPat$
+  #cmpif 0x00000004 : DbgMsgVal("IdleReturn - Radio", sysinfo(2016))
+  #cmpif 0x00000004 : DbgMsgVal("OldIdleState=",oldIdleState)
+  
+  select oldIdleState
+  case STATE_IDLE_VSP
+    //Create the VSP related Advert report and scan report and commit
+    VspAdvCreateCommit()
+    //Start Advertising
+    VspStartAdverts()
+
+  case STATE_IDLE_nonVSP
+    advPrefix$ = "\nAD0:"
+
+  case else
+    //nothing to do
+    #cmpif 0x00000004 : DbgMsg("IdleReturn - unknown")    
+  endselect
+
+  //change state
+  NewState(oldIdleState)    
+  
+endsub
+
+//------------------------------------------------------------------------------
+// Called from a handler when vsp connection fails
+//------------------------------------------------------------------------------
+sub VspNoCarrierRet(rsp)
+
+  IdleReturnAction()  //Will change state to one of IDLE, IDLE_VSP, IDLE_ADV
+
+  //send an NOCARRIER response
+  AppendConnRspEnd(rsp,UARTSndBuf$)
+  //Send out data waiting in buffer
+  SendUartData()
+  //also trigger a reprocessing of the uart buffer just in case
+  rc=SendMsgApp(MSGAPP_PROCESS_UART, DONTCARE_CTX)
+  
+endsub
+
+//------------------------------------------------------------------------------
+// Called from a handler when nonVSP connection fails
+//------------------------------------------------------------------------------
+sub NonVspDisconRet(rsp, ndx)
+
+  IdleReturnAction()  //Will change state to one of IDLE, IDLE_VSP, IDLE_ADV
+
+  //send an DISCON response
+  SendNonVspDiscon(rsp, ndx, UARTSndBuf$)
+  
+  //also trigger a reprocessing of the uart buffer just in case
+  rc=SendMsgApp(MSGAPP_PROCESS_UART, DONTCARE_CTX)
+  
+endsub
+
+//--------------------------------------------------------------------------
+// Given a connection handle, returns 0 if not connected to a trusted device
+// otherwise 1 for unauthenticated pairing and 2 for authenticaed
+//--------------------------------------------------------------------------
+function IsTrustedPeer(hConn)
+  dim kInfo, rAge, rCount,klen
+  dim curAddr$
+  
+  //get address of connected device
+  rc = BleGetAddrFromConnHandle(hConn,curAddr$)
+  #cmpif 0x00000003 : AssertRC(rc, 11020)
+  #cmpif 0x00000004 : dim a$ : a$=StrHexize$(curAddr$)
+  #cmpif 0x00000004 : DbgMsgVal$("Master Addr = ",a$)
+
+  //check if device is trusted  
+  klen = BleBondingIsTrusted(curAddr$, 1, kInfo, rAge, rCount)
+  
+  if klen > 0 then 
+    //it is trusted and for Phase 1 ignore the authentication stuff
+    #cmpif 0x00000004 : print "\n## Peer is trusted "
+    #cmpif 0x00000004 : if (kInfo & 0x1)!=0 then 
+    #cmpif 0x00000004 :   print "(Authenticated)"
+    #cmpif 0x00000004 : endif
+    
+    if (kInfo & 0x1)!=0 then 
+      //it is an authenticated bond
+      kInfo = 2
+    else
+      //it is not an authenticated bond
+      kInfo = 1
+    endif
+  else
+    //not trusted
+    #cmpif 0x00000004 : print "\n## Peer is NOT trusted "
+    kInfo = 0
+  endif
+endfunc kInfo
+
+//------------------------------------------------------------------------------
+//open gatt client, returns a nonzero error code
+//------------------------------------------------------------------------------
+function GattClientOpen()
+  if fGattClient==0 then 
+    rc = BleGattcOpen(SRegGet(CfgId_GattClientMemSize), 0)
+    if rc > 0 then
+      rc=CONN_ERROR_OUTOFMEM
+    else
+      fGattClient=1
+      #cmpif 0x00000004 : DbgMsg("GattClientOpen")
+    endif
+  else
+    rc=RSP_OK
+      #cmpif 0x00000004 : DbgMsg("GattClient was Open")
+  endif
+endfunc rc
+
+//------------------------------------------------------------------------------
+//close gatt client
+//------------------------------------------------------------------------------
+//function GattClientClose()
+//  if fGattClient!=0 then 
+//    BleGattcClose()
+//    fGattClient=0
+//  endif
+//  #cmpif 0x00000004 : DbgMsg("GattClientClose")
+//endfunc 1
+
+//------------------------------------------------------------------------------
+// vspFindIndex is the index into the query array 
+//------------------------------------------------------------------------------
+function FindCharOrDesc()
+  //#cmpif 0x00000004 : DbgMsgVal("FindCharOrDesc Idx=",vspFindIndex)
+  
+  dim cccdUuid : cccdUuid = hVspCccdUuids[vspFindIndex]
+  dim charUuid : charUuid = nArg[vspFindIndex]
+  
+  if cccdUuid==0 then
+    //find char
+    //#cmpif 0x00000004 : DbgMsg("BleGattcFindChar")
+    rc = BleGattcFindChar(connHandles[HCONN_VSP], vspSvcUuid, 0, charUuid, 0)
+  else
+    //find desc
+    //#cmpif 0x00000004 : DbgMsg("BleGattcFindDesc")
+    rc = BleGattcFindDesc(connHandles[HCONN_VSP], vspSvcUuid, 0, charUuid, 0, cccdUuid, 0 )
+  endif
+  #cmpif 0x00000003 : AssertRC(rc, 11930)
+  
+endfunc rc
+
+//------------------------------------------------------------------------------
+// vspFindIndex is the index into the query array 
+// returns 0 if no more cccd's in the array
+//------------------------------------------------------------------------------
+function CccdsEnable()
+  //#cmpif 0x00000004 : DbgMsgVal("CccdsEnable, idx=",vspFindIndex)
+  dim i, hAttr
+  //first find the first cccd
+  for i=vspFindIndex to (VSP_ATTR_MAX_INDEXES-1)
+    if hVspCccdUuids[i] != 0 then
+      //this array index is for a cccd so get the attribure handle for it
+      hAttr = hVspAttr[i]
+      if hAttr != 0 then
+        #cmpif 0x00000004 : print "\n## BleGattcWrite, hAttr =";hAttr;" i=";i
+        //found attr handle for a cccd
+        dontcare$ = "\01\00"
+        rc = BleGattcWrite(connHandles[HCONN_VSP], hAttr, dontcare$)
+        #cmpif 0x00000003 : AssertRC(rc, 12160)
+        vspFindIndex = i
+        exitfunc 1
+      endif
+    endif
+  next
+  //reaching here means no more cccd's to enable
+endfunc 0
+
+//------------------------------------------------------------------------------
+//Setup array of chars+ desc that need to be found in the slave
+//------------------------------------------------------------------------------
+function GetVspHandles()
+  dim i
+  //get vsp uuids and other values into nArg[] 
+  VspGetDefs()
+  //   nArg[3]  = VspServiceUuid
+  //   nArg[4]  = RxUUID       //0
+  //   nArg[5]  = TxUUID       //1
+  //   nArg[6]  = MdmInUUID    //2
+  //   nArg[7]  = MdmOutUUID   //3
+  vspSvcUuid = nArg[3]
+  //shuffle values in the nArg arrays as we are going to reuse it.
+  for i=0 to 3
+    nArg[i]=nArg[i+4]
+  next
+  //   nArg[0]  = RxUUID/0          //0
+  //   nArg[1]  = TxUUID/0          //1
+  //   nArg[2]  = MdmInUUID/0       //2
+  //   nArg[3]  = MdmOutUUID/0      //3
+  //   nArg[4]  = TxUUID/CCCD       //4
+  //   nArg[5]  = MdmOutUUID/CCCD   //5
+  for i=0 to (VSP_ATTR_MAX_INDEXES-1)
+    hVspCccdUuids[i]=0
+    hVspAttr[i]=0  //assume all are optinal
+  next
+  //the RX and TX characteristic are mandatory
+  hVspAttr[VSP_ATTR_INDEX_RX]       = 1
+  hVspAttr[VSP_ATTR_INDEX_TX]       = 1
+  hVspAttr[VSP_ATTR_INDEX_TX_CCCD]  = 1
+  //the TX is capable of being notified
+  nArg[VSP_ATTR_INDEX_TX_CCCD]      = nArg[VSP_ATTR_INDEX_TX]   //uuid handle
+  hVspCccdUuids[VSP_ATTR_INDEX_TX_CCCD] = BleHandleUuid16(0x2902)
+  //the MdmOut is capable of being notified
+  nArg[VSP_ATTR_INDEX_MDMOUT_CCCD]  = nArg[VSP_ATTR_INDEX_MDMOUT]  //uuid handle
+  hVspCccdUuids[VSP_ATTR_INDEX_MDMOUT_CCCD] = hVspCccdUuids[VSP_ATTR_INDEX_TX_CCCD]
+
+  //now trigger the query to find the chars and descriptors
+  vspFindIndex=0
+endfunc FindCharOrDesc()
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub VspEnterConnState(msgId)
+#cmpif 0x00040000 :   vspWaitAck=0
+  if vspCmdModePin>= 0 then
+    //we want fast mode of operation
+    if GpioRead(vspCmdModePin)==0 then
+      //just disconnect
+      vspDisconSts = CONN_ERROR_CMDPINSTATE
+      //some other error, so just drop the connection
+      rc=BleDisconnect(connHandles[HCONN_VSP])
+      //change state
+      NewState(STATE_VSP_DISCONNECTING)
+    else
+      #cmpif 0x00000004 :   DbgMsg("Going For FAST")
+      rc=SendMsgApp(msgId, STATE_VSP_FAST_CONNECTED)
+    endif    
+  else
+    //we want ^^^ mode of operation
+    #cmpif 0x00000004 :   DbgMsg("Going For CARET")
+    rc=SendMsgApp(msgId, STATE_VSP_CARET_CONNECTED)
+  endif
+  #cmpif 0x00000003 : AssertRC(rc, 14130)
+endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub OnVspConnCommon(hConn)
+  connHandles[HCONN_VSP] = hConn
+  vspDisconSts=-1 //assume normal disconnection will happen 
+  vspEscCount=0
+endsub
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub OnNonVspConnection(hConn)
+  dim nodeIdx 
+
+  nodeIdx = GetFreeIdx()
+  if nodeIdx==0 then
+    //disconnect immediately
+    rc=BleDisconnect(hConn)
+    #cmpif 0x00000003 : AssertRC(rc, 16320)
+  else
+    //cache the connection handle
+    connHandles[nodeIdx]=hConn      
+    //send an DISCON response
+    SendNonVspConnect(nodeIdx, UARTSndBuf$)
+    //change state
+    NewState(STATE_nonVSP_CONNECTED)
+    //for now do not process any incoming 
+       //
+       //OnEvent EVATTRNOTIFY Disable
+       //
+    //need to process more    
+    rc=SendMsgApp(MSGAPP_ENTER_NONVSP_CONN_STATE, DONTCARE_CTX)
+  endif
+  
+endsub
+
+//------------------------------------------------------------------------------
+//Called on Connection 
+//------------------------------------------------------------------------------
+sub OnConnect(hConn)
+  #cmpif 0x00000004 : DbgMsg("Connect")
+  #cmpif 0x00000008 : ShowConnParms(hConn)
+  
+  //increment the connection count
+  connCount=connCount+1
+  
+  select curState
+  case STATE_IDLE_VSP
+    //send a RING response
+    SendRingRsp(hConn, UARTSndBuf$  )
+    //action common stuff for vsp whether in our outgoing
+    OnVspConnCommon(hConn)
+    //Flush the VSP buffers just in case there is stuff from previous connections
+    BleVspFlush(3)
+    //incoming VSP connection
+    SaveState(oldIdleState)
+    if encDisconTime != 0 then
+      //we expect an encrypted connection
+      #cmpif 0x00000004 : DbgMsgVal("Enc Required, Timer(ms)=",encDisconTime)
+      TimerStart(TMRNUM_ENCR_WAIT,encDisconTime,0)
+      NewState(STATE_VSP_IN_WAIT_ENCR)
+    else
+      //no encryption required for this connection
+      #cmpif 0x00000004 : DbgMsg("Enc NOT Required")
+      VspEnterConnState(MSGAPP_ENTER_VSPIN_CONN_STATE)      
+    endif    
+        
+  case STATE_VSP_CONNECTING
+    //action common stuff for vsp whether in our outgoing
+    OnVspConnCommon(hConn)
+    //is this a trusted peer
+    if IsTrustedPeer(hConn) > 0 then
+      //Peer is trusted
+      rc = BleEncryptConnection(hConn, 7, 0)
+      #cmpif 0x00000004 : DbgMsg("Encrypting..")
+      //Change state
+      NewState(STATE_VSP_WAIT_ENCRYPT)
+    else
+      //Peer is not trusted
+      rc = GetVspHandles()
+      //Change state
+      NewState(STATE_VSP_GET_HANDLES)
+    endif
+    
+  case STATE_IDLE_nonVSP
+    //new connection so need to create a indx handle
+    //incoming nonVSP connection
+    SaveState(oldIdleState)
+    OnNonVspConnection(hConn)
+    
+  case STATE_nonVSP_CONNECTING
+    //new connection so need to create a indx handle
+    OnNonVspConnection(hConn)
+    
+  case else
+  endselect
+endsub      
+
+//------------------------------------------------------------------------------
+//Called on connection going encrryted
+//------------------------------------------------------------------------------
+sub OnEncrypted(hConn)
+  dim sendMsg : sendMsg=1
+  dim nIdx : nIdx=HCONN_VSP
+  #cmpif 0x00000004 : DbgMsg("Encrypted")
+  
+  select curState
+  case STATE_VSP_IN_WAIT_ENCR
+    VspEnterConnState(MSGAPP_ENTER_VSPIN_CONN_STATE)      
+  
+  case STATE_VSP_WAIT_ENCRYPT
+    //Peer is not trusted
+    rc = GetVspHandles()
+    //Change state
+    NewState(STATE_VSP_GET_HANDLES)
+
+  case STATE_VSP_PAIRING
+    //Successful just works pairing
+    rc=CccdsEnable()
+    //Change state
+    NewState(STATE_VSP_WRITE_CCCDS)
+
+  case STATE_nonVSP_CONNECTED
+    nIdx = GetIdxFromHConn(hConn)
+    sendMsg=2
+    
+  case else
+    sendMsg=0
+  endselect
+  
+  //Conditionally send "ENCRYPT" message
+  SendEncryptRsp(nIdx, sendMsg, UARTSndBuf$ )
+  
+endsub      
+
+//------------------------------------------------------------------------------
+//Called when connection failed to encrypt
+//------------------------------------------------------------------------------
+sub OnUnencrypted(hConn)
+
+  #cmpif 0x00000004 : DbgMsg("Failed to Encrypt")
+  
+  select curState
+  case STATE_VSP_WAIT_ENCRYPT, STATE_VSP_PAIRING
+    vspDisconSts=CONN_ERROR_UNENCRYPTED 
+    //some other error, so just drop the connection
+    rc=BleDisconnect(hConn)
+    //change state
+    NewState(STATE_VSP_DISCONNECTING)
+    
+  case STATE_nonVSP_CONNECTED
+    //some other error, so just drop the connection
+    rc=BleDisconnect(hConn)
+    //remain in state
+
+
+  case else
+  endselect
+endsub      
+
+//------------------------------------------------------------------------------
+//Called when asked to display passkey which is in nCtx
+//------------------------------------------------------------------------------
+sub OnDisplayPasskey(nCtx)
+
+  #cmpif 0x00000004 : DbgMsgVal("Display Passkey = ",nCtx)
+  
+  select curState
+  case STATE_VSP_IN_WAIT_ENCR
+    vspDisconSts=CONN_ERROR_PAIRUI
+    //some other error, so just drop the connection
+    rc=BleDisconnect(connHandles[HCONN_VSP])
+    //change state
+    NewState(STATE_VSP_DISCONNECTING)
+    
+  case STATE_nonVSP_CONNECTED   
+    SendDispPassKey(nCtx, UARTSndBuf$)
+  
+  case else
+  endselect
+endsub      
+
+//------------------------------------------------------------------------------
+//Called when asked for auth key request. nCtx is type of key requested
+//------------------------------------------------------------------------------
+sub OnAuthKeyRequest(nCtx)
+
+  #cmpif 0x00000004 : DbgMsgVal("Auth Key Request = ",nCtx)
+  
+  select curState
+  case STATE_VSP_IN_WAIT_ENCR
+    vspDisconSts=CONN_ERROR_PAIRUI
+    //some other error, so just drop the connection
+    rc=BleDisconnect(connHandles[HCONN_VSP])
+    //change state
+    NewState(STATE_VSP_DISCONNECTING)
+    
+  case STATE_nonVSP_CONNECTED   
+    SendAuthKeyReq(nCtx, UARTSndBuf$)
+  
+  case else
+  endselect
+endsub      
+
+//------------------------------------------------------------------------------
+//Called from finddesc and findchar event handlers in VSP mode
+//------------------------------------------------------------------------------
+sub SvcFindCharDescEv(hConn, hAttr)
+
+  if hAttr==0 then
+    //did not find the attribute, so check if it was mandatory
+    if hVspAttr[vspFindIndex] != 0 then
+      //this was a mandatory attribute so something went wrong hence abort
+      vspDisconSts=CONN_ERROR_NOVSPSERVICE 
+      //some other error, so just drop the connection
+      rc=BleDisconnect(hConn)
+      //change state
+      NewState(STATE_VSP_DISCONNECTING)
+      exitsub
+    endif
+  endif
+  
+  //save the attribure and check if more to find
+  hVspAttr[vspFindIndex]=hAttr
+  if vspFindIndex>=(VSP_ATTR_MAX_INDEXES-1) then
+    //this is for the last item in the query table
+    vspFindIndex=0
+    rc=CccdsEnable()
+    #cmpif 0x00000003 : AssertNE(rc,0,13470)
+    //change state
+    NewState(STATE_VSP_WRITE_CCCDS)
+  else
+    //more to look for
+    vspFindIndex=vspFindIndex+1
+    rc=FindCharOrDesc()
+    //remain in this state
+  endif  
+endsub
+
+//------------------------------------------------------------------------------
+// Returns 1 if nSts from AttrWrite means 'encrypted link required'
+//------------------------------------------------------------------------------
+function Is_Encr_Required(xSts)
+  select xSts
+  case 0x105,0x010F,0x0111
+    exitfunc 1
+  case else
+  endselect
+endfunc 0
+
+//------------------------------------------------------------------------------
+// Called only from when are VSP in master mode
+//------------------------------------------------------------------------------
+sub VspMasterRtsSend(nState)
+    if hVspAttr[VSP_ATTR_INDEX_MDMIN] then
+      if nState != vspAllowRx then 
+        if nState then
+          dontcare$ = "\01"
+        else
+          dontcare$ = "\00"
+        endif
+        rc = BleGattcWriteCmd(connHandles[HCONN_VSP], hVspAttr[VSP_ATTR_INDEX_MDMIN], dontcare$)
+        if rc==0 then
+          vspAllowRx=nState
+        endif
+      endif
+    endif
+endsub
+
+//------------------------------------------------------------------------------
+//We know there is 1 character in the uart buffer so process it for ^ character
+//On exit dontcare$ contains the single caracter that was read from the buffer
+//------------------------------------------------------------------------------
+sub PollForEscapeSeq()
+  dim uLen
+  
+  dontcare$=""
+  uLen = UartReadN(dontcare$, vspEscStringLen)
+  if strcmp(dontcare$,vspEscString$)==0 then
+    if vspEscCount==0 then
+      //first ^ in a while so take snapshot of tick count
+      vspEscStart=GetTickCount()
+      vspEscCount=1
+    else
+      //consecutive ^ so need to calc time spacing
+      uLen = GetTickSince(vspEscStart)
+      if uLen > vspEscMinIntrvl then
+        //long enough so increment count
+        vspEscCount=vspEscCount+1
+        if vspEscCount >= vspEscCountMax then
+          //disconnect            
+          vspDisconSts=CONN_ERROR_USER_DISCON
+          //some other error, so just drop the connection
+          rc=BleDisconnect(connHandles[HCONN_VSP])
+          #cmpif 0x00000003 : AssertRC(rc, 16910)
+          //the ^ caret will not get through
+          dontcare$=""
+          //change state
+          NewState(STATE_VSP_DISCONNECTING)
+        else
+          //take sanpshot of this one
+          vspEscStart=GetTickCount()
+        endif
+      else
+        //too short time so reset count
+        vspEscCount=0
+      endif
+    endif
+  else
+    vspEscCount=0
+  endif
+  
+endsub
+
+//------------------------------------------------------------------------------
+// Initialise the UART
+//------------------------------------------------------------------------------
+sub InitUART()
+  //Sets up the UART to use the required baud rate, flow control and parity options
+  dim TmpStr$, UARTSpeed, UARTTxBuf, UARTRxBuf, UARTFlags$
+
+  rc = UARTInfo(0)
+  if (rc != 0) then
+      //UART is opened, close
+      UARTClose()
+  endif
+
+  //Get values from S-Register Cache
+  UARTSpeed = SRegGet( CfgId_UARTBaudrate )
+  UARTTxBuf = SRegGet( CfgId_UARTTxBufSize )    
+  UARTRxBuf = SRegGet( CfgId_UARTRxBufSize )
+  UARTFlags$ = "CN81H"
+
+  //Reopen the UART
+  rc = UartOpen(UARTSpeed, UARTTxBuf, UARTRxBuf, UARTFlags$)
+  #cmpif 0x00000003 : AssertRC(rc, 9040)
+endsub
+
+//------------------------------------------------------------------------------
+// Load GAP service defaults into sArg$[] and nArg[] to set things up as follows
+//   sArg$[0] = device name
+//   nArg[1]  = MinConnInterval
+//   nArg[2]  = MaxConnInterval
+//   nArg[3]  = LinkSupervisionTimeout
+//   nArg[4]  = Appearance
+//   nArg[5]  = Slave Latency
+//   nArg[6]  = DeviceName is writeable
+//------------------------------------------------------------------------------
+sub GapServiceGetDefs()
+  dim tmpStr$, tmpVal
+
+  //Get device name
+  sArg$[0] = SRegGetStr$( CfgIdStr_DeviceName )
+  //Append part of module BT address if required
+  tmpVal = SRegGet( CfgId_DevNameFormat)
+  #cmpif 0x00000004 : DbgMsgVal("DevNameFormat =",tmpVal)
+  //Default selection if the BT address is appended to the advertised device name 
+  if ((tmpVal >= 1) && (tmpVal <= 7)) then
+    //Get device address
+    tmpStr$ = SysInfo$(4)
+    #cmpif 0x00000004 : dim x$ : x$=strhexize$(tmpStr$)
+    #cmpif 0x00000004 : DbgMsgVal$("SysInfo$(4) =",x$)
+    tmpStr$ = Right$(tmpStr$, tmpVal)
+    //Append to device name
+    sArg$[0] = sArg$[0] + "-" + strhexize$(tmpStr$)
+  endif
+  //take the righmost max characters
+  sArg$[0] = right$(sArg$[0],MaxDevNameSize)
+
+  #cmpif 0x00000004 : DbgMsgVal$("DeviceName =",sArg$[0])
+
+  //Set the tx power level
+  tmpVal = SRegGet( CfgId_TxPower_dBm )
+  rc=BleTxPowerSet(tmpVal)
+
+  //Set min/max connection intervals
+  nArg[1]=CONN_INTERVAL_MIN_ASPERIPH_US
+  nArg[2]=CONN_INTERVAL_MAX_ASPERIPH_US
+  nArg[3]=SRegGet( CfgId_LinkSupervsnAsSlaveSec) * 1000000
+
+  //Read the Slave latency
+  nArg[5] = SRegGet( CfgId_SlaveLatency)
+  tmpVal = nArg[3]/nArg[2]-1    //LinkSuprvsnTouUs/MaxConnIntUs
+  if nArg[5] > tmpVal then
+    nArg[5] = tmpVal   //slave latency has to be compatible with slave latency
+  endif
+
+  //Read the appearance
+  nArg[4] = SRegGet( CfgId_Appearance)
+
+  //Writeable device name is disabled for now
+  nArg[6] = 0
+endsub
+
+//------------------------------------------------------------------------------
+// Initialise the GAP service, uses sArg$[] and nArg[] setup using 
+// GapServiceGetDefs() and/or AT command line
+//------------------------------------------------------------------------------
+function GapServiceUpdate()
+  //Initialise the GAP service with the connection interval data and device name
+  rc = BleGapSvcInit(sArg$[0], nArg[6], nArg[4], nArg[1], nArg[2], nArg[3],  nArg[5])
+  #cmpif 0x00000003 : AssertRC(rc, 9750)
+endfunc rc
+
+//------------------------------------------------------------------------------
+// Configure the pairing capability as set via the S registers
+//------------------------------------------------------------------------------
+sub PairingConfig()
+  //set the iocapability
+  pairIoCapCache = SRegGet(CfgId_PairingIoCapability)
+  rc=BleSecMngrIoCap(pairIoCapCache)
+  #cmpif 0x00000003 : AssertRC(rc, 12800)
+
+  //Enable LESC preference
+  rc=BleSecMngrLescPairingPref(1)
+  #cmpif 0x00000003 : AssertRC(rc, 12860)
+endsub
+
+//------------------------------------------------------------------------------
+// Read, Cache & Config Scanning Parameters
+//------------------------------------------------------------------------------
+sub CacheConfigScanParms()
+  scanIntervalMs = SRegGet(CfgId_ScanInterval_ms)
+  scanWindowMs   = SRegGet(CfgId_ScanWindow_ms)
+  scanType       = SRegGet(CfgId_ScanType)
+
+  //Ensure that the window is sensible
+  if scanWindowMs > scanIntervalMs then
+    scanWindowMs = scanIntervalMs
+  endif
+  
+  //and finally set them
+  rc=BleScanConfig(0,scanIntervalMs)
+    #cmpif 0x00000003 : AssertRC(rc, 22480)
+  rc=BleScanConfig(1,scanWindowMs)
+    #cmpif 0x00000003 : AssertRC(rc, 22500)
+  rc=BleScanConfig(2,scanType)
+    #cmpif 0x00000003 : AssertRC(rc, 22520)
+    
+endsub
+
+//------------------------------------------------------------------------------
+// Extract exatcly one parameter which MUST be a valid 14 hex digit address
+//------------------------------------------------------------------------------
+function ExtractAddr(byref cmdStr$)  //sArg$[0] is updated with address
+  dim args
+  rc = ExtractArgsCSV(cmdStr$,args,1,1)
+  if rc == 0 then
+    //The supplied parameter must dehex to exactly 7 bytes
+    sArg$[0]=StrDehexize$(sArg$[0])
+    if strlen(sArg$[0]) != 7 then
+      //A valid address has not been supplied
+      exitfunc CONN_ERROR_INVALID_ADDRESS
+    endif
+  endif
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+// Extract addr and load other connection related variables
+//------------------------------------------------------------------------------
+function ConnSetup(byref cmdStr$)
+   
+  //Stop adverts if on
+  AdvertsStop()
+  //Stop Scanning if on
+  ScanningStop()
+  
+  //try to open the gatt client
+  rc=GattClientOpen()
+  if rc!=0 then
+    exitfunc rc
+  endif
+  
+  //Extract the mac address of the peer to connect to
+  rc = ExtractAddr(cmdStr$) //sArg$[0] is updated with address
+  if rc != 0 then
+    exitfunc rc
+  endif
+  
+  //Read the min & max connection intervals
+  nArg[1] = SRegGet( CfgId_MinConnIntUs)   
+  nArg[2] = SRegGet( CfgId_MaxConnIntUs)
+  if nArg[1] > nArg[2] then
+     //check the values are sensible
+     nArg[1] = nArg[2]
+  endif
+
+  //Read the link supervision timeout    
+  nArg[3] = SRegGet( CfgId_LinkSuprvsnToutMs) * 1000
+  if nArg[3] < nArg[2] then
+    nArg[3] = nArg[2]+1000000   //add a second to the max interval
+  endif
+  
+  //get connection timeout from s register
+  nArg[0] = SRegGet( CfgId_ConnTimeoutSec ) * 1000
+
+  #cmpif 0x00000004 :     DbgMsg("Conn Parms")
+  #cmpif 0x00000004 :  DbgMsgVal("  Conn Tout(msec)=",nArg[0])
+  #cmpif 0x00000004 :  DbgMsgVal("  Min Intvl      =",nArg[1])
+  #cmpif 0x00000004 :  DbgMsgVal("  Max Intvl      =",nArg[2])
+  #cmpif 0x00000004 :  DbgMsgVal("  Link Suprvsn   =",nArg[3])
+
+  //OK to start an outgoing connection
+  rc=BleConnect(sArg$[0], nArg[0] , nArg[1],nArg[2],nArg[3] )
+  if rc!=0 then
+    #cmpif 0x00000004 : DbgMsgVal ("BleConnect failed with",rc)
+    exitfunc CONN_ERROR_BLECONNECT
+  endif
+  #cmpif 0x00000004 : DbgMsg("Connecting..")
+  
+endfunc rc
+
+//==============================================================================
+//==============================================================================
+#cmpif 0x00020000 : function InitiateTableMap(hConn)
+#cmpif 0x00020000 :   rc = BleDiscServiceFirst(hConn,0,0)
+#cmpif 0x00020000 :   if rc==0 then
+#cmpif 0x00020000 :     exitfunc -1
+#cmpif 0x00020000 :   endif
+#cmpif 0x00020000 : endfunc rc
+
+//==============================================================================
+//==============================================================================
+#cmpif 0x00020000 : sub TerminateTableMap(rc)
+#cmpif 0x00020000 :   if rc==0x6052 then
+#cmpif 0x00020000 :     //BLE_GATTC_NO_MORE_DATA
+#cmpif 0x00020000 :     rc=0
+#cmpif 0x00020000 :   endif
+#cmpif 0x00020000 :   AppendRspEnd(rc,UARTSndBuf$)
+#cmpif 0x00020000 :   //Send out data waiting in buffer
+#cmpif 0x00020000 :   SendUartData()
+#cmpif 0x00020000 : endsub
+
+
+//##############################################################################
+//##############################################################################
+
+//------------------------------------------------------------------------------
+// Process ATI command
+//:/ATIn
+//:/====
+//:/
+//:/
+//------------------------------------------------------------------------------
+function _ati(byref cmdStr$, byref rspBuf$)
+  dim args
+  rc = ExtractArgsCSV(cmdStr$,args,0,1)
+  if rc != 0 then
+    exitfunc rc
+  endif
+  if args > 0 then
+    if ExtractIntToken(sArg$[0],nArg[0])==0 then
+      exitfunc RSP_ERROR_SYNTAX_ERROR
+    endif
+  else
+    nArg[0]=0
+  endif
+  
+  select nArg[0]
+  case 0
+    dontcare$ = ATI_RESPONSE_0
+    
+  case 3
+    GetFirmwareVersion(dontcare$)
+    
+  case 4
+    dontcare$ = SysInfo$(4)
+    dontcare$ = strhexize$(dontcare$)
+
+  case 10
+    dontcare$ = ATI_RESPONSE_10
+    
+  case 13
+    sprint #dontcare$, integer.h' sysinfo(1000)
+    
+  case 23
+    dontcare$ = AppVer
+    
+  case 42
+    sprint #dontcare$, curState
+    
+  case else
+    sprint #dontcare$,sysinfo(nArg[0])
+    
+  endselect  
+  
+  //append to buffer
+  rspBuf$ = rspBuf$ + "\n" + dontcare$ + "\r"
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+// Process ATS command
+//:/ATSn=m
+//:/ATSn?
+//:/ATSn=?
+//:/
+//:/
+//------------------------------------------------------------------------------
+function _ats(byref cmdStr$, byref rspBuf$)
+  //Extract the s-reg number
+  if ExtractIntToken(cmdStr$,nArg[0])==0 then
+    exitfunc RSP_ERROR_SYNTAX_ERROR
+  endif
+  //extract either = or ?
+  if ExtractStrToken(cmdStr$,sArg$[1])==0 then
+    exitfunc RSP_ERROR_SYNTAX_ERROR
+  endif
+  rc = RSP_ERROR_SYNTAX_ERROR  //assume syntax error
+  if strcmp(sArg$[1],"?")==0 then  
+    //get the value of an S register
+    if ExtractStrToken(cmdStr$,sArg$[1])==0 then    
+      //rest of cmd string is empty
+      rc = ATSRegGetValue(nArg[0],rspBuf$)
+    endif
+  elseif strcmp(sArg$[1],"=")==0 then
+    //an assignment or get range
+    if ExtractIntToken(cmdStr$,nArg[2])==0 then
+      //not an integer so try to extract a string
+      if ExtractStrToken(cmdStr$,sArg$[2])>0 then    
+        if strcmp(sArg$[2],"?")==0 then  
+          //range query
+          rc = ATSRegGetRange(nArg[0],rspBuf$)
+        endif
+      endif
+    else
+      //got an integer
+      if ExtractStrToken(cmdStr$,sArg$[3])==0 then    
+        //rest of cmd string is empty
+        #cmpif 0x00000004 : sprint #dbgmsg$, "\nSetReg ";nArg[0];" ";nArg[2]
+        #cmpif 0x00000004 : DbgMsg(dbgmsg$)
+        rc = ATSRegSetValue(nArg[0],nArg[2])
+      endif
+    endif      
+  endif
+endfunc rc  
+
+//------------------------------------------------------------------------------
+// Process AT%S command
+//:/AT%Sn=SomeStringValueInOptionalDoubleQuotes
+//:/AT%Sn?
+//:/AT%Sn=?
+//:/
+//:/
+//------------------------------------------------------------------------------
+function _atsSTR(byref cmdStr$, byref rspBuf$)
+  //Extract the s-reg number
+  if ExtractIntToken(cmdStr$,nArg[0])==0 then
+    exitfunc RSP_ERROR_SYNTAX_ERROR
+  endif
+  //extract either = or ?
+  if ExtractStrToken(cmdStr$,sArg$[1])==0 then
+    exitfunc RSP_ERROR_SYNTAX_ERROR
+  endif
+  rc = RSP_ERROR_SYNTAX_ERROR  //assume syntax error
+  if strcmp(sArg$[1],"?")==0 then  
+    //get the value of an S register
+    if ExtractStrToken(cmdStr$,sArg$[1])==0 then    
+      //rest of cmd string is empty
+      rc = ATSRegGetValueStr(nArg[0],rspBuf$)
+    endif
+  elseif strcmp(sArg$[1],"=")==0 then
+    //an assignment or get range
+    if ExtractStrToken(cmdStr$,sArg$[2])>0 then    
+      if strcmp(sArg$[2],"?")==0 then  
+        //range query
+        rc = ATSRegGetLenRangeStr(nArg[0],rspBuf$)
+      else
+        if IsQuoted(sArg$[2]) then  //check for beginning " and ending "
+          //the string is quoted, so set it
+          TrimQuotes(sArg$[2])
+          rc = ATSRegSetValueStr(nArg[0],sArg$[2])
+        endif
+      endif
+    endif
+  endif
+endfunc rc
+
+//------------------------------------------------------------------------------
+// save registers to non-vol memory
+//------------------------------------------------------------------------------
+function _atampW(byref cmdStr$, byref rspBuf$)
+  //extract something and there should be nothing
+  if ExtractStrToken(cmdStr$,dontcare$)!=0 then
+    exitfunc RSP_ERROR_SYNTAX_ERROR
+  endif    
+endfunc SRegSave()
+
+//------------------------------------------------------------------------------
+// reset all non-vol data to factory settings and then reset
+//------------------------------------------------------------------------------
+function _atampF(byref cmdStr$, byref rspBuf$)
+  //extract something and there should be nothing
+  if ExtractStrToken(cmdStr$,dontcare$)!=0 then
+    exitfunc RSP_ERROR_SYNTAX_ERROR
+  endif    
+  rc = SRegFactoryDef()
+  if rc==RSP_OK then
+    reset(0)
+  endif
+endfunc rc  
+
+//------------------------------------------------------------------------------
+//:/ at+siorN       - read
+//:/ at+siowN,V     - write
+//:/ at+siocN,F,S   - config   F=1(IN), 2(OUT) 3(ANG_IN)
+//------------------------------------------------------------------------------
+function _atPlusSIO(byval actType, byref cmdStr$, byref rspBuf$)
+  dim args
+  rc=ExtractArgsCSV(cmdStr$,args, 1,3)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  
+  //extract the sio number
+  rc = SArgConvertToInt(0,0,0,31)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  //At this point rc==RSP_OK
+  
+  select actType
+  case 0 //READ
+    //append to buffer
+    //#cmpif 0x00000004 :  print "\n## SIO read ";nArg[0]
+    sprint #dontcare$,GpioRead(nArg[0])
+    rspBuf$ = rspBuf$ + "\n" + dontcare$ + "\r"
+  
+  case 1 //WRITE
+    if args==2 then
+      rc = SArgConvertToInt(1,0,0,0x7FFF)
+      if rc!=RSP_OK then
+        exitfunc rc
+      endif
+      //At this point rc==RSP_OK
+      //#cmpif 0x00000004 :  print "\n## SIO write ";nArg[0],nArg[1]
+      GpioWrite(nArg[0],nArg[1])
+    else
+      rc=RSP_ERROR_SYNTAX_ERROR
+    endif
+  
+  case 2 //CONFIG
+    if args==3 then
+      rc = SArgConvertToInt(1,1,1,3)
+      if rc!=RSP_OK then
+        exitfunc rc
+      endif
+      //At this point rc==RSP_OK
+      rc = SArgConvertToInt(2,0,0,255)
+      if rc!=RSP_OK then
+        exitfunc rc
+      endif
+      //At this point rc==RSP_OK
+      //#cmpif 0x00000004 :  print "\n## SIO config ";nArg[0],nArg[1],nArg[2]
+      rc=GpioSetFunc(nArg[0],nArg[1],nArg[2])
+    else
+      rc=RSP_ERROR_SYNTAX_ERROR
+    endif
+  
+  case else
+    rc=RSP_ERROR_GPIO_NOT_AVAILABLE
+  endselect
+
+endfunc rc
+
+//------------------------------------------------------------------------------
+//:/ at+lscn<timeout_seconds><,"escaped_pattern"><,rssi>
+//:/ at+lscn<x>
+//------------------------------------------------------------------------------
+function _atPlusLSCN(byref cmdStr$, byref rspBuf$)
+  dim args
+  sArg$[0]=""
+  rc=ExtractArgsCSV(cmdStr$,args, 0,3)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //#cmpif 0x00000004 : DbgMsgVal ("args=",args)
+  //#cmpif 0x00000004 : DbgMsgVal$("sArg$[0]=",sArg$[0])
+  //#cmpif 0x00000004 : DbgMsgVal$("sArg$[1]=",sArg$[1])
+  //#cmpif 0x00000004 : DbgMsgVal$("sArg$[2]=",sArg$[2])
+  //#cmpif 0x00000004 : DbgMsgVal$("sArg$[3]=",sArg$[3])
+  
+  //Check if this is to stop scanning ( AT+LSCNX )
+  if (args==1) then
+    StrToLower$(sArg$[0])
+    if strcmp(sArg$[0],"x")==0 then
+      ScanningStop()
+      exitfunc RSP_OK
+    endif
+  endif  
+  
+  //Get timeout into nArg[0]
+  rc=SArgConvertToInt(0, SRegGet( CfgId_ScanTimeoutSec ), 0, SREG_ScanTimeoutSec_MAX)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  
+  //Get Scan Pattern
+  StrDeEscape(sArg$[1])  //ensure escaped characters are converted to binary
+  
+  //Get minimum RSSI threshold
+  rc=SArgConvertToInt(2,-128,-128,20)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  
+  //and now start scanning  
+  select curState
+  case STATE_IDLE_nonVSP
+    //Scan timeout has to be specified in milliseconds
+    //now start scanning with new parameters
+    rc = ScanningStart( (nArg[0]* 1000), sArg$[1], nArg[2])
+    advPrefix$ = "\nAD0:"
+    rc=RSP_OK
+    
+  case STATE_IDLE_VSP
+    if nArg[0]== 0 then
+      //permanent scanning requested
+      rc=ScanningStart(0, sArg$[1], nArg[2])
+      //change state
+      advPrefix$ = "\nAD0:"
+      NewState(STATE_IDLE_nonVSP)
+      rc=RSP_OK
+    else
+      //Scan timeout has to be specified in milliseconds
+      //if advertising and/or scanning in progress stop them
+      AdvertsStop()
+      //now start scanning with new parameters
+      rc = ScanningStart( (nArg[0]* 1000), sArg$[1], nArg[2])
+      if rc==0 then 
+        //successfully started scanning
+        advPrefix$ = "\nAD1:"
+        SaveState(oldIdleState)
+        NewState(STATE_SCAN_VSP)
+        //and suspend parser
+        rc=RSP_SUSPEND
+      endif
+    endif
+    
+  case else
+    rc = RSP_ERROR_INCORRECT_MODE
+  endselect      
+  
+endfunc rc  
+
+//------------------------------------------------------------------------------
+//:/ at+ladv<advType><,advIntervalMs>
+//:/ at+ladv<x>
+//------------------------------------------------------------------------------
+function _atPlusLADV(byref cmdStr$, byref rspBuf$)
+  dim args
+  //This command has upto 2 parameters
+  rc=ExtractArgsCSV(cmdStr$,args, 0,2)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  
+  //Check if this is to stop advertising ( AT+LADVX )
+  if (args==1) then
+    StrToLower$(sArg$[0])
+    if strcmp(sArg$[0],"x")==0 then
+      AdvertsStop()
+      if curState==STATE_IDLE_VSP then
+        //only change state if we are in VSP Idle
+        NewState(STATE_IDLE_nonVSP)
+      endif
+      exitfunc RSP_OK
+    endif
+  endif  
+
+  //Get advtype into nArg[0]
+  rc=SArgConvertToInt(0,idleAdvType,SREG_IdleAdvertType_MIN,SREG_IdleAdvertType_MAX)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  if nArg[0]==1 then
+    exitfunc RSP_ERROR_ADV_TYPE
+  endif
+
+  //Get adv interval milliseconds into nArg[1]
+  rc=SArgConvertToInt(1,idleAdvIntvlMs,SREG_IdleAdvertIntvlMs_MIN,SREG_IdleAdvertIntvlMs_MAX)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  
+  //if advertising in progress stop it
+  AdvertsStop()
+  //need to start advertising in idle
+  IdleAdvCommit()
+  //Start Advertising
+  IdleStartAdverts(nArg[0], nArg[1])
+  if curState==STATE_IDLE_VSP then
+    //only change state if we are in VSP Idle
+    NewState(STATE_IDLE_nonVSP)
+  endif
+  
+endfunc RSP_OK  
+
+//------------------------------------------------------------------------------
+//:/ at+lvsp
+//------------------------------------------------------------------------------
+function _atPlusLVSP(byref cmdStr$, byref rspBuf$)
+  dim args
+  //This command has no parameters
+  rc=ExtractArgsCSV(cmdStr$,args, 0,0)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  
+  select curState
+  case STATE_IDLE_nonVSP
+    //if advertising or scanning in progress stop them
+    #cmpif 0x00000004 : DbgMsg("VSP Connectable")
+    AdvertsStop()
+    ScanningStop()
+    //get default parameters
+    if vspAdded==0 then
+      VspGetDefs()
+      //open the VSP service and variable vspAdded will be updated
+      rc = VspOpen()
+    endif
+    if vspAdded != 0 then 
+      //Create the VSP related Advert report and scan report and commit
+      VspAdvCreateCommit()
+      //Start Advertising
+      VspStartAdverts()
+      //change state
+      NewState(STATE_IDLE_VSP)
+      rc=RSP_OK
+    else
+      //change state to idle because we have definitely stopped adverts
+      NewState(STATE_IDLE_nonVSP)
+      rc=RSP_ERROR_VSP_OPENFAIL
+    endif
+
+  case STATE_IDLE_VSP
+    //do nothing as already there anyway
+    rc=RSP_OK
+    
+  case else
+    rc = RSP_ERROR_INCORRECT_MODE
+    
+  endselect      
+  
+endfunc rc  
+
+//------------------------------------------------------------------------------
+//:/ at+bndt[addr]
+//------------------------------------------------------------------------------
+function _atPlusBNDT(byref cmdStr$, byref rspBuf$)
+  rc = ExtractAddr(cmdStr$) //sArg$[0] is updated with address
+  if rc != 0 then
+    exitfunc rc
+  endif
+  
+  dim isTrusted, asCentral, keyInfo, rollAge, rollCount    
+  isTrusted = BleBondingIsTrusted(sArg$[0], asCentral, keyInfo, rollAge, rollCount)
+  if isTrusted then
+    if rollAge <= 0 then
+      rollAge=0   //persistant
+    else
+      rollAge=1   //rolling
+    endif
+    sprint #dontcare$, "\n1,";rollAge;",";StrHexize$(sArg$[0]);"\r"
+  else
+    dontcare$ = "\n0\r"
+  endif
+  rspBuf$ = rspBuf$ + dontcare$
+  
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+//:/ at+bndp[addr]
+//------------------------------------------------------------------------------
+function _atPlusBNDP(byref cmdStr$, byref rspBuf$)
+  rc = ExtractAddr(cmdStr$) //sArg$[0] is updated with address
+  if rc != 0 then
+    exitfunc rc
+  endif
+endfunc BleBondingPersistKey(sArg$[0])
+
+//------------------------------------------------------------------------------
+//:/ at+bndd[addr]
+//------------------------------------------------------------------------------
+function _atPlusBNDD(byref cmdStr$, byref rspBuf$)
+  rc = ExtractAddr(cmdStr$) //sArg$[0] is updated with address
+  if rc != 0 then
+    exitfunc rc
+  endif
+  
+  rc=BleBondingEraseKey(sArg$[0])
+  #cmpif 0x00000003 : AssertRC(rc, 23830)
+  
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+//:/ at+bndx
+//------------------------------------------------------------------------------
+function _atPlusBNDX(byref cmdStr$, byref rspBuf$)
+  
+  rc=BleBondingEraseAll()
+  #cmpif 0x00000003 : AssertRC(rc, 23930)
+  
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+// Process ATD command
+//:/ATDmacaddress14hexbytes
+//:/====
+//:/
+//:/
+//------------------------------------------------------------------------------
+function _atD(byref cmdStr$, byref rspBuf$)
+  
+  //Now check if we are heading for fast mode
+  if vspCmdModePin>=0 then
+    #cmpif 0x00000004 : DbgMsg("Fast Mode will be selected")    
+    //yes, so check state of that pin
+    if GpioRead(vspCmdModePin)==0 then
+      //cmd pin is incorrect state so disallow connection
+      exitfunc CONN_ERROR_CMDPINSTATE
+    endif
+  endif
+  
+  //do not allow if we already have a connection
+  if connCount > 0 then
+    exitfunc CONN_ERROR_TOOMANYCONNECTIONS
+  endif
+  
+  //extract address and load nArg[] with connection related parameters
+  rc = ConnSetup(cmdStr$)
+  if rc!=0 then
+    exitfunc rc
+  endif
+  
+  //save which state we got ATD in so we can return to it    
+  SaveState(oldIdleState)
+  
+  //assume a large default, will be reduced in the connect event from the
+  //actual connection event time interval
+#cmpif 0x00080000 :   vspPumpToutMs = 250 
+  
+  //change state
+  NewState(STATE_VSP_CONNECTING)
+  
+endfunc CONN_SUSPEND
+
+//------------------------------------------------------------------------------
+// Process AT_LCON command
+//:/AT_LCONmacaddress14hexbytes
+//:/====
+//:/
+//:/
+//------------------------------------------------------------------------------
+function _atPlusLCON(byref cmdStr$, byref rspBuf$)
+  
+  //extract address and load nArg[] with connection related parameters
+  rc = ConnSetup(cmdStr$)
+  if rc!=0 then
+    exitfunc rc
+  endif
+  
+  if curState != STATE_nonVSP_CONNECTED then
+    //save which state we got AT+LCON in so we can return to it    
+    SaveState(oldIdleState)
+  endif
+  
+  //change state
+  NewState(STATE_nonVSP_CONNECTING)
+    
+endfunc CONN_SUSPEND
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function _atPlusCMD_I(cmdId, byref cmdStr$)
+  dim args,hConn
+  
+  rc=ExtractArgsCSV(cmdStr$,args, 1,1)  //extract the connection handle
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert to integer and save in nArg[0]
+  rc=SArgConvertToInt(0, 0, 0, MAX_CONNECTIONS)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  
+  if curState != STATE_nonVSP_CONNECTED then
+    exitfunc RSP_ERROR_INCORRECT_MODE
+  endif
+  
+  hConn = connHandles[nArg[0]]
+  select cmdId
+  // Process AT+LDSC command
+  //:/AT+LDSCnn
+  //:/====
+  case CMD_I_LDSC  
+    if connHandles[nArg[0]) then
+      rc=BleDisconnect(hConn)
+      #cmpif 0x00000003 : AssertRC(rc, 26460)
+    endif
+
+  case CMD_I_PAIR
+  // Process AT+PAIR command
+  //:/AT+PAIRnn
+  //:/====
+    rc = BlePair(hConn,1)
+    #cmpif 0x00000003 : AssertRC(rc, 26510)
+
+  case CMD_I_LENC
+  // Process AT+LENC command
+  //:/AT+LENCnn
+  //:/====
+    rc = BleEncryptConnection(hConn, SRegGet(CfgId_MinEncryptionKeyLen), SRegGet(CfgId_MITMreqForEncryption))
+    #cmpif 0x00000003 : AssertRC(rc, 27320)
+    
+#cmpif 0x00020000 :   case CMD_I_GCTM
+#cmpif 0x00020000 :   // Process AT+GCTM command
+#cmpif 0x00020000 :   //:/AT+GCTMnn
+#cmpif 0x00020000 :   //:/====
+#cmpif 0x00020000 :     rc = InitiateTableMap(hConn)
+#cmpif 0x00000003 :     AssertRC(rc, 27420)
+
+    
+  case else
+  endselect
+
+endfunc rc
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function _atPlusPRSP(byref cmdStr$)
+  dim args,hConn
+  
+  if curState != STATE_nonVSP_CONNECTED then
+    exitfunc RSP_ERROR_INCORRECT_MODE
+  endif
+  
+  rc=ExtractArgsCSV(cmdStr$,args, 2,3)  //extract the connection handle & response key
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert to integer and save in nArg[0]
+  rc=SArgConvertToInt(0, 0, 0, MAX_CONNECTIONS)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  hConn = connHandles[nArg[0]]
+  //convert the second parameter to lower case
+  StrToLower$(sArg$[1])
+  if strcmp(sArg$[1],"y")==0 then
+    //accept pairing
+    rc=BleAcceptPairing(hConn, 1)
+  elseif strcmp(sArg$[1],"n")==0 then
+    //reject pairing
+    rc=BleAcceptPairing(hConn, 0)
+  elseif strlen(sArg$[1])==32 then
+    //OOB key is provided
+    sArg$[1] = StrDehexize$(sArg$[1])
+    if strlen(sArg$[1]) == 16 then 
+      rc=BleSecMngrOOBKey(hConn, sArg$[1])
+    else
+      rc=RSP_ERROR_INVALID_HEXSTR
+    endif
+  else
+    rc=SArgConvertToInt(1, 0, 0, 999999)
+    if rc==RSP_OK then
+      rc=BleSecMngrPassKey(hConn, nArg[1])
+    endif
+  endif    
+endfunc rc
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function _atPlusGCRD_WR(cmdType, byref cmdStr$)
+  dim args,hConn
+  
+  if curState != STATE_nonVSP_CONNECTED then
+    exitfunc RSP_ERROR_INCORRECT_MODE
+  endif
+  
+  rc=ExtractArgsCSV(cmdStr$,args, 3,3)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert connhandle to integer and save in nArg[0]
+  rc=SArgConvertToInt(0, 0, 0, MAX_CONNECTIONS)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  //Convert attrhandle to integer and save in nArg[1]
+  rc=SArgConvertToInt(1, 0, 1, 0xFFFE)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  
+  select cmdType
+  case 0  // GATTC Read  
+    //Convert offset to integer and save in nArg[2]
+    rc=SArgConvertToInt(2, 0, 0, 511)
+    if rc!=RSP_OK then
+      exitfunc rc
+    endif
+
+  case 1,2
+    dontcare$=strdehexize$(sArg$[2])
+    if (strlen(dontcare$)*2) != strlen(sArg$[2]) then
+      exitfunc RSP_ERROR_INVALID_HEXSTR
+    endif
+    
+  case else
+  endselect
+  
+  hConn = connHandles[nArg[0]]
+
+  select cmdType
+  case 0  // GATTC Read  
+    rc=BleGattcRead(hConn,nArg[1],nArg[2])
+
+  case 1  //GATTC Write Acked
+    rc=BleGattcWrite(hConn,nArg[1],dontcare$)
+    
+  case 2  //GATTC Write NOT Acked
+    rc=BleGattcWriteCmd(hConn,nArg[1],dontcare$)
+    
+  case else
+  endselect
+
+endfunc rc
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function _atPlusGCFA(byref cmdStr$)
+  dim args,i,hConn
+  
+  if curState != STATE_nonVSP_CONNECTED then
+    exitfunc RSP_ERROR_INCORRECT_MODE
+  endif
+  
+  rc=ExtractArgsCSV(cmdStr$,args, 5,7)  //will be 7 if descriptor find
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert connection handle to integer and save in nArg[0]
+  rc=SArgConvertToInt(0, 0, 0, MAX_CONNECTIONS)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  
+  for i=1 to (args+1)
+    //Yes, given we are using MAX_UUID_HANDLES below means that is the highest
+    //instance of that object we can look for, but that is not a showstopper restriction in real life
+    rc=SArgConvertToInt(i, 0, 0, (MAX_UUID_HANDLES-1))
+    if rc!=RSP_OK then
+      exitfunc rc
+    endif  
+  next
+  
+  hConn = connHandles[nArg[0]]
+  if args==7 then 
+    //find a descriptor
+    rc=BleGattcFindDesc(hConn,uuidHandles[nArg[1]],nArg[2],uuidHandles[nArg[3]],nArg[4],uuidHandles[nArg[5]],nArg[6])
+  else
+    //find a characteristic 
+    rc=BleGattcFindChar(hConn,uuidHandles[nArg[1]],nArg[2],uuidHandles[nArg[3]],nArg[4])
+  endif
+endfunc rc
+
+//------------------------------------------------------------------------------
+// AT+UUID n,16bitUuid,m
+// AT+UUID n,16bitUuid    
+// AT+UUID n,32bitHex     
+//------------------------------------------------------------------------------
+function _atPlusUUID(byref cmdStr$, byref rspBuf$)
+  dim args,hUuid
+  
+  rc=ExtractArgsCSV(cmdStr$,args, 2,3)  //extract up to 3 parameters
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert to uuid handle index and save in nArg[0]
+  rc=SArgConvertToInt(0, 0, 0, (MAX_UUID_HANDLES-1))
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  if args==3 then
+    //AT+UUID n,16bituuid,m
+    
+    //Convert 16 bit base offset and save in nArg[1]
+    rc=SArgConvertToInt(1, 0, 0, 0xFFFF)
+    if rc!=RSP_OK then
+      exitfunc rc
+    endif
+  
+    //Convert to uuid handle index and save in nArg[2]
+    rc=SArgConvertToInt(2, 0, 0, (MAX_UUID_HANDLES-1))
+    if rc!=RSP_OK then
+      exitfunc rc
+    endif
+    
+    hUuid = BleHandleUuidSibling(uuidHandles[nArg[2]],nArg[1])
+  else
+    if strlen(sArg$[1]) >= 10 then
+      //AT+UUID n,32bitHex     
+      
+      //get the 16 byte uuid   
+      sArg$[1] = StrDehexize$(sArg$[1])
+      if strlen(sArg$[1]) != 16 then 
+        exitfunc RSP_ERROR_INVALID_HEXSTR
+      endif
+
+      hUuid = BleHandleUuid128(sArg$[1])
+      
+    else
+      //AT+UUID n,16bitUuid    
+      
+      //Convert 16 bit base offset and save in nArg[1]
+      rc=SArgConvertToInt(1, 0, 0, 0xFFFF)
+      if rc!=RSP_OK then
+        exitfunc rc
+      endif
+      
+      hUuid = BleHandleUuid16(nArg[1])
+      
+    endif
+  endif
+  
+  if hUuid==0 then
+    exitfunc RSP_ERROR_INVALID_UUID
+  endif
+  
+  uuidHandles[nArg[0]] = hUuid
+  
+  sprint #dontcare$,"\n" ; integer.h' hUuid ; "\r"
+  //append to buffer
+  rspBuf$ = rspBuf$ + dontcare$
+  
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function _atPlusCMD_IS(cmdType, byref cmdStr$)
+  dim args,hChar
+    
+  rc=ExtractArgsCSV(cmdStr$,args, 2,2)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert first parm to integer and save in nArg[0]
+  rc=SArgConvertToInt(0, 0, 0, MAX_CONNECTIONS)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  //Convert data to binary
+  dontcare$=strdehexize$(sArg$[1])
+  if (strlen(dontcare$)*2) != strlen(sArg$[1]) then
+    exitfunc RSP_ERROR_INVALID_HEXSTR
+  endif
+
+  hChar = charHandles[nArg[0]]
+  select cmdType  
+  case CMD_IS_NOTIFY
+    if curState != STATE_nonVSP_CONNECTED then
+      exitfunc RSP_ERROR_INCORRECT_MODE
+    endif
+    rc=BleCharValueNotify(hChar,dontcare$)
+    
+  case CMD_IS_INDICATE
+    if curState != STATE_nonVSP_CONNECTED then
+      exitfunc RSP_ERROR_INCORRECT_MODE
+    endif
+    rc=BleCharValueIndicate(hChar,dontcare$)
+    
+  case CMD_IS_LOCALWRITE
+    rc=BleCharValueWrite(hChar,dontcare$)
+    
+  case else
+    rc=RSP_ERROR_UNKNOWN_CMD
+  endselect  
+endfunc rc
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function _atPlusGSSB_E(fNew, byref cmdStr$)
+  dim args
+  
+  if fNew then
+    rc=ExtractArgsCSV(cmdStr$,args, 1,1)  //extract the uuid handle index
+    if rc!=RSP_OK then
+      exitfunc rc
+    endif 
+    //Convert to uuid handle index and save in nArg[0]
+    rc=SArgConvertToInt(0, 0, 0, (MAX_UUID_HANDLES-1))
+    if rc!=RSP_OK then
+      exitfunc rc
+    endif
+  
+    //A new service is being defined
+    if svcHandle then
+      //We have not ENDed a service definition yet
+      exitfunc RSP_ERROR_SVC_NOTENDED
+    endif
+    //Always define a primary service
+    rc=BleServiceNew(1,uuidHandles[nArg[0]],svcHandle)
+    
+  else
+    //The end of a service definition
+    rc=BleServiceCommit(svcHandle)
+    svcHandle=0
+    
+  endif  
+endfunc rc
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function _atPlusGSMD(byref cmdStr$)
+  dim args,i
+  
+  rc=ExtractArgsCSV(cmdStr$,args, 4,4)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert to metadata handle index and save in nArg[0]
+  rc=SArgConvertToInt(0, 1, 1, MAX_METADATA_HANDLES)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  //Convert to read & write rights and save in nArg[]
+  for i=1 to 2
+    rc=SArgConvertToInt(i, 0, 0, 3)  //4&5 are not allowed.
+    if rc!=RSP_OK then
+      exitfunc rc
+    endif
+  next
+  //Convert to length and save in nArg[3]
+  rc=SArgConvertToInt(3, 1, 1, MAX_ATTIBUTE_LEN)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  
+  //Set nFlags to 0 -- No capability for authorisation exposed.
+  metaHandles[nArg[0]] = BleAttrMetadataEx(nArg[1],nArg[2],nArg[3],0,rc)
+  
+endfunc rc
+
+//------------------------------------------------------------------------------
+//AT+GSCB u,pr,m{V}<,m{C}<,m{S}>>  //CharAdd m{XXX} is the metadata index and 0 means not provided.
+//------------------------------------------------------------------------------
+function _atPlusGSCB(byref cmdStr$)
+  dim args,i
+  
+  if chrInProg then
+    exitfunc RSP_ERROR_CHAR_NOTENDED
+  endif
+  
+  rc=ExtractArgsCSV(cmdStr$,args,3,5)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert to uuid handle index and save in nArg[0]
+  rc=SArgConvertToInt(0, 1, 1, (MAX_UUID_HANDLES-1))
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  //Convert to properties and save in nArg[1]
+  rc=SArgConvertToInt(1, 1, 1, 63)  //does not allow reliable writes
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  //Initialise all 3 metadata in nArg[2]..nArg[4] to 0
+  nArg[3]=0 : nArg[4]=0
+  //Convert to read & write rights and save in nArg[]
+  args = args -1
+  for i=2 to args
+    rc=SArgConvertToInt(i, 1, 1, MAX_METADATA_HANDLES)
+    if rc!=RSP_OK then
+      exitfunc rc
+    endif
+  next
+  rc=BleCharNew(nArg[1],uuidHandles[nArg[0]],metaHandles[nArg[2]],metaHandles[nArg[3]],metaHandles[nArg[4]])
+  if rc==0 then
+    chrInProg=1
+  endif
+endfunc rc
+
+//------------------------------------------------------------------------------
+//AT+GSCE hexdata   - returns an index to identify the characteristic
+//------------------------------------------------------------------------------
+function _atPlusGSCE(byref cmdStr$,byref rspBuf$)
+  dim args,charH,nIdx
+  
+  if chrInProg==0 then
+    exitfunc RSP_OK
+  endif
+  if svcHandle==0 then
+    exitfunc RSP_ERROR_SVC_NOTSTARTED
+  endif
+  
+  rc=ExtractArgsCSV(cmdStr$,args, 1,1)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif 
+  //Convert data to binary
+  dontcare$=strdehexize$(sArg$[0])
+  if (strlen(dontcare$)*2) != strlen(sArg$[0]) then
+    exitfunc RSP_ERROR_INVALID_HEXSTR
+  endif
+  
+  rc=BleCharCommit(svcHandle,dontcare$,charH)
+  if rc==0 then
+    chrInProg=0
+    rc=AddCharHandle(charH,nIdx)
+    if rc==0 then
+      sprint #dontcare$,"\n" ; nIdx ; "\r"
+      //append to buffer
+      rspBuf$ = rspBuf$ + dontcare$
+    endif
+  endif
+  
+endfunc rc
+
+//------------------------------------------------------------------------------
+//AT+GSDA u,m,hexdata      //Descriptor Add
+//------------------------------------------------------------------------------
+//function _atPlusGSDA(byref cmdStr$)
+//  dim charH,nIdx
+//  
+//  if chrInProg==0 then
+//    exitfunc RSP_ERROR_CHAR_NOTSTARTED
+//  endif
+//  
+//  rc=ExtractArgsCSV(cmdStr$,args, 3,3)
+//  if rc!=RSP_OK then
+//    exitfunc rc
+//  endif 
+//  //Convert to uuid handle index and save in nArg[0]
+//  rc=SArgConvertToInt(0, 1, 1, (MAX_UUID_HANDLES-1))
+//  if rc!=RSP_OK then
+//    exitfunc rc
+//  endif
+//  //Convert to metadata handle index and save in nArg[1]
+//  rc=SArgConvertToInt(1, 1, 1, MAX_METADATA_HANDLES)
+//  if rc!=RSP_OK then
+//    exitfunc rc
+//  endif
+//  //Convert data to binary
+//  dontcare$=strdehexize$(sArg$[2])
+//  if (strlen(dontcare$)*2) != strlen(sArg$[2]) then
+//    exitfunc RSP_ERROR_INVALID_HEXSTR
+//  endif
+//  
+//  DO SOMETHING HERE
+//  
+//endfunc rc
+
+//------------------------------------------------------------------------------
+// AT% has been encountered
+//------------------------------------------------------------------------------
+function _atPERCENT(byref cmdStr$, byref rspBuf$)
+
+  //Extract the command letter and process
+  select GetAtCmdLetter(cmdStr$)
+  case ATCMD_S,(ATCMD_S+0x20)
+    rc=_atsSTR(cmdStr$,rspBuf$)
+
+  case else
+    rc=RSP_ERROR_UNKNOWN_CMD
+
+  endselect
+
+endfunc rc
+
+//------------------------------------------------------------------------------
+// AT& has been encountered
+//------------------------------------------------------------------------------
+function _atAMPERSAND(byref cmdStr$, byref rspBuf$)
+
+  //Extract the command letter and process
+  select GetAtCmdLetter(cmdStr$)
+  case ATCMD_W,(ATCMD_W+0x20)
+    rc=_atampW(cmdStr$,rspBuf$)
+
+  case ATCMD_F,(ATCMD_F+0x20)
+    rc=_atampF(cmdStr$,rspBuf$)
+    
+  case else
+    rc=RSP_ERROR_UNKNOWN_CMD
+
+  endselect
+
+endfunc rc
+
+//------------------------------------------------------------------------------
+// AT+ has been encountered
+//------------------------------------------------------------------------------
+function _atPLUS(byref cmdStr$, byref rspBuf$)
+  dim tmp$
+  
+  //extract the first 4 characters
+  tmp$=StrSplitLeft$(cmdStr$,4)
+  //convert all data to lower case
+  StrToLower$(tmp$)
+  //check what command it is
+  if strcmp(tmp$,"sior")==0 then
+    rc=_atPlusSIO(0,cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"siow")==0 then
+    rc=_atPlusSIO(1,cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"sioc")==0 then
+    rc=_atPlusSIO(2,cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"lscn")==0 then
+    rc=_atPlusLSCN(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"lvsp")==0 then
+    rc=_atPlusLVSP(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"ladv")==0 then
+    rc=_atPlusLADV(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"bndt")==0 then
+    rc=_atPlusBNDT(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"bndp")==0 then
+    rc=_atPlusBNDP(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"bndd")==0 then
+    rc=_atPlusBNDD(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"bndx")==0 then
+    rc=_atPlusBNDX(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"lcon")==0 then
+    rc=_atPlusLCON(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"ldsc")==0 then
+    rc=_atPlusCMD_I(CMD_I_LDSC, cmdStr$)
+    
+  elseif strcmp(tmp$,"pair")==0 then
+    rc=_atPlusCMD_I(CMD_I_PAIR, cmdStr$)
+    
+  elseif strcmp(tmp$,"lenc")==0 then
+    rc=_atPlusCMD_I(CMD_I_LENC, cmdStr$)
+    
+  elseif strcmp(tmp$,"prsp")==0 then
+    rc=_atPlusPRSP(cmdStr$)
+
+  elseif strcmp(tmp$,"gcrd")==0 then
+    rc=_atPlusGCRD_WR(0,cmdStr$)
+
+  elseif strcmp(tmp$,"gcwa")==0 then    //write acked
+    rc=_atPlusGCRD_WR(1,cmdStr$)
+
+  elseif strcmp(tmp$,"gcwc")==0 then    //write cmd (not acked)
+    rc=_atPlusGCRD_WR(2,cmdStr$)
+    
+  elseif strcmp(tmp$,"gcfa")==0 then    //find attribute of characteristic value or descriptor
+    rc=_atPlusGCFA(cmdStr$)
+    
+  elseif strcmp(tmp$,"uuid")==0 then
+    rc=_atPlusUUID(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"gsno")==0 then
+    rc=_atPlusCMD_IS(CMD_IS_NOTIFY,cmdStr$)
+    
+  elseif strcmp(tmp$,"gsic")==0 then
+    rc=_atPlusCMD_IS(CMD_IS_INDICATE,cmdStr$)
+    
+  elseif strcmp(tmp$,"gssb")==0 then
+    rc=_atPlusGSSB_E(1,cmdStr$)
+    
+  elseif strcmp(tmp$,"gsse")==0 then
+    rc=_atPlusGSSB_E(0,cmdStr$)
+    
+  elseif strcmp(tmp$,"gsmd")==0 then
+    rc=_atPlusGSMD(cmdStr$)
+    
+  elseif strcmp(tmp$,"gscb")==0 then
+    rc=_atPlusGSCB(cmdStr$)
+    
+  elseif strcmp(tmp$,"gsce")==0 then
+    rc=_atPlusGSCE(cmdStr$,rspBuf$)
+    
+  elseif strcmp(tmp$,"gswc")==0 then
+    rc=_atPlusCMD_IS(CMD_IS_LOCALWRITE,cmdStr$)
+
+
+//  --------------------------------------------------    
+// Following only to be added when custom descriptor requirement
+// asked for.
+//  --------------------------------------------------    
+//  elseif strcmp(tmp$,"gsda")==0 then
+//    rc=_atPlusGSDA(cmdStr$)
+//  --------------------------------------------------    
+    
+  //Optional Tablemap command    
+#cmpif 0x00020000 :   elseif strcmp(tmp$,"gctm")==0 then  //tablemap
+#cmpif 0x00020000 :     rc=_atPlusCMD_I(CMD_I_GCTM, cmdStr$)
+    
+  else
+    //Not a known 'at+' command
+    rc = RSP_ERROR_UNKNOWN_CMD
+  endif
+endfunc rc
+
+//------------------------------------------------------------------------------
+// Function for parsing commands when in application command mode and cmdStr$
+// is at least 3 characters
+//------------------------------------------------------------------------------
+sub ParseAtCommand(byref cmdStr$, byref rspBuf$)
+  dim tmp$
+  
+  //extract the first 2 characters
+  tmp$=StrSplitLeft$(cmdStr$,2)
+  //convert all data to lower case
+  StrToLower$(tmp$)
+  //check that it is "at"
+  if strcmp(tmp$,"at")!=0 then
+    //Not an 'at' command
+    rc = RSP_ERROR_SYNTAX_ERROR
+  else
+    //Extract the command letter and process
+    select GetAtCmdLetter(cmdStr$)
+    case ATCMD_EMPTY
+      rc=RSP_OK
+      
+    case ATCMD_I,(ATCMD_I+0x20)
+      rc=_ati(cmdStr$,rspBuf$)
+      
+    case ATCMD_S,(ATCMD_S+0x20)
+      rc=_ats(cmdStr$,rspBuf$)
+      
+    case ATCMD_D,(ATCMD_D+0x20)
+      rc=_atD(cmdStr$,rspBuf$)
+      AppendConnRspEnd(rc,rspBuf$)
+      exitsub //becuase we don't what to hit the AppendRspEnd() at the end of this routine
+      
+    case ATCMD_Z,(ATCMD_Z+0x20)
+      reset(0)
+      
+    case ATCMD_PERCENT
+      rc=_atPERCENT(cmdStr$,rspBuf$)
+      
+    case ATCMD_AMPERSAND
+      rc=_atAMPERSAND(cmdStr$,rspBuf$)
+      
+    case ATCMD_PLUS
+      rc=_atPLUS(cmdStr$,rspBuf$)
+      
+    case else
+      rc=RSP_ERROR_UNKNOWN_CMD
+      
+    endselect
+  endif
+    
+  // Add an OK or ERROR to the response
+  AppendRspEnd(rc,rspBuf$)
+
+endsub
+
+//------------------------------------------------------------------------------
+// Routine to service command mode, if it returns 0, then it implies exit the application
+//------------------------------------------------------------------------------
+sub ProcessCommands(byref ORIGRecBuf$,byref RSPSndBuf$)
+  dim termPos, cmdStr$
+
+  //find position of the first \r in the string
+  termPos = StrPos(ORIGRecBuf$, termStr$, 0)
+  while (atParse)&&(termPos >= 0)
+    if (termPos == 0) then
+      //empty string so just send OK
+      AppendRspEnd(RSP_OK,RSPSndBuf$)  
+      cmdStr$=StrSplitLeft$(ORIGRecBuf$, 1)
+    else
+      //non empty string
+      termPos = termPos + 1
+      cmdStr$=StrSplitLeft$(ORIGRecBuf$, termPos)
+
+      //Parse and run AT command
+      ParseAtCommand(cmdStr$,RSPSndBuf$)
+    endif
+    //Send out data waiting in buffer
+    SendUartData()
+    //find position of the first \r in the string
+    termPos = StrPos(ORIGRecBuf$, termStr$, 0)
+  endwhile
+endsub
+
+//------------------------------------------------------------------------------
+// Startup
+//------------------------------------------------------------------------------
+sub Startup()
+  dim scanPat$,i,startflags
+  
+  //initial nonVsp connection handle array
+  for i = 0 to MAX_CONNECTIONS
+    connHandles[i]=INVALID_CONN_HANDLE
+  next
+  
+  //initial uuid handle array
+  for i = 0 to (MAX_UUID_HANDLES-1)
+    uuidHandles[i]=INVALID_UUID_HANDLE
+  next
+  
+  //Initialise the first metadata handle to 0 and will remain that way
+  metaHandles[0]=0
+  
+  //set SRegister Defaults
+  SReg8SetCache()
+  SReg16SetCache()
+  SReg32SetCache()
+  SRegStrSetCache()
+
+  //Wait for tx buffer to flush 
+  #cmpif 0x00000001 : while UartInfo(5)>0
+  #cmpif 0x00000001 : endwhile
+
+  //get startup flags
+  startflags=SRegGet(CfgId_StartupFlags)
+  
+  dim nUpdated,newVal : nUpdated=0
+  //Configure for high bandwidth  
+  newVal = (startflags & 0x08)>>3
+  SetConfigKey(214,newVal,nUpdated)
+  //If any config key was changed then reset so it comes into effect
+  if nUpdated>0 then
+    reset(0)
+  endif
+
+  //Setup the uart
+  InitUART()
+  //If we came alive because of a reset() call earlier then send an OK
+  if sysinfo(2000)==10 then
+    AppendRspEnd(RSP_OK,UARTSndBuf$)
+    //Send out data waiting in buffer
+    SendUartData()
+  endif
+  
+  //Initialise the GPIO
+  InitGPIO()
+  
+  //Configure Pairing Capability
+  PairingConfig()  
+  
+  //Initialise the GAP Service
+  GapServiceGetDefs()  //into sArg$[] and nArg[]
+  rc=GapServiceUpdate()  
+  
+  //Cache & Config Scanning Paramters
+  CacheConfigScanParms()  
+  
+  //Precreate the idle more advert reports
+  IdleAdvCreate()
+  idleAdvType    = SRegGet(CfgId_IdleAdvertType)
+  if idleAdvType == 1 then
+    //Idle mode adverts are not allowed to be ADV_DIRECT_IND
+    idleAdvType=0
+  endif
+  idleAdvIntvlMs = SRegGet(CfgId_IdleAdvertIntvlMs)
+  
+  //Cache the max ^ count
+  vspEscCountMax = SRegGet(CfgId_VspEscChrCountMax)
+  //Cache the min ^ interval
+  vspEscMinIntrvl = SRegGet(CfgId_VspEscChrIntrvlMinMs)
+  
+  //Vsp escape string in slow connection mode
+  vspEscString$ = "^"
+  vspEscStringLen = strlen(vspEscString$)+1
+  
+  //Get startup flags
+  vspAttrMaxLen = 20
+  vspAdded = 0
+  //Check if need to make connectable for VSP
+  if ((startflags & 0x00000001)==0x00000001) then
+    #cmpif 0x00000004 : DbgMsg("VSP Connectable")
+    //get default parameters
+    VspGetDefs()
+    //open the VSP service and variable vspAdded will be updated
+    rc = VspOpen()
+    if vspAdded != 0 then 
+      //Create the VSP related Advert report and scan report and commit
+      VspAdvCreateCommit()
+      //Start Advertising
+      VspStartAdverts()
+      //change state
+      NewState(STATE_IDLE_VSP)
+    endif
+  endif
+  if vspAdded == 0 then 
+    //VSP was not added
+    if ((startflags & 0x00000006)==0) then 
+      //do not start advertising or scanning
+      NewState(STATE_IDLE_nonVSP)
+      exitsub
+    endif 
+    //Check if adverts to be started
+    if ((startflags & 0x00000002)==0x00000002) then 
+      //need to start advertising in idle
+      IdleAdvCommit()
+      //Start Advertising
+      IdleStartAdverts(idleAdvType, idleAdvIntvlMs)
+      //#cmpif 0x00000004 : DbgMsg("IDLE_ADV_SCN adverts started")
+    endif
+    //Check if scanning to be started
+    if ((startflags & 0x00000004)==0x00000004) then 
+      //need to start scanning in idle
+      scanPat$=SRegGetStr$( CfgIdStr_ScanPattern )
+      rc = ScanningStart(0,scanPat$,SRegGet(CfgId_ScanRssiMinimum))
+      //#cmpif 0x00000004 : DbgMsg("IDLE_ADV_SCN scanning started")
+    endif
+    //change state
+    advPrefix$ = "\nAD0:"
+    NewState(STATE_IDLE_nonVSP)
+  endif
+
+endsub
+
+//******************************************************************************
+// Handlers
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// In Command mode and data has arrived from the uart
+//------------------------------------------------------------------------------
+function HndlrUartCommand()
+  //Data received from UART
+  dontcare = UARTReadN(UARTRecBuf$, MaxCmdStringSize)
+  ProcessCommands(UARTRecBuf$,UARTSndBuf$)
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Called when scanning has timedout
+//------------------------------------------------------------------------------
+function HndlrScanTimeout() as integer
+  #cmpif 0x00000004 : DbgMsg("Scan Timeout")
+  
+  if curState==STATE_SCAN_VSP then
+    rc=BleScanAbort()
+    
+    IdleReturnAction()
+    
+    //send an OK response
+    AppendRspEnd(RSP_OK,UARTSndBuf$)
+    //Send out data waiting in buffer
+    SendUartData()
+    //also trigger a reprocessing of the uart buffer just in case
+    rc=SendMsgApp(MSGAPP_PROCESS_UART, DONTCARE_CTX)
+  else
+    //send a 'scanend' response
+    SendScanEnd(UARTSndBuf$)
+  endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when a connection attempt has timeout 
+//------------------------------------------------------------------------------
+function HndlrConnTout()
+  #cmpif 0x00000004 : DbgMsg("Connect Timeout")
+  select curState
+  case STATE_VSP_CONNECTING
+    VspNoCarrierRet(CONN_ERROR_TIMEOUT)    
+    
+  case STATE_nonVSP_CONNECTING
+    if connCount<=0 then
+      //first outgoing nonvsp connection
+      NonVspDisconRet(CONN_ERROR_TIMEOUT, 0)  //will take us back to the idle state
+    else
+      //multiple nonvsp connections
+      //send an DISCON response
+      SendNonVspDiscon(CONN_ERROR_TIMEOUT,0,UARTSndBuf$)
+      //change state
+      NewState(STATE_nonVSP_CONNECTED)
+      //also trigger a reprocessing of the uart buffer just in case
+      rc=SendMsgApp(MSGAPP_PROCESS_UART, DONTCARE_CTX)
+    endif
+  
+  case else
+  endselect
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there at least one scan response waiting to be read
+dim _display, _adType
+//------------------------------------------------------------------------------
+function HndlrAdvReport00()
+  //Read all cached advert reports
+  rc=BleScanGetAdvReportEx(_adType,periphAddr$, advData$, nDiscarded, nRssi, dontcare)
+  while (rc == 0)
+    //#cmpif 0x00000004 : print "\n## Adv=";strhexize$(advData$)
+    _display=0
+    if nRssi > scnRssi then
+      if scnPatternLen>0 then
+        if strpos(advData$,scnPattern$,0) >= 0 then
+          //rssi is above threshold and pattern found
+          _display=1
+        endif
+      else
+        //rssi is above threshold and no pattern specified
+        _display=1
+      endif
+    endif
+    if _display then
+      rc = BleGetADBytag(advData$, 0x09, nme$)
+      print advPrefix$;_adType;" ";StrHexize$(periphAddr$);" ";nRssi;" \22"; nme$ ; "\22\r";
+    endif
+    rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
+  endwhile
+endfunc 1
+
+//------------------------------------------------------------------------------
+//Disconnect
+//------------------------------------------------------------------------------
+function HndlrDisCon(hndl as integer, rsn as integer)
+  #cmpif 0x00000004 : DbgMsg("Disconnect")
+
+  select curState
+  case STATE_VSP_DISCONNECTING, STATE_VSP_PAIRING, STATE_VSP_CARET_CONNECTED,STATE_VSP_FAST_CONNECTED
+    //Some other error while writing to a cccd
+    if vspDisconSts<=0 then 
+      //assume a normal disconnection has happenned
+      vspDisconSts=CONN_ERROR_USER_DISCON
+    endif
+    VspNoCarrierRet(vspDisconSts)  
+    connHandles[HCONN_VSP] = INVALID_CONN_HANDLE
+    
+  case STATE_nonVSP_CONNECTING, STATE_nonVSP_CONNECTED
+    dim nodeIdx : nodeIdx = GetIdxFromHConn(hndl)
+    if nodeIdx==0 then
+      //ignore this because we were not track that connection
+    else
+      if connCount<=1 then  //comparing against 1 because it decremented at the end of this routine
+        //first outgoing nonvsp connection
+        NonVspDisconRet(rsn, nodeIdx)  //will take us back to the idle state
+      else
+        //multiple nonvsp connections
+        //send an DISCON response
+        SendNonVspDiscon(rsn,nodeIdx,UARTSndBuf$)
+        //also trigger a reprocessing of the uart buffer just in case
+        rc=SendMsgApp(MSGAPP_PROCESS_UART, DONTCARE_CTX)
+      endif
+      connHandles[nodeIdx]=INVALID_CONN_HANDLE
+    endif
+    
+  case else
+    VspNoCarrierRet(rsn)  
+    connHandles[HCONN_VSP] = INVALID_CONN_HANDLE
+  endselect
+  
+  if connCount>0 then
+    //decrement the connection count
+    connCount=connCount-1
+  endif
+  
+endfunc 1  
+
+//------------------------------------------------------------------------------
+//CCCD Descriptor found via BleGattcFindDesc()
+//------------------------------------------------------------------------------
+function HndlrFindDesc(hConn, hAttr)
+  //#cmpif 0x00000004 : DbgMsgVal("EvFindDesc hAttr=",hAttr)
+
+  select curState
+  case STATE_VSP_GET_HANDLES
+    SvcFindCharDescEv(hConn,hAttr)
+    
+  case STATE_nonVSP_CONNECTED
+    //get connection index from conn handle
+    dontcare = GetIdxFromHConn(hConn)  
+    sprint #dontcare$, "\nFD:";dontcare;",";hAttr;"\r"
+    SendUartDataEx(dontcare$)
+    
+  case else
+  endselect
+endfunc 1
+
+//------------------------------------------------------------------------------
+//Characteristic found via BleGattcFindChar()
+//------------------------------------------------------------------------------
+function HndlrFindChar(hConn,cProp,hAttr,hIncSvcUuid)
+  //#cmpif 0x00000004 : DbgMsgVal("EvFindChar hAttr=",hAttr)
+
+  select curState
+  case STATE_VSP_GET_HANDLES
+    SvcFindCharDescEv(hConn,hAttr)
+    
+  case STATE_nonVSP_CONNECTED
+    //get connection index from conn handle
+    dontcare = GetIdxFromHConn(hConn)  
+    sprint #dontcare$, "\nFC:";dontcare;",";hAttr;",";cProp;"\r"
+    SendUartDataEx(dontcare$)
+    
+  case else
+  endselect
+endfunc 1
+
+//------------------------------------------------------------------------------
+//UART data received in vsp fast connected state (as master)
+//------------------------------------------------------------------------------
+//Following with 0x00080000 is used for Write without ACK
+#cmpif 0x00080000 : function HndlrUartRxVspOutFC()
+#cmpif 0x00080000 :   //Read data that has arrived through via the UART
+#cmpif 0x00080000 :   if (vspAllowTx == 1) then
+#cmpif 0x00080000 :     do
+#cmpif 0x00080000 :       dontcare = UartReadN(UARTRecBuf$, vspAttrMaxLen)
+#cmpif 0x00080000 :       if dontcare > 0 then
+#cmpif 0x00080000 :         rc = BleGattcWriteCmd(connHandles[HCONN_VSP], hVspAttr[VSP_ATTR_INDEX_RX], UARTRecBuf$)
+#cmpif 0x00080000 :         select rc
+#cmpif 0x00080000 :         case 0 //UWRESULTCODE_SUCCESS
+#cmpif 0x00080000 :           StrShiftLeft(UARTRecBuf$,dontcare)
+#cmpif 0x00080000 :           
+#cmpif 0x00080000 :         case 0x6804 //UWRESULTCODE_BLE_NO_TX_BUFFERS
+#cmpif 0x00080000 :           TimerStart(TMRNUM_DATA_PUMP,vspPumpToutMs,0)
+#cmpif 0x00080000 :           exitfunc 1
+#cmpif 0x00080000 :         
+#cmpif 0x00080000 :         case 0x620C //UWRESULTCODE_BLE_DATA_SIZE
+#cmpif 0x00080000 :           dontcare$= StrSplitLeft$(UARTRecBuf$,vspAttrMaxLen)
+#cmpif 0x00080000 :           rc = BleGattcWriteCmd(connHandles[HCONN_VSP], hVspAttr[VSP_ATTR_INDEX_RX], dontcare$)
+#cmpif 0x00080000 :           if rc!=0 then
+#cmpif 0x00080000 :             //did not manage to sent it, so put it back in the original buffer (at the beginning)
+#cmpif 0x00080000 :             UARTRecBuf$ = dontcare$+UARTRecBuf$
+#cmpif 0x00080000 :             if rc==0x6804 then //UWRESULTCODE_BLE_NO_TX_BUFFERS
+#cmpif 0x00080000 :               TimerStart(TMRNUM_DATA_PUMP,vspPumpToutMs,0)
+#cmpif 0x00080000 :               exitfunc 1
+#cmpif 0x00080000 :             endif
+#cmpif 0x00080000 :           endif
+#cmpif 0x00080000 :         case else
+#cmpif 0x00080000 :         endselect
+#cmpif 0x00080000 :       endif
+#cmpif 0x00080000 :     dowhile dontcare
+#cmpif 0x00080000 :   endif
+#cmpif 0x00080000 : endfunc 1
+
+//Following with 0x00040000 is used for Write with ACK
+#cmpif 0x00040000 : function HndlrUartRxVspOutFC()
+#cmpif 0x00040000 :   //Read data that has arrived through via the UART
+#cmpif 0x00040000 :   if (vspWaitAck == 0) && (vspAllowTx == 1) then
+#cmpif 0x00040000 :     dontcare = UartReadN(UARTRecBuf$, vspAttrMaxLen)
+#cmpif 0x00040000 :     if dontcare > 0 then
+#cmpif 0x00040000 :       rc = BleGattcWrite(connHandles[HCONN_VSP], hVspAttr[VSP_ATTR_INDEX_RX], UARTRecBuf$)
+#cmpif 0x00040000 :       vspWaitAck = 1
+#cmpif 0x00040000 :       StrShiftLeft(UARTRecBuf$,dontcare)
+#cmpif 0x00040000 :     endif
+#cmpif 0x00040000 :   endif
+#cmpif 0x00040000 : endfunc 1
+
+
+//------------------------------------------------------------------------------
+//UART data received in vsp slow connected state (as master)
+//------------------------------------------------------------------------------
+function HndlrUartRxVspOutSC()
+  //check number of bytes in receive buffer
+  dontcare=UartInfo(3)
+  if dontcare==1 then
+    PollForEscapeSeq()  //on exit dontcare$ contains what was read
+    UARTRecBuf$ = UARTRecBuf$+dontcare$
+  endif  
+endfunc HndlrUartRxVspOutFC()
+
+//------------------------------------------------------------------------------
+//This timer was started when notify buffers ran out while calling WriteCmd
+//------------------------------------------------------------------------------
+#cmpif 0x00080000 : function HndlrTmrVspPump()
+#cmpif 0x00080000 :   select curState
+#cmpif 0x00080000 :   case STATE_VSP_CARET_CONNECTED, STATE_VSP_FAST_CONNECTED
+#cmpif 0x00080000 :     rc = HndlrUartRxVspOutFC()
+#cmpif 0x00080000 : 
+#cmpif 0x00080000 :   case else
+#cmpif 0x00080000 :   endselect
+#cmpif 0x00080000 : endfunc 1
+
+//------------------------------------------------------------------------------
+//A write to an attribute has been acked/nacked
+//------------------------------------------------------------------------------
+function HandlerAttrWrite(hConn,hAttr,xSts)
+  //#cmpif 0x00000004 : print "\n## EvAttrWrite hAttr=";hAttr;" sts=";xSts
+  
+  select curState
+  case STATE_VSP_WRITE_CCCDS
+    //save status for later use
+    vspDisconSts=nSts 
+    //check status
+    if xSts==0 then
+      //#cmpif 0x00000004 : DbgMsg("EvAttrWrite OK")
+      //a cccd was successfuly written, so check for next
+      vspFindIndex=vspFindIndex+1
+      if vspFindIndex>=VSP_ATTR_MAX_INDEXES then
+        //all cccd's written
+        VspEnterConnState(MSGAPP_ENTER_VSPOUT_CONN_STATE)
+      else
+        //there could be more cccd's to enable       
+        rc=CccdsEnable()
+        if rc==0 then
+          //there were no more cccd's to enable
+          VspEnterConnState(MSGAPP_ENTER_VSPOUT_CONN_STATE)
+        else
+          //a write has been sent to a cccd, remain in this state
+          //NOTHING TO DO
+        endif
+      endif
+    elseif (Is_Encr_Required(xSts) != 0) && (pairIoCapCache==0) then
+      #cmpif 0x00000004 : DbgMsg("EvAttrWrite Encr Req ** Start PAIRING")
+      //the link requires encryption, and configured for just works
+      rc = BlePair(hConn,1)
+      #cmpif 0x00000003 : AssertRC(rc, 22610)
+      //change state
+      NewState(STATE_VSP_PAIRING)
+    else
+      #cmpif 0x00000004 : DbgMsgVal("EvAttrWrite other err",xSts)
+      //some other error, so just drop the connection
+      vspDisconSts=CONN_ERROR_AUTHLINK_REQUIRED
+      rc=BleDisconnect(hConn)
+      //change state
+      NewState(STATE_VSP_DISCONNECTING)
+    endif
+    
+  case STATE_VSP_FAST_CONNECTED,STATE_VSP_CARET_CONNECTED
+#cmpif 0x00040000 : vspWaitAck=0
+    //and immeditaly send more data if we can
+    rc = HndlrUartRxVspOutFC()
+    
+  case STATE_nonVSP_CONNECTED
+    dim nIdx
+    //get connection index from conn handle
+    nIdx = GetIdxFromHConn(hConn)  
+    sprint #dontcare$, "\nAW:";nIdx;",";xSts;"\r"
+    SendUartDataEx(dontcare$)
+    
+  case else
+  endselect
+endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function HndlrAttrRead(hConn,hAttr,xSts) as integer
+  dim a$,ofst,nIdx
+  //get connection index from conn handle
+  nIdx = GetIdxFromHConn(hConn)  
+  if xSts == 0 then
+    //we have a successful read
+    rc = BleGattcReadData(hConn,hAttr,ofst,a$)
+    if rc==0 then
+      sprint #dontcare$, "\nAR:";nIdx;",";ofst;",";StrHexize$(a$);"\r"
+    else 
+      sprint #dontcare$, "\nAB:";nIdx;",";integer.h' rc;"\r"
+    endif
+  else
+    //failed to read
+    sprint #dontcare$, "\nAS:";nIdx;",";xSts;"\r"
+  endif
+  SendUartDataEx(dontcare$)
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Called wheh uart tx buffer is empty in vp fast mode
+//------------------------------------------------------------------------------
+function HndlrUartTxEmptyOut()
+  VspMasterRtsSend(1)
+  SendUartData()
+endfunc 1
+
+//------------------------------------------------------------------------------
+//Vsp (air-side) data received in vsp fast connected state
+//------------------------------------------------------------------------------
+function HndlrNotifyVspOut()
+  dim hConn, hAttr, aData$, discard, wrLen
+  rc=BleGattcNotifyRead(hConn, hAttr, aData$, discard)
+  while (rc == 0)
+    if (hAttr == hVspAttr[VSP_ATTR_INDEX_TX]) then
+      //Data has arrived
+      SendUartDataEx(aData$)
+      if strlen(UARTSndBuf$) > 0 then
+        VspMasterRtsSend(0)
+      endif
+    elseif (hAttr == hVspAttr[VSP_ATTR_INDEX_MDMOUT]) then
+      //Modem Out from peer changed
+      if (strcmp(aData$, "\01") == 0) then
+        vspAllowTx = 1
+        rc = HndlrUartRxVspOutFC()
+      else
+         vspAllowTx = 0
+      endif
+    endif
+    rc=BleGattcNotifyRead(hConn, hAttr, aData$, discard)
+  endwhile  
+endfunc 1
+
+//------------------------------------------------------------------------------
+//NonVsp connection received a notify
+//------------------------------------------------------------------------------
+function HndlrNotifyNonVsp()
+  dim hConn, hAttr, aData$, discard, wrLen, nIdx
+  do
+    rc=BleGattcNotifyRead(hConn, hAttr, aData$, discard)
+    if rc!=0 then
+      exitfunc 1
+    endif
+    nIdx = GetIdxFromHConn(hConn)
+    if nIdx>0 then
+      sprint #dontcare$,"\nIN:";nIdx;",";hAttr;",";StrHexize$(aData$);"\r"
+      SendUartDataEx(dontcare$)
+    endif
+  dowhile(1)
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Waited too long for Vsp connection to be encrypted do just drop the connection
+//------------------------------------------------------------------------------
+function HndlrTmrWaitEncr()
+  if curState==STATE_VSP_IN_WAIT_ENCR then
+    vspDisconSts=CONN_ERROR_UNENCRYPTED 
+    //some other error, so just drop the connection
+    rc=BleDisconnect(connHandles[HCONN_VSP])
+    //change state
+    NewState(STATE_VSP_DISCONNECTING)
+  endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Function for bridging data between the VSP service and the UART in FAST mode
+//------------------------------------------------------------------------------
+function HndlrBridgeInF()
+    //Pass data between UART and VSP service
+    BleVspUartBridge()
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Function for bridging data between the VSP service and the UART in SLOW mode
+//------------------------------------------------------------------------------
+function HndlrBridgeInS()
+  //Pass data between UART and VSP service
+  dim uLen
+  //check space in vsp tx buffer
+  if BleVspInfo(4) >= MIN_SPACE_IN_VSPTXBUF_TO_CHECK_FOR_CARETS then
+    //check number of bytes in receive buffer
+    uLen=UartInfo(3)
+    if uLen==1 then
+      PollForEscapeSeq()  //on exit dontcare$ contains what was read
+      rc=BleVspWrite(dontcare$)
+      exitfunc 1
+    endif
+  endif  
+  BleVspUartBridge()
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This will be called with the cmd mode pin transitions from 0 to 1
+//------------------------------------------------------------------------------
+function HndlrVspCmdMode()
+  select curState
+  case STATE_VSP_FAST_CONNECTED
+    //disconnect            
+    vspDisconSts=CONN_ERROR_USER_DISCON
+    //some other error, so just drop the connection
+    rc=BleDisconnect(connHandles[HCONN_VSP])
+    //change state
+    NewState(STATE_VSP_DISCONNECTING)  
+    
+  case else
+  endselect
+endfunc 1
+
+//------------------------------------------------------------------------------
+//BLE message
+//------------------------------------------------------------------------------
+function HndlrBleMsg(nMsgId, nCtx)
+  select nMsgId
+  case BLE_EVBLEMSGID_CONNECT
+    OnConnect(nCtx)
+
+  case BLE_EVBLEMSGID_ENCRYPTED
+    OnEncrypted(nCtx)
+
+  case BLE_EVBLEMSGID_UNENCRYPTED
+    OnUnencrypted(nCtx)
+
+  case BLE_EVBLEMSGID_DISCONNECT
+    //Disconnected see HndlrDisCon
+
+  #cmpif 0x00000004 : case BLE_EVBLEMSGID_NEW_BOND
+  #cmpif 0x00000004 :   DbgMsg("New Bond")
+
+  #cmpif 0x00000004 : case BLE_EVBLEMSGID_UPDATED_BOND
+  #cmpif 0x00000004 :   DbgMsg("Updated Bond")
+
+  #cmpif 0x00000004 : case BLE_EVBLEMSGID_LESC_PAIRING
+  #cmpif 0x00000004 :   DbgMsg("LESC Pairing")
+
+  case BLE_EVBLEMSGID_DISPLAY_PASSKEY
+    OnDisplayPasskey(nCtx)
+
+  case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
+    #cmpif 0x00000004 :   DbgMsgVal("Auth Key Request, type=",nCtx)
+    OnAuthKeyRequest(nCtx)
+
+  #cmpif 0x00000004 : case BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER
+  #cmpif 0x00000004 :   DbgMsg("Conn to Bonded Master ")
+
+  #cmpif 0x00000004 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+  #cmpif 0x00000004 :   ShowConnParms(nCtx)
+
+  #cmpif 0x00000004 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
+  #cmpif 0x00000004 :   DbgMsg("Conn Parm Negotiation FAILED")
+
+  case else        
+    #cmpif 0x00000004 : DbgMsgVal("Unprocessed nMsgId",nMsgId)
+  endselect
+endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x00020000 : function HandlerPrimSvc(hConn,hUuid,hStart,hEnd) as integer
+#cmpif 0x00020000 :   if hStart!=0 then
+#cmpif 0x00020000 :     //S: hStart,(hEnd),hUuid
+#cmpif 0x00020000 :     sprint #dontcare$, "\nTM:S:";hStart;" ,(";hEnd;") ,";integer.h' hUuid;"\r"
+#cmpif 0x00020000 :     SendUartDataEx(dontcare$)
+#cmpif 0x00020000 :     //And get all characteristics of this service
+#cmpif 0x00020000 :     rc=BleDiscCharFirst(hConn,0,hStart,hEnd)
+#cmpif 0x00020000 :     if rc!=0 then
+#cmpif 0x00020000 :       TerminateTableMap(rc)
+#cmpif 0x00020000 :     endif
+#cmpif 0x00020000 :   else
+#cmpif 0x00020000 :     //Reached end of remote gatt table
+#cmpif 0x00020000 :     TerminateTableMap(0)
+#cmpif 0x00020000 :   endif
+#cmpif 0x00020000 : endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x00020000 : function HandlerCharDisc(hConn,hUuid,cProp,hVal,hiUuid) as integer
+#cmpif 0x00020000 :   if hVal!=0 then
+#cmpif 0x00020000 :     //C: hVal,cProp,hUuid,hiUuid
+#cmpif 0x00020000 :     sprint #dontcare$,"\nTM: C:";hVal;" ,";integer.h' cProp;" ,";integer.h' hUuid;" ,";hiUuid;"\r"     //use SendUartData instead
+#cmpif 0x00020000 :     SendUartDataEx(dontcare$)
+#cmpif 0x00020000 :     //And get all descriptors of this characteristics
+#cmpif 0x00020000 :     rc=BleDiscDescFirst(hConn,0,hVal)
+#cmpif 0x00020000 :     if rc!=0 then
+#cmpif 0x00020000 :       TerminateTableMap(rc)
+#cmpif 0x00020000 :     endif
+#cmpif 0x00020000 :   else
+#cmpif 0x00020000 :     //No more chars in this service, so go for next service
+#cmpif 0x00020000 :     rc = BleDiscServiceNext(hConn)
+#cmpif 0x00020000 :     if rc!=0 then
+#cmpif 0x00020000 :       TerminateTableMap(rc)
+#cmpif 0x00020000 :     endif
+#cmpif 0x00020000 :   endif
+#cmpif 0x00020000 : endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+#cmpif 0x00020000 : function HandlerDescDisc(hConn,hUuid,hDesc) as integer
+#cmpif 0x00020000 :   if hDesc!=0 then
+#cmpif 0x00020000 :     //D: hDesc,hUuid
+#cmpif 0x00020000 :     sprint #dontcare$,"\nTM:  D:";hDesc;" ,";integer.h' hUuid;"\r"     //use SendUartData instead
+#cmpif 0x00020000 :     SendUartDataEx(dontcare$)
+#cmpif 0x00020000 :   endif
+#cmpif 0x00020000 :   //And get all descriptors of this characteristics
+#cmpif 0x00020000 :   rc=BleDiscDescNext(hConn)
+#cmpif 0x00020000 :   if rc!=0 then
+#cmpif 0x00020000 :     //No more descc in this char, so go for next char
+#cmpif 0x00020000 :     rc = BleDiscCharNext(hConn)
+#cmpif 0x00020000 :     if rc!=0 then
+#cmpif 0x00020000 :       rc = BleDiscServiceNext(hConn)
+#cmpif 0x00020000 :       if rc!=0 then
+#cmpif 0x00020000 :         TerminateTableMap(rc)
+#cmpif 0x00020000 :       endif
+#cmpif 0x00020000 :     endif
+#cmpif 0x00020000 :   endif
+#cmpif 0x00020000 : endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there when an Indicate is acknowledged
+//------------------------------------------------------------------------------
+function HndlrCharHvc(BYVAL hChar AS INTEGER) as integer
+  charIdx=GetIdxFromHChar(hChar)
+  if charIdx>0 then
+    sprint #dontcare$,"\nAK:";charIdx;"\r"
+    SendUartDataEx(dontcare$)
+  endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function HndlrCharVal(BYVAL hChar AS INTEGER, byval offset, byval len) as integer
+  charIdx=GetIdxFromHChar(hChar)
+  if charIdx>0 then
+    rc=BleCharValueRead(hChar,tmpDta$)
+    sprint #dontcare$,"\nWR:";charIdx;",";StrHexize$(tmpDta$);"\r"
+    SendUartDataEx(dontcare$)
+  endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function HndlrCharCccd(BYVAL hChar AS INTEGER, BYVAL nVal AS INTEGER) as integer
+  charIdx=GetIdxFromHChar(hChar)
+  if charIdx>0 then
+    sprint #dontcare$,"\nCC:";charIdx;",";nVal;"\r"
+    SendUartDataEx(dontcare$)
+  endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+function HndlrCharSccd(BYVAL hChar AS INTEGER, BYVAL nVal AS INTEGER) as integer
+  charIdx=GetIdxFromHChar(hChar)
+  if charIdx>0 then
+    sprint #dontcare$,"\nSC:";charIdx;",";nVal;"\r"
+    SendUartDataEx(dontcare$)
+  endif
+endfunc 1
+
+////------------------------------------------------------------------------------
+////------------------------------------------------------------------------------
+//function HndlrCharDesc(BYVAL hChar AS INTEGER, BYVAL hDesc AS INTEGER) as integer
+//  dim duid,a$,rc
+//  print "\nEVCHARDESC(hChar=";integer.h' hChar;",hDesc=";integer.h' hDesc;")"
+//
+//  //Read the descriptor data
+//  rc = BleCharDescRead(hChar,hDesc,0,512,duid,a$)
+//  print "\n > BleCharDescRead (0,512) = "
+//  print "hUuid=";integer.h' duid;",data=";StrHexize$(a$);",len=";StrLen(a$);") returned ";integer.h' rc
+//endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called process an event thrown by this application used
+// for serialisation
+//------------------------------------------------------------------------------
+function HndlrMessageApp(nMsgId, nCtx)
+  select nMsgId
+  case MSGAPP_PROCESS_UART
+    //process the uart as if we just got some uart activity
+    OnEvent EVUARTRX              Call HndlrUartCommand
+    rc=HndlrUartCommand()
+    
+  case MSGAPP_ENTER_NONVSP_CONN_STATE
+    OnEvent EVATTRNOTIFY          Call HndlrNotifyNonVsp
+    //also trigger a reprocessing of the uart buffer just in case
+    rc=SendMsgApp(MSGAPP_PROCESS_UART, DONTCARE_CTX)
+    
+  case MSGAPP_ENTER_VSPOUT_CONN_STATE  //nCtx is the new state to enter
+    #cmpif 0x00000004 :   DbgMsg("Going For VSPOUT")
+    //Allow TX
+    vspAllowTx=1
+    //send the connect response
+    AppendConnRspEnd(CONN_OK, UARTSndBuf$ )
+    //Send out data waiting in buffer
+    SendUartData()
+    //change uart and vsp handlers
+    if nCtx==STATE_VSP_FAST_CONNECTED then
+      #cmpif 0x00000004 :   DbgMsg("HndlrUartRxVspOutFC")
+      OnEvent EVUARTRX            Call HndlrUartRxVspOutFC
+#cmpif 0x00080000 : OnEvent EVNOTIFYBUF         Call HndlrUartRxVspOutFC
+    else
+      #cmpif 0x00000004 :   DbgMsg("HndlrUartRxVspOutSC")
+      OnEvent EVUARTRX            Call HndlrUartRxVspOutSC
+#cmpif 0x00080000 : OnEvent EVNOTIFYBUF         Call HndlrUartRxVspOutFC
+    endif
+    OnEvent EVATTRNOTIFY          Call HndlrNotifyVspOut
+    OnEvent EVUARTTXEMPTY         Call HndlrUartTxEmptyOut
+    //enable incoming data from peer
+    VspMasterRtsSend(1)
+    //change state
+    NewState(nCtx)
+    
+  case MSGAPP_ENTER_VSPIN_CONN_STATE  //nCtx is the new state to enter
+    #cmpif 0x00000004 :   DbgMsg("Going For VSPIN")
+    //send the connect response
+    AppendConnRspEnd(CONN_OK, UARTSndBuf$ )
+    //Send out data waiting in buffer
+    SendUartData()
+    //change uart and vsp handlers  
+    if nCtx==STATE_VSP_FAST_CONNECTED then
+      #cmpif 0x00000004 :   DbgMsg("HndlrUartRxVspInFC")
+      OnEvent EVVSPRX             Call HndlrBridgeInF
+      OnEvent EVUARTRX            Call HndlrBridgeInF
+      OnEvent EVVSPTXEMPTY        Call HndlrBridgeInF
+      OnEvent EVUARTTXEMPTY       Call HndlrBridgeInF
+      //start bridging cached data 
+      rc=HndlrBridgeInF()
+    else
+      #cmpif 0x00000004 :   DbgMsg("HndlrUartRxVspInSC")
+      OnEvent EVVSPRX             Call HndlrBridgeInS
+      OnEvent EVUARTRX            Call HndlrBridgeInS
+      OnEvent EVVSPTXEMPTY        Call HndlrBridgeInS
+      OnEvent EVUARTTXEMPTY       Call HndlrBridgeInS
+      //start bridging cached data 
+      rc=HndlrBridgeInS()
+    endif
+    //change state
+    NewState(nCtx)
+    
+  case else
+    //do nothing
+  endselect
+endfunc 1
+
+//******************************************************************************
+//Setup event handlers
+//******************************************************************************
+OnEvent EVBLEMSG                Call HndlrBleMsg
+OnEvent EVUARTRX                Call HndlrUartCommand
+OnEvent EVBLE_SCAN_TIMEOUT      Call HndlrScanTimeout
+OnEvent EVBLE_ADV_REPORT        Call HndlrAdvReport00
+OnEvent EVMSGAPP                Call HndlrMessageApp
+OnEvent EVBLE_CONN_TIMEOUT      Call HndlrConnTout
+OnEvent EVDISCON                call HndlrDisCon
+OnEvent EVFINDDESC              call HndlrFindDesc
+OnEvent EVFINDCHAR              call HndlrFindChar
+OnEvent EVATTRWRITE             call HandlerAttrWrite
+OnEvent EVATTRREAD              call HndlrAttrRead
+OnEvent EVTMR0                  call HndlrTmrWaitEncr
+OnEvent EVDETECTCHAN0           call HndlrVspCmdMode
+OnEvent EVCHARHVC               call HndlrCharHvc
+OnEvent EVCHARVAL               call HndlrCharVal
+OnEvent EVCHARCCCD              call HndlrCharCccd
+OnEvent EVCHARSCCD              call HndlrCharSccd
+//OnEvent EVCHARDESC              call HndlrCharDesc   //FUTURE
+
+#cmpif 0x00080000 : OnEvent EVTMR1                  call HndlrTmrVspPump
+
+#cmpif 0x00020000 : OnEvent EVDISCPRIMSVC           call HandlerPrimSvc
+#cmpif 0x00020000 : OnEvent EVDISCCHAR              call HandlerCharDisc
+#cmpif 0x00020000 : OnEvent EVDISCDESC              call HandlerDescDisc
+
+//******************************************************************************
+// Start up code from here -equivalent to main() in a 'C' application
+//******************************************************************************
+
+Startup()
+
+
+//******************************************************************************
+//Wait in a lower-power mode for an event to occur
+//******************************************************************************
+WAITEVENT
