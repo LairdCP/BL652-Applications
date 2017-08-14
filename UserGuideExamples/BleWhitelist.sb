@@ -53,6 +53,7 @@ sub WhiteListInit()
   IF rc==0 THEN
     //Add address we want to specifically look for
     addr$="000016A40B1623"
+    addr$ = StrDehexize$(addr$)
     rc=BleWhitelistAddAddr(hWlist,addr$)
     AssertRC(110)
     //Made a mistake so clear it
@@ -60,6 +61,7 @@ sub WhiteListInit()
     AssertRC(120)
     //now add the correct address
     addr$="000016A40B1642"
+    addr$ = StrDehexize$(addr$)
     rc=BleWhitelistAddAddr(hWlist,addr$)
     AssertRC(130)
     //now add first one in the trusted database

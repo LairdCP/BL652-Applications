@@ -455,7 +455,7 @@
 //    - Changes whether OOB pairing is preferred or not
 //
 // -----------------------------------------------------------------------------
-// ble pair lescpref #INTLESCPREF#
+// ble pair lesc #INTLESCPREF#
 //    - Security Manager related
 //    - This will result in BleSecMngrLescPairingPref() being called
 //    - valid values for #INTLESCPREF# are
