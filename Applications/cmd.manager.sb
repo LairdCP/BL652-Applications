@@ -493,6 +493,10 @@
 //    - #mitmRequired# set to 1 to enable Man In The Middle Protection
 //
 // -----------------------------------------------------------------------------
+// ble phy
+//	  - Request a new PHY configuration or respond to a PHY change request
+//
+// -----------------------------------------------------------------------------
 // scan abort
 //   - abort a scan operation (memory is not freed)
 //
@@ -1925,11 +1929,24 @@ function _BleBond()
     endif
 endfunc 5
 
+//------------------------------------------------------------------------------
+//#CMD#//  ble phy       #INTconnHandle# #INTrxPhy# #INTtxPhy# #INToption#
+//------------------------------------------------------------------------------
+function _BlePhy()
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //Extract 3 (#INTconnHandle# #INTrxPhy# #INTtxPhy#) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+        exitfunc rc
+    endif
+    exitfunc BlePhySet(hc[i[1]], i[2], i[3], 0)
+endfunc 5
 
 //-------------------------------------------------------------------------
 //#CMD#//  ble bond
 //#CMD#//  ble pair
 //#CMD#//  ble encrypt
+//#CMD#//  ble phy
 //-------------------------------------------------------------------------
 function _Ble()
     tlen = ExtractStrToken(urtcmd$,tkn$)
@@ -1946,12 +1963,18 @@ function _Ble()
     if strcmp(tkn$,"pair")==0 then
         exitfunc _BlePair()
     endif
+
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"encrypt")==0 then
         exitfunc _BleEncrypt()
     endif
-endfunc 5
 
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	if strcmp(tkn$,"phy")==0 then
+        exitfunc _BlePhy()
+    endif
+
+endfunc 5
 
 //-------------------------------------------------------------------------
 //#CMD#//  misc sysinfo #INTformat# #INTid#    //INTformat: 0=dex, 1=Oct, 2=binary, 3=hex
@@ -1961,6 +1984,7 @@ endfunc 5
 //#CMD#//  misc i  clearall
 //#CMD#//  misc i  set #INTidx# #INTval#
 //#CMD#//  misc address
+//#CMD#//  misc phy
 //-------------------------------------------------------------------------
 function _Misc()
   tlen = ExtractStrToken(urtcmd$,tkn$)
@@ -2061,8 +2085,12 @@ function _Misc()
     print "BLE Address: ";Tmp$;"\n"
     exitfunc -2
   endif
+  //=================================================
+  if strcmp(tkn$,"phy")==0 then
+    rc = ExtractIntTokens(urtcmd$,1,3)
+	exitfunc BlePhySet(hc[i[1]], i[2], i[3], 0)
+  endif
 endfunc 5
-
 
 //-------------------------------------------------------------------------
 //#CMD#//  uart set #INTnewspeed#
@@ -2744,6 +2772,25 @@ function SetMode(msgID, cmd) as integer
     endif
 endfunc 1
 
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+	print "BLE PHY CHANGED: \n"
+    print "Handle: ";integer.h' hConn;"\n"
+	print "Status: ";integer.h' nStatus;"\n"
+    print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    print "BLE PHY REQUEST: \n"
+    print "Handle: ";integer.h' hConn;"\n"
+    print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
 
 //******************************************************************************
 //******************************************************************************
@@ -2777,6 +2824,9 @@ OnEvent  EVCHARHVC                call HandlerCharHvc
 OnEvent  EVCHARCCCD               call HandlerCharCccd
 OnEvent  EVCHARSCCD               call HandlerCharSccd
 OnEvent  EVCHARDESC               call HandlerCharDesc
+
+OnEvent  EVBLE_PHY_UPDATED	 	   call HandlerPhyChngd
+OnEvent  EVBLE_PHY_REQUEST		   call HandlerPhyReq
 
 
 
