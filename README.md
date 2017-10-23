@@ -14,3 +14,7 @@ UwTerminalX is a cross-platform utility for communicating and downloading applic
 BL652 Quick Start Demonstration
 -------------------------------
 Get started in minutes with the [`DVK-BL652 Quick Start`](https://www.lairdtech.com/bl652-quick-start) Guide!
+
+Notes
+-------------------------------
+Please note that for simplicity reasons, some sample apps have been written without important features such as error handling or result code checking. However, when writing your applications, please ensure that result codes returned from the API functions are always checked to ensure that your applications are robust and bug-free.
