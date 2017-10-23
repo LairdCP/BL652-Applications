@@ -15,6 +15,10 @@ BL652 Quick Start Demonstration
 -------------------------------
 Get started in minutes with the [`DVK-BL652 Quick Start`](https://www.lairdtech.com/bl652-quick-start) Guide!
 
+Older firmwares
+-------------------------------
+The files in this repository are designed for use with the latest BL652 firmware, which at the time of writing is 28.7.3.0. For applications targeting older firmware, please check the [Releases tab](https://github.com/LairdCP/BL652-Applications/releases)
+
 Notes
 -------------------------------
 Please note that for simplicity reasons, some sample apps have been written without important features such as error handling or result code checking. However, when writing your applications, please ensure that result codes returned from the API functions are always checked to ensure that your applications are robust and bug-free.
