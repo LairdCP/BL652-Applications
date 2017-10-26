@@ -1,0 +1,394 @@
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Copyright (c) 2016, Laird                                                  ++
+//                                                                            ++
+// Permission to use, copy, modify, and/or distribute this software for any   ++
+// purpose with or without fee is hereby granted, provided that the above     ++
+// copyright notice and this permission notice appear in all copies.          ++
+//                                                                            ++
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES   ++
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF           ++
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR    ++
+// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES     ++
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN      ++
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR ++
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.                ++
+//                                                                            ++
+// SPDX-License-Identifier:ISC                                                ++
+//                                                                            ++
+//******************************************************************************
+//
+// BL652 Data Length Extension: this app demonstrates the use of Data Length Extension
+// feature on the BL652. This is the peripheral app and should ONLY be used against another
+// BL652 loaded with $autorun$.dle.data.length.extension.central.sb
+//
+//******************************************************************************
+//
+//
+//******************************************************************************
+// Definitions
+//******************************************************************************
+#define ENABLE_DATA_LENGTH_EXTENSION       1
+
+#define BLE_1M_PHY                      1
+#define BLE_2M_PHY                      2
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+dim rc                              // Result code variable (used for checking if a function completed successfully or not)
+dim BaseUUID                        // Base UUID for the VSP service which other UUIDs will be siblings of
+
+dim svcID                           // VSP Service ID
+dim TXchar                          // TX characteristic
+dim RXchar                          // RX characteristic
+dim MOchar                          // Modem Out characteristic
+dim MIchar                          // Modem In characteristic
+dim MIval                           // Modem In value
+
+dim ConnectionID                    // Holds the connection ID of the VSP client (if one is connected)
+dim RecBuf$ : RecBuf$ = ""          // VSP receive buffer
+dim UARTBlocked : UARTBlocked = 0   // When set to 1 will not read data from the UART
+dim UartData$                       // Data from the UART waiting to be sent out
+
+
+dim nBleMaxPacketLength : nBleMaxPacketLength = 27  //Default maximum packet length on BL652
+dim nAttributeMTU       : nAttributeMTU = 23        //Default Maximum Transmission Unit on BL652
+dim nAttributeLength    : nAttributeLength = 20     //Default Attribute Data Length on BL652
+
+//******************************************************************************
+// Initialise Global Variable
+//******************************************************************************
+ConnectionID = 0
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//------------------------------------------------------------------------------
+// Register Error Handler as early as possible
+//------------------------------------------------------------------------------
+sub HandlerOnErr()
+    print "\n OnErr - ";GetLastError();"\n"
+endsub
+onerror next HandlerOnErr
+
+//------------------------------------------------------------------------------
+// Assert to check that a resultCode is 0 which means success
+//------------------------------------------------------------------------------
+sub AssertRC(rc, tag)
+    if (rc != 0) then
+        print "Assert Error ";rc;" @ tag ";tag;"\r\n"
+    endif
+endsub
+
+//-------------------------------------------------------------------------------
+// Definitions for attribute values needed to achieve Data Length Extension
+#define ATTRIBUTE_MTU_KEY_ID                    211    // CFG ID 211
+#define ATTRIBUTE_DATA_LENGTH_KEY_ID            212    // CFG ID 212
+#define USE_STRINT_IN_EVENTS_KEY_ID             213    // CFG ID 213
+#define ENABLE_HIGH_BANDWIDTH_KEY_ID            214    // CFG ID 214
+#define BLE_MAX_PACKET_LENGTH_KEY_ID            216    // CFG ID 216
+
+#define ATTRIBUTE_DATA_LENGTH_MAXIMUM           244 // Gatt Server Attribute Maximum Length - Range:20-244
+#define ATTRIBUTE_MTU_MAXIMUM                   247 // Attribut Maximum Trnasmission Unit - Range:23-247
+#define BLE_MAX_PACKET_LENGTH                   251 // BLE Maximum packet length - Range: 27:251
+#define USE_STRING_IN_EVENTS                    1   // 0: use EVATTRNOTIFY, 1: use EVATTRNOTIFYEX (See user manual)
+#define BLE_ENABLE_HIGH_BANDWIDTH               1   // 0: 3 packets/interval (default), 1: 6 packets/interval
+
+//-------------------------------------------------------------------------------
+// This function is used to configure the BL652 to use the maximum Attribute
+// Transmission Unit (MTU), maximum Attribute Data Length, and the maximum
+// packet length
+//-------------------------------------------------------------------------------
+FUNCTION DataLengthExtension()
+
+    // Get current attribute MTU, attribute data length, and maximum packet length values
+    rc = NvCfgKeyGet(ATTRIBUTE_MTU_KEY_ID, nAttributeMTU)
+    rc = NvCfgKeyGet(ATTRIBUTE_DATA_LENGTH_KEY_ID, nAttributeLength)
+    rc = NvCfgKeyGet(BLE_MAX_PACKET_LENGTH_KEY_ID, nBleMaxPacketLength)
+
+    // Check if these are the values needed to achieve DLE
+    IF  (nAttributeMTU != ATTRIBUTE_MTU_MAXIMUM) || (nAttributeLength != ATTRIBUTE_DATA_LENGTH_MAXIMUM)	|| (nBleMaxPacketLength != BLE_MAX_PACKET_LENGTH) THEN
+        // Change the Attribute MTU to be the maximum allowed by the BL652 (247)
+        rc = NvCfgKeySet(ATTRIBUTE_MTU_KEY_ID, ATTRIBUTE_MTU_MAXIMUM)
+        // Change the Attribute Data Length to be the maximum allowed by the BL652 (244)
+        rc = NvCfgKeySet(ATTRIBUTE_DATA_LENGTH_KEY_ID, ATTRIBUTE_DATA_LENGTH_MAXIMUM)
+        // Allow data to be thrown in messages (i.e. Use EVATTRNOTIFYEX instead of EVATTRNOTIFY)
+        rc = NvCfgKeySet(USE_STRINT_IN_EVENTS_KEY_ID, USE_STRING_IN_EVENTS)
+        // Change the bandwidth configuration to HIGH (6 packets per interval)
+        rc = NvCfgKeySet(ENABLE_HIGH_BANDWIDTH_KEY_ID, BLE_ENABLE_HIGH_BANDWIDTH)
+        // Change the maximum packet length to 251 bytes
+        rc = NvCfgKeySet(BLE_MAX_PACKET_LENGTH_KEY_ID, BLE_MAX_PACKET_LENGTH)
+        // Reset the module so that the data is overwritten
+        Reset(0)
+    ENDIF
+
+ENDFUNC 0
+//------------------------------------------------------------------------------
+// Start LE Adverts
+//------------------------------------------------------------------------------
+FUNCTION BleStartAdverts()
+
+    DIM nMinConnInterval, nMaxConnInterval
+
+IF ENABLE_DATA_LENGTH_EXTENSION==1 THEN
+    // For packet length extension, the optimum connection interval is 28750 us
+    nMinConnInterval = 28000
+    nMaxConnInterval = 29000
+ELSE
+    // For default packet length, the optimum connection interval is 7500 us
+    nMinConnInterval = 7500
+    nMaxConnInterval = 7700
+ENDIF
+
+    // Register GAP service with device name and connection intervals
+    dim DevName$ : DevName$ = "LAIRD_BL652"
+    rc = BleGapSvcInit(DevName$, 0, 0, nMinConnInterval, nMaxConnInterval, 4000000,  0)
+
+    // Start Ble adverts
+    dim Addr$ : Addr$ = ""
+    rc = BleAdvertStart(0, Addr$, 250, 0, 0)
+
+ENDFUNC 0
+
+//------------------------------------------------------------------------------
+// This shows the cuttent connection parameters
+//------------------------------------------------------------------------------
+SUB ShowConnParms()
+    DIM intrvl,sprvto,slat
+    rc = BleGetCurConnParms(ConnectionID,intrvl,sprvto,slat)
+    print "## ConnParms :: Interval=";intrvl;",SuperTout=";sprvto;",SlaveLatency=";slat;"\n"
+ENDSUB
+
+//------------------------------------------------------------------------------
+// Function that will create a custom VSP service with Tx/Rx characteristics
+//------------------------------------------------------------------------------
+function CreateVSPService()
+
+    dim TmpStr$, RxUUID, TxUUID, ModemInUUID, ModemOutUUID, mdVal, mdCccd, s$
+
+    // Base UUID
+    TmpStr$ = "569a1101b87f490c92cb11ba5ea5167c"
+    TmpStr$ = StrDehexize$(TmpStr$)
+    BaseUUID = BleHandleUuid128(TmpStr$)
+
+    // Setup Tx/Rx characteristics
+    TxUUID = 0x2000
+    TxUUID = BleHandleUuidSibling(BaseUUID, TxUUID)
+    RxUUID = 0x2001
+    RxUUID = BleHandleUuidSibling(BaseUUID, RxUUID)
+
+    // Setup Modem characteristics
+    ModemInUUID  = 0x2002
+    ModemInUUID = BleHandleUuidSibling(BaseUUID, ModemInUUID)
+    ModemOutUUID = 0x2003
+    ModemOutUUID = BleHandleUuidSibling(BaseUUID, ModemOutUUID)
+
+    // Create new VSP service
+    rc = BleServiceNew(1, BaseUUID, svcID)
+    rc = BleServiceCommit(svcID)
+
+    //Create the ModemIn characteristic
+    mdVal = BleAttrMetadata(0,1,2,0,rc)
+    rc = BleCharNew(8, ModemInUUID, mdVal, 0, 0)
+    s$ = "\01" //Enabled by default
+    rc = BleCharCommit(svcID, s$, MIchar)
+
+    //Create the ModemOut characteristic
+    mdVal = BleAttrMetadata(0,0,2,0,rc)
+    mdCccd = BleAttrMetadata(1,1,2,0,rc) //Metadata for CCCD attribute of Characteristic
+    rc = BleCharNew(16, ModemOutUUID, mdVal, mdCccd, 0)
+    rc = BleCharCommit(svcID, s$, MOchar)
+
+    //Create the RX characteristic
+    mdVal = BleAttrMetadata(0,1,nAttributeLength,1,rc)
+    rc = BleCharNew(8, RxUUID, mdVal, 0, 0)
+    rc = BleCharCommit(svcID, s$, RXchar)
+
+    //Create the TX characteristic
+    mdVal = BleAttrMetadata(0,0,nAttributeLength,1,rc)
+    mdCccd = BleAttrMetadata(1,1,2,0,rc) //Metadata for CCCD attribute of Characteristic
+    rc = BleCharNew(16, TxUUID, mdVal, mdCccd, 0)
+    rc = BleCharCommit(svcID, s$, TXchar)
+
+endfunc 0
+
+//------------------------------------------------------------------------------
+// Function to handle Ble event messages
+//------------------------------------------------------------------------------
+#define BLE_EVBLEMSGID_CONNECT                  0   //nCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT               1   //nCtx = connection handle
+#define BLE_EVBLEMSGID_SERVICE_ERROR            4   //nCtx = resultcode
+#define BLE_EVBLEMSGID_DISPLAY_PASSKEY          9   //nCtx = passcode to display
+#define BLE_EVBLEMSGID_NEW_BOND                 10  //nCtx = connection handle
+#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST         11  //nCtx = 1 for passkey, 2 for 16 byte OOB data
+#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE   12  //nCtx = new notification state 0=off, 1=on
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE        14  //nCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL   15  //nCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER    16  //nCtx = connection handle
+#define BLE_EVBLEMSGID_UPDATED_BOND             17  //nCtx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                18  //nCtx = connection handle
+#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING    19  //nCtx = current supply voltage
+#define BLE_EVBLEMSGID_UNENCRYPTED              20  //nCtx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE         21  //nCtx = connection handle
+//------------------------------------------------------------------------------
+function HndlrBleMsg(nMsgId, nCtx)
+
+    select nMsgId
+    case BLE_EVBLEMSGID_CONNECT
+        PRINT "## Connected\n"
+        ConnectionID = nCtx
+        ShowConnParms()
+
+    case BLE_EVBLEMSGID_DISCONNECT
+        PRINT "## Disconnected!\n"
+        dim Addr$ : Addr$ = ""
+        rc = BleAdvertStart(0, Addr$, 250, 0, 0)
+
+    case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+        ShowConnParms()
+
+    case else
+    endselect
+
+endfunc 1
+
+//------------------------------------------------------------------------------
+// EVUARTRX - Function handler for UART data receive
+//------------------------------------------------------------------------------
+FUNCTION HndlrUartRx()
+
+    dim RdLen, DataToSend$
+
+    IF UARTBlocked == 0 THEN
+        RdLen = UARTREADN(UartData$, nAttributeLength)
+        // Ensure that we only read nAttribureLength
+        DataToSend$ = Left$(UartData$, nAttributeLength)
+
+        // If there is data, send it as notifications
+        IF RdLen > 0 THEN
+            rc = BLECHARVALUENOTIFY(TXchar, DataToSend$)
+            IF rc != 0 THEN
+                // We couldn't send, just keep it saved in DataToSend$
+                UARTBlocked = 1
+            ELSE
+                // Shift UartData by the amount that was written
+                StrShiftLeft(UartData$,RdLen)
+            ENDIF
+        ENDIF
+    ENDIF
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVNOTIFYBUF - Notification buffer was emptied
+//------------------------------------------------------------------------------
+FUNCTION HndlrNtfyBuf()
+
+    IF UARTBlocked == 1 THEN
+        UARTBlocked = 0
+        rc = HndlrUartRx()
+    ELSE
+        //Check for UART data
+        rc = HndlrUartRx()
+    ENDIF
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVCHARVAL - Handler for characteristic value written
+//------------------------------------------------------------------------------
+FUNCTION HndlrCharVal(charHandle, offset, len)
+
+    dim Rd$, arc, SLen, SWritten
+
+    arc = BleCharValueRead(charHandle, Rd$)
+    IF charHandle == RXchar THEN
+        PRINT Rd$
+    ENDIF
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVCHARVALUE - Handler for characteristic value written
+//------------------------------------------------------------------------------
+FUNCTION HndlrCharValue(nConnHandle, charHandle, offset, len, BYVAL Rd$ AS STRING)
+
+    // Just print the data that we got from the char
+    IF charHandle == RXchar THEN
+        PRINT Rd$
+    ENDIF
+
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVATTRIBUTEMTU - This handler is called when there is an event that the attribute MTU has changed
+//------------------------------------------------------------------------------
+FUNCTION HandlerAttrMTUchng(BYVAL hCOnn AS INTEGER, BYVAL nSize AS INTEGER)
+    print "## Attribute MTU Changed - Size=";nSize;"\n"
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// EVPACKETLENGTH - This handler is called when the packet length is changed
+//------------------------------------------------------------------------------
+FUNCTION HandlerPacketLength(BYVAL hConn, BYVAL Tx_Octets, BYVAL Tx_Time, BYVAL Rx_Octets, BYVAL Rx_Time)
+    print "## Packet Length Changed - Tx=";Tx_Octets;" Rx=";Tx_Octets;"\n"
+ENDFUNC 1
+
+//==============================================================================
+// EVBLE_PHY_UPDATED - This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+	print "## PHY Changed: Status: ";integer.h' nStatus;" - PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//==============================================================================
+// EVBLE_PHY_REQUEST - This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    print "## PHY Request - PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+	// Accept the PHY requested by the remote device
+	rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
+//******************************************************************************
+// Start up code from here -equivalent to main() in a 'C' application
+//******************************************************************************
+
+// Close UART and open at 921600 baud rate
+UARTClose()
+rc = UartOpen(1000000, 2048, 800, "CN81H")
+
+// Enable Data Length Extension
+IF ENABLE_DATA_LENGTH_EXTENSION==1 THEN
+    rc = DataLengthExtension()
+ENDIF
+
+// Setup VSP service
+rc = CreateVSPService()
+// Start LE Adverts
+rc = BleStartAdverts()
+
+
+//******************************************************************************
+//Setup event handlers
+//******************************************************************************
+// UART events
+ONEVENT EVUARTRX          CALL HndlrUartRx
+// Generic BLE events
+ONEVENT EVBLEMSG          CALL HndlrBleMsg
+ONEVENT EVCHARVAL         CALL HndlrCharVal           // Used if AT+CFG 213=0
+ONEVENT EVCHARVALUE       CALL HndlrCharValue         // Used if AT+CFG 213=1
+ONEVENT EVNOTIFYBUF       CALL HndlrNtfyBuf
+// Data Length Extenstion events
+ONEVENT EVATTRIBUTEMTU    CALL HandlerAttrMTUchng
+ONEVENT EVPACKETLENGTH    CALL HandlerPacketLength
+// BLE PHY
+OnEvent EVBLE_PHY_UPDATED CALL HandlerPhyChngd
+OnEvent EVBLE_PHY_REQUEST CALL HandlerPhyReq
+
+//******************************************************************************
+//Wait in a lower-power mode for an event to occur
+//******************************************************************************
+WAITEVENT
