@@ -16,9 +16,9 @@
 //
 //******************************************************************************
 //
-// BL652 Data Length Extension: this app demonstrates the use of Data Length Extension
-// feature on the BL652. This is the central app and should ONLY be used against another
-// BL652 loaded with $autorun$.dle.data.length.extension.peripheral.sb
+// 2MPHY Throughput central: this app demonstrates the use of Data Length Extension
+// feature and 2MPHY on the BL652. This is the central app and should ONLY be used
+// against another BL652 loaded with $autorun$.2mphy.throughput.peripheral.sb
 //
 //******************************************************************************
 //
@@ -345,15 +345,15 @@ ENDFUNC 1
 //------------------------------------------------------------------------------
 FUNCTION HandlerPacketLength(BYVAL hConn, BYVAL Tx_Octets, BYVAL Tx_Time, BYVAL Rx_Octets, BYVAL Rx_Time)
     print "## Packet Length Changed - Tx=";Tx_Octets;" Rx=";Tx_Octets;"\n"
-	// Upon receiving a packet length update event, request a move to 2M PHY
-	rc = BlePhySet(hConn, BLE_2M_PHY, BLE_2M_PHY, 0)
+    // Upon receiving a packet length update event, request a move to 2M PHY
+    rc = BlePhySet(hConn, BLE_2M_PHY, BLE_2M_PHY, 0)
 ENDFUNC 1
 
 //==============================================================================
 // EVBLE_PHY_UPDATED - This handler is called when the BLE PHY is changed
 //==============================================================================
 function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
-	print "## PHY Changed: Status: ";integer.h' nStatus;" - PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+    print "## PHY Changed: Status: ";integer.h' nStatus;" - PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
 endfunc 1
 
 //==============================================================================
@@ -361,17 +361,17 @@ endfunc 1
 //==============================================================================
 function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
     print "## PHY Request - PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
-	// Accept the PHY requested by the remote device
-	rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+    // Accept the PHY requested by the remote device
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
 endfunc 1
 
 //******************************************************************************
 // Start up code from here -equivalent to main() in a 'C' application
 //******************************************************************************
 
-// Close UART and open at 921600 baud rate
+// Close UART and open at 1000000 baud rate
 UartClose()
-rc = UartOpen(1000000, 2048, 800, "CN81H")
+rc = UartOpen(1000000, 2048, 2048, "CN81H")
 
 // Enable Data Length Extension
 IF ENABLE_DATA_LENGTH_EXTENSION==1 THEN
