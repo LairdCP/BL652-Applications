@@ -19,6 +19,16 @@ Older firmwares
 -------------------------------
 The files in this repository are designed for use with the latest BL652 firmware, which at the time of writing is 28.7.3.0. For applications targeting older firmware, please check the [Releases tab](https://github.com/LairdCP/BL652-Applications/releases)
 
+Best Practices for Writing smartBASIC Applications
+-------------------------------
+1. Always check the resultcode returned from an API function. Non-zero result codes usually indicate that the operation has not been successful.
+2. smartBASIC is event driven; ensure that the application is written in an event-driven manner. Starting with a state-machine or a flowchart is highly recommended.
+3. Minimize the use of WAITEVENTs; ideally, WAITEVENT should be used only once at the end of the program to ensure the app is simple and robust.
+4. Minimize radio usage when possible to save power.
+5. Use comments wherever possible to ensure that the appliaction can be read and understood.
+6. Only hard-code when necessary. When hard-coding, use #defines to give meaning to the constants used.
+7. Follow the smartBASIC app  template found [here](https://github.com/LairdCP/BL652-Applications/blob/master/Applications/ttt.template.sb).
+
 Notes
 -------------------------------
 Please note that for simplicity reasons, some sample apps have been written without important features such as error handling or result code checking. However, when writing your applications, please ensure that result codes returned from the API functions are always checked to ensure that your applications are robust and bug-free.
