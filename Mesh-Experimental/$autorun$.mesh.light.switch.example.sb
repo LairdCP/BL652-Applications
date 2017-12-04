@@ -1,0 +1,566 @@
+//******************************************************************************
+// Laird Technologies (c) 2013
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++            In this case $autorun$ will be the filename               ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+//
+// This example is used to demonstrate how to manage multiple $autorun$ apps
+//
+// Give it the file name "$autorun$.somedescription.somemoredescription.sb"
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// When UwTerminal downloads the app it will store it as $autorun$
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+//******************************************************************************
+
+#set $cmpif, 0xFFFEFFFF  //All Features
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+        // size of i[]
+#define NUM_OF_I_PARAMS                     (8)
+        // size of s$[] and must be at least 8 elements for BleSvcRegDevInfo()
+#define NUM_OF_S_PARAMS                     (8)
+
+#define MAX_MODELS            10
+
+#define COMPANY_ID_BTSIG      (0xFFFF)
+#define COMPANY_ID_NORDIC     (0x0059)
+#define COMPANY_ID_LAIRD      (0x0077)
+
+#define SIMPLE_ON_OFF_SERVER_MODEL_ID   (0)
+#define SIMPLE_ON_OFF_CLIENT_MODEL_ID   (1)
+
+#define SIMPLE_ON_OFF_OPCODE_SET            ((0xC1 <<16)+COMPANY_ID_NORDIC)
+#define SIMPLE_ON_OFF_OPCODE_GET            ((0xC2 <<16)+COMPANY_ID_NORDIC)
+#define SIMPLE_ON_OFF_OPCODE_SET_UNRELIABLE ((0xC3 <<16)+COMPANY_ID_NORDIC)
+#define SIMPLE_ON_OFF_OPCODE_STATUS         ((0xC4 <<16)+COMPANY_ID_NORDIC)
+
+
+#define BLE_MESH_NODE_STATE_WAIT_FOR_PROVISIONING           100
+#define BLE_MESH_NODE_STATE_WAIT_PROVISIONING_START         110
+#define BLE_MESH_NODE_STATE_WAIT_PROV_OUTPUT_REQ            120
+#define BLE_MESH_NODE_STATE_WAIT_PROV_INPUT_REQ             130
+#define BLE_MESH_NODE_STATE_WAIT_PROV_STATIC_REQ            140
+#define BLE_MESH_NODE_STATE_WAIT_PROV_OOB_PUBKEY_REQ        150
+#define BLE_MESH_NODE_STATE_WAIT_PROVISIONING_FAIL          190
+#define BLE_MESH_NODE_STATE_PROVISIONED                     200
+#define BLE_MESH_NODE_STATE_CONFIG_START                    210
+#define BLE_MESH_NODE_STATE_CONFIG_DONE                     280
+#define BLE_MESH_NODE_STATE_CONFIG_FAIL                     290
+#define BLE_MESH_NODE_STATE_KEY_REFRESH_START               300
+#define BLE_MESH_NODE_STATE_KEY_REFRESH_END                 390
+#define BLE_MESH_NODE_STATE_IV_UPDATE_NOTIFICATION          400
+#define BLE_MESH_NODE_STATE_UNPROVISIONED_DEVICE            500
+
+#define RESP_TIMEOUT_SEC                     30
+
+//******************************************************************************
+// Library Import
+//******************************************************************************
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+
+dim rc
+dim stRsp$ as string        //Uart rx data is stored here
+
+dim ok$,er$,pr$, uc$
+
+dim i[NUM_OF_I_PARAMS]      // index 0 used for return values
+dim s$[NUM_OF_S_PARAMS]    // must be at least 8 elements for BleSvcRegDevInfo()
+
+dim urtcmd$                 //cmd line from uart
+dim tkn$,tlen               //used by command parser
+dim urts                    //will be <0 if uart parser suspended
+
+dim hModel[MAX_MODELS]
+dim OnOffState : OnOffState=0
+
+dim nTid                   //Transaction ID - just incremented for each reliable msg sent
+
+//******************************************************************************
+// Initialisse Global Variable
+//******************************************************************************
+
+ok$    = "\nOK"
+er$    = "\nERROR "
+pr$    = "\r\n>"
+uc$    = "\nUNKNOWN COMMAND"
+
+
+//******************************************************************************
+// Function and Subroutine definitions
+//******************************************************************************
+
+//==============================================================================
+//==============================================================================
+#cmpif 0x00000001 : sub AssertRC(byval tag as integer)
+#cmpif 0x00000001 :   if rc!=0 then
+#cmpif 0x00000001 :     print "\nFailed with ";integer.h' rc;" at tag ";tag
+#cmpif 0x00000001 :   endif
+#cmpif 0x00000001 : endsub
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function ExtractIntTokens(u$,stIdx,num)
+  while num>0
+    tlen = ExtractIntToken(u$,i[stIdx])
+    if tlen == 0 then
+      exitfunc 4
+    endif
+    num=num-1
+    stIdx = stIdx+1
+  endwhile
+endfunc 0
+
+//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
+function ExtractStrTokens(u$,stIdx,num)
+  while num>0
+    tlen = ExtractStrToken(u$,s$[stIdx])
+    if tlen == 0 then
+      exitfunc 3
+    endif
+    num=num-1
+    stIdx = stIdx+1
+  endwhile
+endfunc 0
+
+//==============================================================================
+//==============================================================================
+sub UartRsp(rsp as integer)
+    if rsp == 0 then
+        print ok$;pr$
+    elseif rsp == -2 then
+        print pr$
+    elseif rsp == -4 then
+        print uc$;pr$
+    elseif rsp > 0 then
+        print er$;integer.h' rsp;pr$
+    endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub get_status_string(status$)
+  if OnOffState then
+    status$="\01"
+  else
+    status$="\00"
+  endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub publish_state_server(ihModel) 
+  dim status$
+  
+  get_status_string(status$)
+
+  rc=BleMeshPublish(ihModel,SIMPLE_ON_OFF_OPCODE_STATUS,status$)
+  #cmpif 0x00000001 : AssertRC(1670)
+  
+  #cmpif 0x00000002 : print "\n ## BleMeshPublish() called"
+  
+endsub
+
+//==============================================================================
+//==============================================================================
+sub reply_status_server(ihModel, respInfo$) 
+  dim status$
+  
+  get_status_string(status$)
+
+  rc=BleMeshReply(ihModel,SIMPLE_ON_OFF_OPCODE_STATUS,status$,respInfo$)
+  #cmpif 0x00000001 : AssertRC(1810)
+  
+  #cmpif 0x00000002 : print "\n ## BleMeshReply() called"
+endsub
+
+//==============================================================================
+//==============================================================================
+sub mesh_start_server()
+  rc=BleMeshSchemaNew(0x1234)
+  #cmpif 0x00000001 : AssertRC(1900)
+
+  rc=BleMeshAddVendorModel(COMPANY_ID_NORDIC,SIMPLE_ON_OFF_SERVER_MODEL_ID, hModel[0])
+  #cmpif 0x00000001 : AssertRC(1930)
+
+  rc=BleMeshAddOpcode(SIMPLE_ON_OFF_OPCODE_SET)
+  #cmpif 0x00000001 : AssertRC(1990)
+  rc=BleMeshAddOpcode(SIMPLE_ON_OFF_OPCODE_GET)
+  #cmpif 0x00000001 : AssertRC(2010)
+  rc=BleMeshAddOpcode(SIMPLE_ON_OFF_OPCODE_SET_UNRELIABLE)
+  #cmpif 0x00000001 : AssertRC(2030)
+
+  //rc=BleMeshAddSigModel(1234, hModel[1])
+  //#cmpif 0x00000001 : AssertRC(1960)
+
+
+  #define PRODID     0
+  #define VERID      0
+  #define FEATURES   1
+  #define DEF_TTL    4
+  rc=BleMeshStart(0,COMPANY_ID_NORDIC,PRODID,VERID,FEATURES,DEF_TTL)
+  #cmpif 0x00000001 : AssertRC(2140)
+  
+  if rc==0 then
+    print "\nRunning as Light Switch Server\n"
+  endif
+  
+endsub
+
+//-------------------------------------------------------------------------
+//#CMD#//  ms start
+//#CMD#//  ms on
+//#CMD#//  ms off
+//-------------------------------------------------------------------------
+function _server()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"start")==0 then
+    OnOffState=1
+    mesh_start_server() 
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"on")==0 then
+    OnOffState=1
+    publish_state_server(hModel[0]) 
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"off")==0 then
+    OnOffState=0
+    publish_state_server(hModel[0]) 
+    exitfunc 0
+  endif
+endfunc 5
+
+//==============================================================================
+//==============================================================================
+sub mesh_start_client()
+
+  //Add Client 0 in Element 0
+  rc=BleMeshSchemaNew(-1234)
+  #cmpif 0x00000001 : AssertRC(2260)
+  rc=BleMeshAddVendorModel(COMPANY_ID_NORDIC,SIMPLE_ON_OFF_CLIENT_MODEL_ID, hModel[0])
+  #cmpif 0x00000001 : AssertRC(2280)
+  rc=BleMeshAddOpcode(SIMPLE_ON_OFF_OPCODE_STATUS)
+  #cmpif 0x00000001 : AssertRC(2300)
+
+  //Add Client 1 in Element 1
+  rc=BleMeshAddElement(0x1234)
+  #cmpif 0x00000001 : AssertRC(2340)
+  rc=BleMeshAddVendorModel(COMPANY_ID_NORDIC,SIMPLE_ON_OFF_CLIENT_MODEL_ID, hModel[1])
+  #cmpif 0x00000001 : AssertRC(2360)
+  rc=BleMeshAddOpcode(SIMPLE_ON_OFF_OPCODE_STATUS)
+  #cmpif 0x00000001 : AssertRC(2380)
+
+  //Add Client 2 in Element 2
+  rc=BleMeshAddElement(0x1234)
+  #cmpif 0x00000001 : AssertRC(2420)
+  rc=BleMeshAddVendorModel(COMPANY_ID_NORDIC,SIMPLE_ON_OFF_CLIENT_MODEL_ID, hModel[2])
+  #cmpif 0x00000001 : AssertRC(2440)
+  rc=BleMeshAddOpcode(SIMPLE_ON_OFF_OPCODE_STATUS)
+  #cmpif 0x00000001 : AssertRC(2460)
+
+  //Add Client 3 in Element 3
+  rc=BleMeshAddElement(0x1234)
+  #cmpif 0x00000001 : AssertRC(2500)
+  rc=BleMeshAddVendorModel(COMPANY_ID_NORDIC,SIMPLE_ON_OFF_CLIENT_MODEL_ID, hModel[3])
+  #cmpif 0x00000001 : AssertRC(2520)
+  rc=BleMeshAddOpcode(SIMPLE_ON_OFF_OPCODE_STATUS)
+  #cmpif 0x00000001 : AssertRC(2540)
+
+  #define PRODID     0
+  #define VERID      0
+  #define FEATURES   1
+  #define DEF_TTL    4
+  rc=BleMeshStart(1,COMPANY_ID_NORDIC,PRODID,VERID,FEATURES,DEF_TTL)
+  #cmpif 0x00000001 : AssertRC(2290)
+  
+  if rc==0 then
+    print "\nRunning Provisioner and 3 Light Switch Clients\n"
+  endif
+  
+endsub
+
+//==============================================================================
+//==============================================================================
+sub UpdateSet(set$, nState)
+  
+  set$="\00\00"
+  rc=BleEncode8(set$,nState,0)
+  #cmpif 0x00000001 : AssertRC(2780)
+  rc=BleEncode8(set$,nTid,1)
+  #cmpif 0x00000001 : AssertRC(2800)
+  nTid=(nTid+1)&0xFF
+
+endsub
+
+//==============================================================================
+//==============================================================================
+function BleMeshSimpleSet(servernum, nState)
+  dim set$
+  
+  UpdateSet(set$,nState)
+  
+  rc=BleMeshPublishReliable(hModel[servernum],SIMPLE_ON_OFF_OPCODE_SET,SIMPLE_ON_OFF_OPCODE_STATUS, RESP_TIMEOUT_SEC, set$)
+  #cmpif 0x00000001 : AssertRC(2960)
+  
+  #cmpif 0x00000002 : print "\n ## - BleMeshPublishReliable() called for SET"
+endfunc 0
+
+//==============================================================================
+//==============================================================================
+function BleMeshSimpleGet(servernum)
+  dim get$ : get$=""
+  
+  rc=BleMeshPublishReliable(hModel[servernum],SIMPLE_ON_OFF_OPCODE_GET,SIMPLE_ON_OFF_OPCODE_STATUS, RESP_TIMEOUT_SEC, get$)
+  #cmpif 0x00000001 : AssertRC(3070)
+  
+  #cmpif 0x00000002 : print "\n ## - BleMeshPublishReliable() called for GET"
+endfunc 0 
+
+//==============================================================================
+//==============================================================================
+function BleMeshSmplSetUnRel(servernum, nState, repeats)
+  dim set$, i
+  
+  UpdateSet(set$,nState)
+  
+  for i=1 to repeats
+    rc=BleMeshPublish(hModel[servernum],SIMPLE_ON_OFF_OPCODE_SET_UNRELIABLE,set$)
+    #cmpif 0x00000001 : AssertRC(2960)
+    #cmpif 0x00000002 : print "\n ## - BleMeshPublish() called for SET_UNREL"
+  next 
+  
+endfunc 0
+
+//-------------------------------------------------------------------------
+//#CMD#//  mc start
+//#CMD#//  mc set        #INTservnum  #INTnewstate
+//#CMD#//  mc setunrel   #INTservnum  #INTnewstate #INTrepeats
+//#CMD#//  mc get        #INTservnum
+//-------------------------------------------------------------------------
+function _client()
+  tlen = ExtractStrToken(urtcmd$,tkn$)
+  if tlen == 0 then
+    exitfunc 5
+  endif
+  //=================================================
+  if strcmp(tkn$,"start")==0 then
+    OnOffState=1
+    mesh_start_client() 
+    exitfunc 0
+  endif
+  //=================================================
+  if strcmp(tkn$,"set")==0 then
+    //extract 2 (#INTservnum  #INTnewstate) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,2)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=BleMeshSimpleSet(i[1],i[2])
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"setunrel")==0 then
+    //extract 3 (#INTservnum  #INTnewstate #INTrepeats) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,3)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=BleMeshSmplSetUnRel(i[1],i[2],i[3])
+    exitfunc rc
+  endif
+  //=================================================
+  if strcmp(tkn$,"get")==0 then
+    //extract 1 (#INTservnum ) and store starting at i[1]
+    rc = ExtractIntTokens(urtcmd$,1,1)
+    if rc != 0 then
+      exitfunc rc
+    endif
+    rc=BleMeshSimpleGet(i[1])
+    exitfunc rc
+  endif
+endfunc 5
+
+
+//==============================================================================
+//==============================================================================
+function OnUartCmd() as integer
+  rc=-2 //default response is ">"
+  tlen = ExtractStrToken(urtcmd$,tkn$) //get first token
+  if tlen > 0 then
+
+    if strcmp(tkn$,"ms")==0 then
+      rc = _server()
+
+    elseif strcmp(tkn$,"mc")==0 then
+      rc = _client()
+
+
+    else
+        rc=-4 //send an "UNKNOWN COMMAND" response to user
+
+    endif
+  endif
+  // send a response back to the user
+  UartRsp(rc)
+endfunc 1
+
+//******************************************************************************
+// Handler definitions
+//******************************************************************************
+
+//==============================================================================
+// This handler is called when data has arrived at the serial port
+//==============================================================================
+function HandlerUartRxCmd() as integer
+  dim nMatch
+
+  if urts < 0 then
+    //uart parser is suspended
+    exitfunc 1
+  endif
+
+  //check if CR has been received
+  nMatch=UartReadMatch(stRsp$,13)
+  if nMatch!=0 then
+    //CR exists in the input buffer
+    urtcmd$ = strsplitleft$(stRsp$,nMatch)
+    exitfunc OnUartCmd()
+  endif
+endfunc 1
+
+
+
+//==============================================================================
+// This handler is called when there is an incoming mesh message
+//==============================================================================
+function HandlerMeshOpcMsg(iElemIdx, ihModel, iOpcode, byval sData$, byval respInfo$) as integer
+  dim len,tmp$
+
+  print "\nEVBLEMSG_OPC_MSG elem:";iElemIdx
+  print " hndl:";integer.h' ihModel
+  print " opc:"
+  sprint #tmp$,integer.h' iOpcode : print right$(tmp$,6)
+  select iOpcode
+  case SIMPLE_ON_OFF_OPCODE_SET
+    print " (SET)"
+  case SIMPLE_ON_OFF_OPCODE_GET
+    print " (GET)"
+  case SIMPLE_ON_OFF_OPCODE_SET_UNRELIABLE
+    print " (SET_UNREL)"
+  case SIMPLE_ON_OFF_OPCODE_STATUS
+    print " (STATUS)"
+  case else
+    print " (?)"
+  endselect
+  print " data:";strhexize$(sData$)
+  
+  select iOpcode
+  case SIMPLE_ON_OFF_OPCODE_SET
+    len=BleDecodeU8(sData$,OnOffState,0)
+    reply_status_server(ihModel, respInfo$) 
+    publish_state_server(ihModel) 
+    
+  case SIMPLE_ON_OFF_OPCODE_GET
+    reply_status_server(ihModel, respInfo$) 
+  
+  case SIMPLE_ON_OFF_OPCODE_SET_UNRELIABLE
+    len=BleDecodeU8(sData$,OnOffState,0)  
+    publish_state_server(ihModel) 
+  
+  case else
+  endselect
+  
+endfunc 1
+
+//==============================================================================
+//==============================================================================
+function HandlerMeshState( nState, byval sCtx$ )
+  dim prnCtx : prnCtx=1
+  dim nArg[4]
+  print "\nEVBLEMESH_STATE : "
+  select nState
+  case BLE_MESH_NODE_STATE_WAIT_FOR_PROVISIONING
+    print "Wait_For_Provisioning"
+  case BLE_MESH_NODE_STATE_WAIT_PROVISIONING_START
+    print "Provisioning_Started"
+  case BLE_MESH_NODE_STATE_WAIT_PROV_OUTPUT_REQ
+    print "Prov_Output_Req"
+  case BLE_MESH_NODE_STATE_WAIT_PROV_INPUT_REQ
+    print "Prov_Input_Req"
+  case BLE_MESH_NODE_STATE_WAIT_PROV_STATIC_REQ
+    print "Prov_Static_Req"
+  case BLE_MESH_NODE_STATE_WAIT_PROV_OOB_PUBKEY_REQ
+    print "Prov_Oob_PubKey_Req"
+  case BLE_MESH_NODE_STATE_WAIT_PROVISIONING_FAIL
+    print "Provisioning_Fail"
+  case BLE_MESH_NODE_STATE_PROVISIONED
+    rc=BleDecodeU16(sCtx$,nArg[0],0)
+    rc=BleDecodeU16(sCtx$,nArg[1],2)
+    print "Provisioned <Addr=";nArg[0];" Count=";nArg[1];">"
+    prnCtx=0
+  case BLE_MESH_NODE_STATE_CONFIG_START
+    print "Config_Start"
+  case BLE_MESH_NODE_STATE_CONFIG_DONE 
+    print "Config_Done"
+  case BLE_MESH_NODE_STATE_CONFIG_FAIL 
+    print "Config_Fail"
+  case BLE_MESH_NODE_STATE_KEY_REFRESH_START
+    print "Key_Refresh_Start"
+  case BLE_MESH_NODE_STATE_KEY_REFRESH_END
+    print "Key_Refresh_End"
+  case BLE_MESH_NODE_STATE_IV_UPDATE_NOTIFICATION
+    print "IV_Update_Notification"
+  case BLE_MESH_NODE_STATE_UNPROVISIONED_DEVICE
+    print "Unprovisioned_recv"
+  case else
+    print "?State?=";nState
+  endselect
+  if (strlen(sCtx$)>0) && (prnCtx!=0) then
+    print " <Ctx=";StrHexize$(sCtx$);">"
+  endif
+endfunc 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+OnEvent EVUARTRX                 call HandlerUartRxCmd
+onevent EVBLEMESH_OPC_MSG        call HandlerMeshOpcMsg
+onevent EVBLEMESH_STATE          call HandlerMeshState
+
+print "\nRunning MESH sample app\n"
+
+//Send an OK response
+UartRsp(0)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+// An application can have multiple <WaitEvent> statements
+//------------------------------------------------------------------------------
+if rc==0 then
+  waitevent  // PURPOSELY COMMENTED OUT
+endif
+
+print "\nExiting sample app\n"
+

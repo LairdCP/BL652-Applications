@@ -1,0 +1,30 @@
+ATI 4
+ATI 6
+ATI 3
+at&f 0x100000
+at&f 1
+
+AT+LIC "8FF465CF61AD3DA00262" //Client
+AT+LIC "5506E2D87006829D70CC" //Server 3
+AT+LIC "350D11639F1D5A634DA0" //Server 2
+AT+LIC "BBB01428CCC8C9B3BC97" //Server 1
+$autorun$   //CLIENT
+mc start
+mc setunrel 0 1 1  //#INTservnum  #INTnewstate #INTrepeats
+mc get  0      //#INTservnum
+mc set  0 0   //#INTservnum  #INTnewstate
+mc set  1 0   //#INTservnum  #INTnewstate
+mc set  2 0   //#INTservnum  #INTnewstate
+
+
+at&f 0x100000
+$autorun$   //SERVER
+ms start
+ms on
+ms off
+
+
+
+
+
+at&f 0x100000
