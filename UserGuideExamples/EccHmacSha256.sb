@@ -1,0 +1,28 @@
+//Example :: EccHmacSha256.sb
+
+dim rc, key$
+dim data_A$, hmacOut_A$
+dim data_B$, hmacOut_B$
+
+key$ = "KEY"
+data_A$ = "AAAAB"
+data_B$ = "AAAAA"
+
+// Generate the HMAC-SHA256 for the first data
+rc = EccHmacSha256(key$, data_A$, hmacOut_A$)
+if rc == 0 then
+	PRINT "\rHMAC of data_A: "; strhexize$(hmacOut_A$)
+endif
+
+// Generate the HMAC-SHA256 for the second data
+rc = EccHmacSha256(key$, data_B$, hmacOut_B$)
+if rc == 0 then
+	PRINT "\rHMAC of data_A: "; strhexize$(hmacOut_B$)
+endif
+
+// Compare the HMAC-SHA256 outputs
+if StrCmp(hmacOut_A$, hmacOut_B$) == 0 then
+	PRINT "\rData A matches Data B"
+else
+	PRINT "\rData A does not match Data B"
+endif
