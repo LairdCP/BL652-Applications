@@ -33,6 +33,12 @@
 
 #define MAX_MODELS            10
 
+#define SIO_LED1              17
+#define SIO_LED2              19
+#define SIO_BUTTON1           11
+#define SIO_BUTTON2           15
+
+
 #define COMPANY_ID_BTSIG      (0xFFFF)
 #define COMPANY_ID_NORDIC     (0x0059)
 #define COMPANY_ID_LAIRD      (0x0077)
@@ -64,6 +70,10 @@
 
 #define RESP_TIMEOUT_SEC                     30
 
+#define ROLE_NONE                            0
+#define ROLE_CLIENT                          1
+#define ROLE_SERVER                          2
+
 //******************************************************************************
 // Library Import
 //******************************************************************************
@@ -88,6 +98,8 @@ dim hModel[MAX_MODELS]
 dim OnOffState : OnOffState=0
 
 dim nTid                   //Transaction ID - just incremented for each reliable msg sent
+
+dim role  : role=ROLE_NONE
 
 //******************************************************************************
 // Initialisse Global Variable
@@ -149,6 +161,20 @@ sub UartRsp(rsp as integer)
     elseif rsp > 0 then
         print er$;integer.h' rsp;pr$
     endif
+endsub
+
+//==============================================================================
+//==============================================================================
+sub GpioInit()
+  rc = gpiosetfunc(SIO_BUTTON1,1,2)             //digital in with a weak pull up resistor
+  #cmpif 0x00000001 : AssertRC(1670)
+  rc = gpiosetfunc(SIO_LED1,2,0)                //digital out, and default low
+  #cmpif 0x00000001 : AssertRC(1690)
+  rc = gpiosetfunc(SIO_LED2,2,0)                //digital out, and default low
+  #cmpif 0x00000001 : AssertRC(1690)
+  
+  rc = GpioAssignEvent(0,SIO_BUTTON1,0)           //binds a gpio transition low to high to an event for button1
+  #cmpif 0x00000001 : AssertRC(1710)
 endsub
 
 //==============================================================================
@@ -217,6 +243,7 @@ sub mesh_start_server()
   
   if rc==0 then
     print "\nRunning as Light Switch Server\n"
+    role = ROLE_SERVER
   endif
   
 endsub
@@ -233,7 +260,7 @@ function _server()
   endif
   //=================================================
   if strcmp(tkn$,"start")==0 then
-    OnOffState=1
+    OnOffState=0
     mesh_start_server() 
     exitfunc 0
   endif
@@ -296,6 +323,7 @@ sub mesh_start_client()
   
   if rc==0 then
     print "\nRunning Provisioner and 3 Light Switch Clients\n"
+    role = ROLE_CLIENT
   endif
   
 endsub
@@ -365,7 +393,7 @@ function _client()
   endif
   //=================================================
   if strcmp(tkn$,"start")==0 then
-    OnOffState=1
+    onOffState=0
     mesh_start_client() 
     exitfunc 0
   endif
@@ -401,6 +429,32 @@ function _client()
   endif
 endfunc 5
 
+//==============================================================================
+//==============================================================================
+sub  UpdateLed()
+  gpiowrite(SIO_LED1,onOffState)
+endsub
+
+//==============================================================================
+//==============================================================================
+sub  OnButtonChange()
+  //toggle the current state
+  if onOffState==0 then
+    onOffState=1
+  else
+    onOffState=0
+  endif
+  
+  if role==ROLE_SERVER then
+    UpdateLed()
+    publish_state_server(hModel[0]) 
+  elseif role==ROLE_CLIENT then
+    //do not update led until we get the confirmation status
+    rc=BleMeshSimpleSet(0,onOffState)
+  elseif role==ROLE_NONE then
+    UpdateLed()
+  endif
+endsub
 
 //==============================================================================
 //==============================================================================
@@ -478,6 +532,7 @@ function HandlerMeshOpcMsg(iElemIdx, ihModel, iOpcode, byval sData$, byval respI
   select iOpcode
   case SIMPLE_ON_OFF_OPCODE_SET
     len=BleDecodeU8(sData$,OnOffState,0)
+    UpdateLed()
     reply_status_server(ihModel, respInfo$) 
     publish_state_server(ihModel) 
     
@@ -486,7 +541,12 @@ function HandlerMeshOpcMsg(iElemIdx, ihModel, iOpcode, byval sData$, byval respI
   
   case SIMPLE_ON_OFF_OPCODE_SET_UNRELIABLE
     len=BleDecodeU8(sData$,OnOffState,0)  
+    UpdateLed()
     publish_state_server(ihModel) 
+  
+  case SIMPLE_ON_OFF_OPCODE_STATUS
+    len=BleDecodeU8(sData$,onOffState,0)  
+    UpdateLed()
   
   case else
   endselect
@@ -541,13 +601,23 @@ function HandlerMeshState( nState, byval sCtx$ )
   endif
 endfunc 1
 
+//==============================================================================
+//==============================================================================
+function HandlerBtnRelease()
+  OnButtonChange()
+endfunc 1
+
 //******************************************************************************
 // Equivalent to main() in C
 //******************************************************************************
 
 OnEvent EVUARTRX                 call HandlerUartRxCmd
-onevent EVBLEMESH_OPC_MSG        call HandlerMeshOpcMsg
-onevent EVBLEMESH_STATE          call HandlerMeshState
+OnEvent EVBLEMESH_OPC_MSG        call HandlerMeshOpcMsg
+OnEvent EVBLEMESH_STATE          call HandlerMeshState
+OnEvent EVDETECTCHAN0            call HandlerBtnRelease
+
+//Initialise gpio for LED1 and BUTTON1
+GpioInit()
 
 print "\nRunning MESH sample app\n"
 
