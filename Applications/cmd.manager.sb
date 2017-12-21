@@ -21,6 +21,21 @@
 // +++++                                                                      ++
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
+// ---------------------
+//  Application Version 
+// ---------------------
+#define AppVer "1.01"
+
+// ---------------------
+//  Application History
+// ---------------------
+//
+// 1.01 (21/12/2017):
+//       Correct some commands wrongly treating integers as strings
+//
+// 1.00:
+//       Initial Release
+//
 // This app provides for a command interface over the uart and the protocol is
 // as follows:-
 //
