@@ -1,4 +1,4 @@
-// Copyright (c) 2014, Laird
+// Copyright (c) 2014-2017, Laird
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -1604,7 +1604,7 @@ function _Gatts()
         exitfunc rc
       endif
       //Extract 1 (#INTmduseridx#) and store starting at i[1]
-      rc = ExtractStrTokens(urtcmd$,1,1)
+      rc = ExtractIntTokens(urtcmd$,1,1)
       if rc != 0 then
         exitfunc rc
       endif
@@ -1627,7 +1627,7 @@ function _Gatts()
         exitfunc rc
       endif
       //Extract 2 (#INThuuid# #INTmddescidx#) and store starting at i[1]
-      rc = ExtractStrTokens(urtcmd$,1,2)
+      rc = ExtractIntTokens(urtcmd$,1,2)
       if rc != 0 then
         exitfunc rc
       endif
@@ -1641,7 +1641,7 @@ function _Gatts()
         exitfunc rc
       endif
       //Extract 2 (#INThsvcidx# #INTcharhandleidx#) and store starting at i[1]
-      rc = ExtractStrTokens(urtcmd$,1,2)
+      rc = ExtractIntTokens(urtcmd$,1,2)
       if rc != 0 then
         exitfunc rc
       endif
@@ -1650,7 +1650,7 @@ function _Gatts()
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"read")==0 then
       //Extract 1 (#INTcharhandleidx#) and store starting at i[1]
-      rc = ExtractStrTokens(urtcmd$,1,1)
+      rc = ExtractIntTokens(urtcmd$,1,1)
       if rc != 0 then
         exitfunc rc
       endif
@@ -1664,7 +1664,7 @@ function _Gatts()
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"write")==0 then
       //Extract 1 (#INTcharhandleidx#) and store starting at i[1]
-      rc = ExtractStrTokens(urtcmd$,1,1)
+      rc = ExtractIntTokens(urtcmd$,1,1)
       if rc != 0 then
         exitfunc rc
       endif
@@ -1678,7 +1678,7 @@ function _Gatts()
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"Notify")==0 then
       //Extract 1 (#INTcharhandleidx#) and store starting at i[1]
-      rc = ExtractStrTokens(urtcmd$,1,1)
+      rc = ExtractIntTokens(urtcmd$,1,1)
       if rc != 0 then
         exitfunc rc
       endif
@@ -1692,7 +1692,7 @@ function _Gatts()
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"indicate")==0 then
       //Extract 1 (#INTcharhandleidx#) and store starting at i[1]
-      rc = ExtractStrTokens(urtcmd$,1,1)
+      rc = ExtractIntTokens(urtcmd$,1,1)
       if rc != 0 then
         exitfunc rc
       endif
@@ -1706,7 +1706,7 @@ function _Gatts()
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"descread")==0 then
       //Extract 5 (#INTcharhandleidx# #INTdeschandle# #INToffset# #INTlength# #INTdescuuidhandle#) and store starting at i[1]
-      rc = ExtractStrTokens(urtcmd$,1,5)
+      rc = ExtractIntTokens(urtcmd$,1,5)
       if rc != 0 then
         exitfunc rc
       endif
