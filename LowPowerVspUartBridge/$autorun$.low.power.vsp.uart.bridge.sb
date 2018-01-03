@@ -123,7 +123,11 @@
 // Version History
 //******************************************************************************
 //
-#define APP_VERSION                                   "v1.20"
+#define APP_VERSION                                   "v1.30"
+//
+//v1.30 (3 Jan 2018)
+//  - Bug Fix: Using UART_CTS to re-open uart now works (After closing uart_cts
+//             was not being configured as a general purpose input
 //
 //v1.20 (13 Jun 2017)
 //  - Improved customisation so that customer does not need to alter this file
@@ -287,6 +291,8 @@ function UartCloseConditional()
       #cmpif 0x00000003 : AssertRC(rc, 3640)
     rc=GpioSetFunc(UART_SIONUM_RX,1,2)   //RX  - Pull high input & irq on hi2lo transition
       #cmpif 0x00000003 : AssertRC(rc, 3660)
+    rc=GpioSetFunc(UART_SIONUM_CTS,1,1)   //CTS  - Pull low input & irq on lo2hi transition
+      #cmpif 0x00000003 : AssertRC(rc, 3670)
     rc=GpioAssignEvent(UART_GPIO_ASSIGN_CHANNEL, UART_REOPEN_SIONUM, UART_REOPEN_STATE_CHANGE)
       #cmpif 0x00000003 : AssertRC(rc, 3680)
       

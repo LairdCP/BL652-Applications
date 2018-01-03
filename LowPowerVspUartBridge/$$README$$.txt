@@ -3,11 +3,14 @@ May 2017
 ********************
 v1.10
 The smartBASIC application in "$autorun$.low.power.vsp.uart.bridge.sb" implements
-the state machine depicted in "LowPowerVspUartBridge.pdf" and provides a bridge
+the state machine depicted in "LowPowerVspUartBridge.flo" and provides a bridge
 between the uart and Laird's VSP profile.
 In addition it is designed for low power operation in that when there is no
 activity, the uart is closed so that power consumption is even lower and 
 if there is any airside or uart activity it is reopened.
+
+  Note: the state machine diagram can be viewed using the free viewer 
+        that can be downloaded from https://www.rff.com/viewer.php
 
 The user is free to fine tune the application by changing any of the #defines
 in the the application.

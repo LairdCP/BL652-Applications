@@ -28,7 +28,8 @@
 // This file is included in "$autorun$.low.power.vsp.uart.bridge.sb" and 
 // provides custom behavior for the low power vsp to uart bridge. This file
 // contains function and subroutines that are depicted in red colour in
-// the state machine diagram shown in "LowPowerVspUartBridge.pdf"
+// the state machine diagram shown in "LowPowerVspUartBridge.flo"
+// (Download free viewer from https://www.rff.com/viewer.php)
 //
 // The custom behaviour in this file is designed to provide messages to the
 // host via the uart which consist the following:-
@@ -147,12 +148,18 @@
 
 //Input Pin which is toggled to re-open the uart  (NOTE: This default is for BL652)
 //State of input pin to wake up
+//------
 #define UART_REOPEN_SIONUM                            UART_SIONUM_RX    //UART_RX (on BL652)
 #define UART_REOPEN_STATE_CHANGE                      UART_REOPEN_TRANSITION_LO_to_HI
+//------
+//#define UART_REOPEN_SIONUM                            UART_SIONUM_CTS    //UART_CTS (on BL652)
+//#define UART_REOPEN_STATE_CHANGE                      UART_REOPEN_TRANSITION_HI_to_LO
+//------
     //=========================================================================
     //Note: On BL652,if you want to use UART_CTS (driven by Host's RTS) to wakeup then
     //      UART_REOPEN_SIONUM        ==  UART_SIONUM_CTS
     //      UART_REOPEN_STATE_CHANGE  ==  UART_REOPEN_TRANSITION_HI_to_LO
+    // So comment and uncomment the appropriate 2 lines above
     //=========================================================================
 
 
