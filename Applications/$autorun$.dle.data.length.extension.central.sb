@@ -348,7 +348,7 @@ ENDFUNC 1
 // Start up code from here -equivalent to main() in a 'C' application
 //******************************************************************************
 
-// Close UART and open at 921600 baud rate
+// Close UART and open at 1000000 baud rate
 UartClose()
 rc = UartOpen(1000000, 2048, 800, "CN81H")
 
