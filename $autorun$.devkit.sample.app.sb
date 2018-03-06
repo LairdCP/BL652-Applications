@@ -56,6 +56,7 @@
 //   0x00000200 : Print welcome message
 //   0x00000400 : OnErr print message with last error
 //   0x00000800 : Connection messages
+//   0x00001000 : PHY messages
 //   =====================================================
 //#set $cmpif, 0x00000F0E  //Use this for Regression test
 #set $cmpif, 0x00000F0E
@@ -146,6 +147,8 @@
 #define DEFAULT_PRN_BLOCKTIME_MS                      50
 #define DEFAULT_STARTMSG_BLOCKTIME_MS                 100
 
+#define BLE_PHY_DEFAULT_TX                            1
+#define BLE_PHY_DEFAULT_RX                            1
 //******************************************************************************
 // Global Variable Declarations
 //******************************************************************************
@@ -877,24 +880,46 @@ function HndlrNotifyBuf() as integer
     rc = HandlerUartRx()
 endfunc 1 //Remain blocked in WAITEVENT
 
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    #cmpif 0x00001000 : sprint #prn$,  "\n==================== Connection Phy Update ===================\r\n"
+    #cmpif 0x00001000 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
+    #cmpif 0x00001000 : sprint #prn$, " Handle=";integer.h' hConn;" PhyTx=";PhyTx;" PhyRx=";PhyRx;"\n"
+    #cmpif 0x00001000 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
+    #cmpif 0x00001000 : sprint #prn$, "=====================================================================\r\n\r\n"
+    #cmpif 0x00001000 : PrintPrn$( DEFAULT_PRN_BLOCKTIME_MS )
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a requiest for PHY change
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
 //******************************************************************************
 // Equivalent to main() in C
 //******************************************************************************
 
 //Register handlers for events we are interested in
-OnEvent EVUARTRX     call HandlerUartRx
-OnEvent EvCharVal    call HndlrCharVal
-OnEvent EvBleMsg     call HndlrBleMsg
-OnEvent EvCharCccd   call HndlrCccd
-OnEvent EvGpioChan0  call HndlrGpio
-OnEvent EvGpioChan1  call HndlrGpio
-OnEvent EvConnRssi   call HndlrConnRssi
-OnEvent EvTmr0       call HndlrTimer0
-OnEvent EvTmr1       call HndlrTimer1
-OnEvent EvTmr2       call HndlrTimer2
-OnEvent EVVSPRX      call HndlrVspDataRxd
-OnEvent EVVSPTXEMPTY call HndlrVspDataRxd
-OnEvent EVNOTIFYBUF  call HndlrNotifyBuf
+OnEvent EVUARTRX            call HandlerUartRx
+OnEvent EvCharVal           call HndlrCharVal
+OnEvent EvBleMsg            call HndlrBleMsg
+OnEvent EvCharCccd          call HndlrCccd
+OnEvent EvGpioChan0         call HndlrGpio
+OnEvent EvGpioChan1         call HndlrGpio
+OnEvent EvConnRssi          call HndlrConnRssi
+OnEvent EvTmr0              call HndlrTimer0
+OnEvent EvTmr1              call HndlrTimer1
+OnEvent EvTmr2              call HndlrTimer2
+OnEvent EVVSPRX             call HndlrVspDataRxd
+OnEvent EVVSPTXEMPTY        call HndlrVspDataRxd
+OnEvent EVNOTIFYBUF         call HndlrNotifyBuf
+OnEvent EVBLE_PHY_UPDATED   call HandlerPhyChngd
+OnEvent EVBLE_PHY_REQUEST   call HandlerPhyReq
 
 //Populate Gatt table and start advertising
 OnStartup()
