@@ -1474,6 +1474,26 @@ function HandlerUartRxCmd() as integer
     endif
 
 endfunc 1
+
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    //print "BLE PHY CHANGED: \n"
+    //print "Handle: ";integer.h' hConn;"\n"
+    //print "Status: ";integer.h' nStatus;"\n"
+    //print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a requiest for PHY change
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    dim rc
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
 //==============================================================================
 // Called after SendMsgApp is called. Used to switch between command and
 // gatttool listen modes
@@ -1507,6 +1527,10 @@ OnEvent  EVUARTRX                call HandlerUartRxCmd
 
 //Event recieved to switch between normal and gatttool mode
 OnEvent  EVMSGAPP                call SetMode
+
+// PHY related events
+OnEvent  EVBLE_PHY_UPDATED       call HandlerPhyChngd
+OnEvent  EVBLE_PHY_REQUEST       call HandlerPhyReq
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

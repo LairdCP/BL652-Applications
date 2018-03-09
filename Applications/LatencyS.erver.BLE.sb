@@ -156,6 +156,25 @@ FUNCTION ResetTest()
     ENDIF
 ENDFUNC 1
 
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    //print "BLE PHY CHANGED: \n"
+    //print "Handle: ";integer.h' hConn;"\n"
+    //print "Status: ";integer.h' nStatus;"\n"
+    //print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a requiest for PHY change
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
+
 //******************************************************************************
 // Equivalent to main() in C
 //******************************************************************************
@@ -177,9 +196,11 @@ AssertRC(rc, 175)
 //------------------------------------------------------------------------------
 // Enable synchronous event handlers
 //------------------------------------------------------------------------------
-ONEVENT EVBLEMSG   CALL HndlrBleMsg
-ONEVENT EVCHARVAL  CALL HndlrCharVal
-ONEVENT EVUARTRX   CALL ResetTest
+ONEVENT EVBLEMSG           CALL HndlrBleMsg
+ONEVENT EVCHARVAL          CALL HndlrCharVal
+ONEVENT EVUARTRX           CALL ResetTest
+ONEVENT EVBLE_PHY_UPDATED  CALL HandlerPhyChngd
+ONEVENT EVBLE_PHY_REQUEST  CALL HandlerPhyReq
 
 //------------------------------------------------------------------------------
 // Wait for a synchronous event.

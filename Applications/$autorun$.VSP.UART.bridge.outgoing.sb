@@ -981,6 +981,24 @@ function HndlrGpioChan0()
 endfunc 1
 
 //------------------------------------------------------------------------------
+// This handler is called when the BLE PHY is changed
+//------------------------------------------------------------------------------
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    //print "BLE PHY CHANGED: \n"
+    //print "Handle: ";integer.h' hConn;"\n"
+    //print "Status: ";integer.h' nStatus;"\n"
+    //print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is a requiest for PHY change
+//------------------------------------------------------------------------------
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
+//------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 sub Initialise()
   //Just works pairing will work without confirmation
@@ -1022,12 +1040,14 @@ ONEVENT EVATTRNOTIFY       CALL HndlrAttrNotify
 ONEVENT EVFINDDESC         CALL HndlrFindDesc
 ONEVENT EVUARTRX           CALL HndlrUartRxCmd
 ONEVENT EVUARTTXEMPTY      CALL HndlrUartTxEmpty
-OnEvent EVATTRREAD         CALL HndlrAttrRead
-OnEvent EVGPIOCHAN0        CALL HndlrGpioChan0
-OnEvent EVBLE_SCAN_TIMEOUT CALL HndlrScanTO
-OnEvent EVBLE_ADV_REPORT   CALL HndlrScanResp
-OnEvent EVMSGAPP           CALL SetMode
-OnEvent EVTMR0             CALL _disconnect
+ONEVENT EVATTRREAD         CALL HndlrAttrRead
+ONEVENT EVGPIOCHAN0        CALL HndlrGpioChan0
+ONEVENT EVBLE_SCAN_TIMEOUT CALL HndlrScanTO
+ONEVENT EVBLE_ADV_REPORT   CALL HndlrScanResp
+ONEVENT EVMSGAPP           CALL SetMode
+ONEVENT EVTMR0             CALL _disconnect
+ONEVENT EVBLE_PHY_UPDATED  CALL HandlerPhyChngd
+ONEVENT EVBLE_PHY_REQUEST  CALL HandlerPhyReq
 
 //------------------------------------------------------------------------------
 // Wait for a synchronous event.

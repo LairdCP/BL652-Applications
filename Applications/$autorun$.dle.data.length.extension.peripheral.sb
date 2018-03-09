@@ -333,6 +333,24 @@ FUNCTION HandlerPacketLength(BYVAL hConn, BYVAL Tx_Octets, BYVAL Tx_Time, BYVAL 
     print "## Packet Length Changed - Tx=";Tx_Octets;" Rx=";Tx_Octets;"\n"
 ENDFUNC 1
 
+//------------------------------------------------------------------------------
+// This handler is called when the BLE PHY is changed
+//------------------------------------------------------------------------------
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    //print "BLE PHY CHANGED: \n"
+    //print "Handle: ";integer.h' hConn;"\n"
+    //print "Status: ";integer.h' nStatus;"\n"
+    //print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is a requiest for PHY change
+//------------------------------------------------------------------------------
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
 //******************************************************************************
 // Start up code from here -equivalent to main() in a 'C' application
 //******************************************************************************
@@ -365,6 +383,9 @@ ONEVENT EVNOTIFYBUF     CALL HndlrNtfyBuf
 // Data Length Extenstion events
 ONEVENT EVATTRIBUTEMTU  CALL HandlerAttrMTUchng
 ONEVENT EVPACKETLENGTH  CALL HandlerPacketLength
+// Phy related changes
+OnEvent EVBLE_PHY_UPDATED   call HandlerPhyChngd
+OnEvent EVBLE_PHY_REQUEST   call HandlerPhyReq
 
 //******************************************************************************
 //Wait in a lower-power mode for an event to occur

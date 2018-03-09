@@ -291,6 +291,24 @@ FUNCTION HndlrCharCccd(charHandle, nVal)
     ENDIF
 ENDFUNC 1
 
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    //print "BLE PHY CHANGED: \n"
+    //print "Handle: ";integer.h' hConn;"\n"
+    //print "Status: ";integer.h' nStatus;"\n"
+    //print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a requiest for PHY change
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
 //******************************************************************************
 // Equivalent to main() in C
 //******************************************************************************
@@ -310,12 +328,14 @@ ENDIF
 //------------------------------------------------------------------------------
 // Enable synchronous event handlers
 //------------------------------------------------------------------------------
-ONEVENT  EVCHARVAL      CALL HndlrCharVal      //BLE characteristic written
-ONEVENT  EVNOTIFYBUF    CALL HndlrNtfyBuf      //BLE NotIFy buffer free
-ONEVENT  EVTMR0         CALL HndlrNtfyBuf      //Timer 0 expired
-ONEVENT  EVUARTTXEMPTY  CALL HndlrUartTxEmpty  //UART transmit buffer empty
-ONEVENT  EVBLEMSG       CALL HndlrBleMsg       //BLE event message
-ONEVENT  EVCHARCCCD     CALL HndlrCharCccd     //CCCD written
+ONEVENT  EVCHARVAL          CALL HndlrCharVal      // BLE characteristic written
+ONEVENT  EVNOTIFYBUF        CALL HndlrNtfyBuf      // BLE NotIFy buffer free
+ONEVENT  EVTMR0             CALL HndlrNtfyBuf      // Timer 0 expired
+ONEVENT  EVUARTTXEMPTY      CALL HndlrUartTxEmpty  // UART transmit buffer empty
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg       // BLE event message
+ONEVENT  EVCHARCCCD         CALL HndlrCharCccd     // CCCD written
+ONEVENT  EVBLE_PHY_UPDATED  CALL HandlerPhyChngd   // PHY changed
+ONEVENT  EVBLE_PHY_REQUEST  CALL HandlerPhyReq     // PHY change request
 
 //------------------------------------------------------------------------------
 // Wait for a synchronous event.

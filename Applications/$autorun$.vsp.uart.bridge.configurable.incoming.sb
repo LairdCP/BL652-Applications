@@ -47,7 +47,7 @@
 //   0x00000002 : LED1: connection status (on = connected)
 //   0x00000004 : LED2: app mode (on = app command mode)
 //   0x00000008 : LED2: flashes if fatal error occured
-//   0x00000010 : Not used
+//   0x00000010 : Display PHY related events
 //   0x00000020 : Allow configuration over UART
 //   0x00000040 : Allow configuration over VSP
 //   0x00000080 : Not used
@@ -1532,6 +1532,24 @@ function HndlrTmr0()
     endif
 endfunc 1
 
+//------------------------------------------------------------------------------
+// This handler is called when the BLE PHY is changed
+//------------------------------------------------------------------------------
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    #cmpif 0x00000010 :print "BLE PHY CHANGED: \n"
+    #cmpif 0x00000010 :print "Handle: ";integer.h' hConn;"\n"
+    #cmpif 0x00000010 :print "Status: ";integer.h' nStatus;"\n"
+    #cmpif 0x00000010 :print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is a requiest for PHY change
+//------------------------------------------------------------------------------
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
 
 //******************************************************************************
 // Start up code from here -equivalent to main() in a 'C' application
@@ -1580,6 +1598,9 @@ if (ApplicationError == 0) then
     endif
 endif
 ONEVENT EVTMR0 CALL HndlrTmr0   //disconnects
+// Phy related events
+OnEvent EVBLE_PHY_UPDATED   call HandlerPhyChngd
+OnEvent EVBLE_PHY_REQUEST   call HandlerPhyReq
 
 //******************************************************************************
 //Wait in a lower-power mode for an event to occur

@@ -1234,6 +1234,24 @@ function HandlerCharHvc(BYVAL hChar AS INTEGER) as integer
   endif
 endfunc 1
 
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    //print "BLE PHY CHANGED: \n"
+    //print "Handle: ";integer.h' hConn;"\n"
+    //print "Status: ";integer.h' nStatus;"\n"
+    //print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a requiest for PHY change
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    dim rc
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
 
 //******************************************************************************
 // Equivalent to main() in C
@@ -1253,6 +1271,8 @@ OnEvent  EVBLEMSG           call HandlerBleMsg
 OnEvent  EVMSGAPP           call HandlerMsgApp
 OnEvent  EVCHARCCCD         call HandlerCharCccd
 OnEvent  EVCHARHVC          call HandlerCharHvc
+OnEvent  EVBLE_PHY_UPDATED  call HandlerPhyChngd
+OnEvent  EVBLE_PHY_REQUEST  call HandlerPhyReq
 
 //------------------------------------------------------------------------------
 // Initialise and then wait for events
