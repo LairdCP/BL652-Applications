@@ -1,0 +1,82 @@
+//Example :: BlePhySet.sb
+
+// Ensure that the remote device is advertising
+
+#define BTAddr              "000016A4B75202"
+
+// Variable declaration
+DIM rc, hConn
+
+//------------------------------------------------------------------------------
+// Function to handle Ble event messages
+//------------------------------------------------------------------------------
+#define BLE_EVBLEMSGID_CONNECT                  0   //nCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT               1   //nCtx = connection handle
+//------------------------------------------------------------------------------
+FUNCTION HandlerBleMsg(nMsgId, nCtx)
+
+    select nMsgId
+    case BLE_EVBLEMSGID_CONNECT
+        print "## Connected!\n"
+        // Upon connection, request a change to 2MPHY
+        hConn = nCtx
+        dim nPhyTx : nPhyTx = 2
+        dim nPhyRx : nPhyRx = 2
+        dim nOptions : nOptions = 0
+        rc = BlePhySet(hConn, nPhyTx, nPhyRx, nOptions)
+
+    case BLE_EVBLEMSGID_DISCONNECT
+        print "## Disconnected!\n"
+
+    case else
+    endselect
+ENDFUNC 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is a connection attempt timeout
+//------------------------------------------------------------------------------
+function HandlerBleConnTimOut() as integer
+  print "## Connection attempt stopped via timeout\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when remote is requesting a switch to a different PHY
+//------------------------------------------------------------------------------
+function  HandlerPhyRequest(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    print "## BLE PHY REQUEST: \n"
+    print "Handle: ";integer.h' hConn;"\n"
+    print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when the BLE PHY is updated
+//------------------------------------------------------------------------------
+function  HandlerPhyUpdated(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    print "## BLE PHY CHANGED: \n"
+    print "Handle: ";integer.h' hConn;"\n"
+    print "Status: ";integer.h' nStatus;"\n"
+    print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent  EVBLEMSG                 call HandlerBleMsg
+OnEvent  EVBLE_CONN_TIMEOUT       call HandlerBleConnTimOut
+OnEvent  EVBLE_PHY_REQUEST        call HandlerPhyRequest
+OnEvent  EVBLE_PHY_UPDATED        call HandlerPhyUpdated
+
+//Connect to remote device
+DIM addr$
+addr$ = BTAddr
+addr$ = StrDehexize$(addr$)
+
+// Change default configuration so that EVBLE_PHY_REQUEST is thrown
+rc = BleConnectConfig(9, 1)
+
+rc = BleConnect(addr$, 30000, 27000, 30000, 500000)
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+//------------------------------------------------------------------------------
+WaitEvent
