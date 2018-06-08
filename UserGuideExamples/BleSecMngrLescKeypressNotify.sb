@@ -161,6 +161,7 @@ OnEvent  EVLESCKEYPRESS           call HandlerLescKeypress
 '//------------------------------------------------------------------------------
 
 // Start Adverts
+dim prAdr$
 rc = BleAdvertStart(0,prAdr$,25,0,0)
 PRINT "\nAdverts start"
 // Enable keypress notifications
