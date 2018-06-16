@@ -1,0 +1,12 @@
+//Example :: SpiSlaveOpen.sb
+dim rc, nHandle
+
+// Open SPI Slave Periperhal
+rc = SpiSlaveOpen(nHandle)
+if rc == 0 then
+	print "\nOpened SPI Slave peripheral with handle = ";integer.h' nHandle
+else
+	print "\nFailed to open SPI Slave peripheral"
+endif
+
+WaitEvent

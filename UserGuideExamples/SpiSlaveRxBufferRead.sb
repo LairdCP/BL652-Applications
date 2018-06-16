@@ -1,0 +1,21 @@
+//Example :: SpiSlaveRxBufferRead.sb
+dim rc, nHandle, st$
+dim nLen : nLen = 30 // Try to read 30 bytes of data
+
+// Open SPI Slave Peripheral
+rc = SpiSlaveOpen(nHandle)
+if rc == 0 then
+	// Try reading data from SPI slave buffer
+	rc = SpiSlaveRxBufferRead(nHandle, nLen, st$)
+	if rc == 0 then
+		if nLen > 0 then
+			print "\nSPI slave Data read: "; st$
+		else
+			print "\nNo SPI slave data read"
+		endif
+	else
+		print "\nFailed to read SPI Slave data with error code ";integer.h' rc
+	endif
+endif
+
+WaitEvent

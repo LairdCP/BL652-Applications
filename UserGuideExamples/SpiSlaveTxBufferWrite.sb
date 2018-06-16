@@ -1,0 +1,17 @@
+//Example :: SpiSlaveTxBufferWrite.sb
+dim rc, nHandle
+dim st$ : st$ = "SPI Slave Data"
+
+// Open SPI Slave Periperhal
+rc = SpiSlaveOpen(nHandle)
+if rc == 0 then
+	// Try writing data to the buffer
+	rc = SpiSlaveTxBufferWrite(nHandle, st$)
+	if rc == 0 then
+		print "\nSPI Slave buffer updated with written data"
+	else
+		print "\nFailed to write SPI Slave data with error code ";integer.h' rc
+	endif
+endif
+
+WaitEvent

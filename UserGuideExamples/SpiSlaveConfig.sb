@@ -1,0 +1,20 @@
+//Example :: SpiSlaveConfig.sb
+dim rc, nHandle
+
+// Configure SPI Slave peripheral Tx buffer before opening
+rc = SpiSlaveConfig(4, 100)
+if rc == 0 then
+	print "\nSPI slave tx buffer size configured"
+else
+	print "\nFailed to configure SPI slave tx buffer with error code ";integer.h' rc
+endif
+
+// Open SPI Slave Periperhal
+rc = SpiSlaveOpen(nHandle)
+if rc == 0 then
+	print "\nOpened SPI Slave peripheral with handle = ";integer.h' nHandle
+else
+	print "\nFailed to open SPI Slave peripheral"
+endif
+
+WaitEvent
