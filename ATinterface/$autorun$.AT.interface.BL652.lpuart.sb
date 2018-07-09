@@ -1,0 +1,148 @@
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Copyright (c) 2017, Laird                                                  ++
+//                                                                            ++
+// Permission to use, copy, modify, and/or distribute this software for any   ++
+// purpose with or without fee is hereby granted, provided that the above     ++
+// copyright notice and this permission notice appear in all copies.          ++
+//                                                                            ++
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES   ++
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF           ++
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR    ++
+// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES     ++
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN      ++
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR ++
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.                ++
+//                                                                            ++
+// SPDX-License-Identifier:ISC                                                ++
+//                                                                            ++
+// ************************************************************************** ++
+// A smartBASIC application that exposes an AT Interface to control a VSP     ++
+// or non-VSP connection and advertise or scan that will run on the BL652     ++
+// module with the following features:-                                       ++
+//    + AT+GCTM command enabled to query peer's gatt table schema             ++
+//    + If error handler called then module will reset and restart            ++
+//    + VSP Overrun Event is enabled when there is a VSP incoming overrun     ++
+//    + Low Power Uart operation - port closed when there is no activity      ++
+// ************************************************************************** ++
+//                                                                            ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminalX downloads the app to the module it will be saved   ++
+// +++++  as a file with filename $autorun$ which means it will run           ++
+// +++++  automatically on reset.                                             ++
+// +++++  The File System can be queried using the command AT+DIR             ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// -------------------
+// Application Version
+// -------------------
+#define AppVer                 "2.00"  //Application version (ATI33)
+//
+// -------------------
+// Application History
+// -------------------
+//
+//
+//  2.00
+//    Released after code review
+//
+//  1.90
+//    Beta release for testing
+//
+//******************************************************************************
+
+//******************************************************************************
+// Compiler/Debug options
+//******************************************************************************
+//The following is the 'as-deployed' to customer setting
+#set $cmpif, 0x004E0000 //see $LIB$.AT.interface.sb for bitmask description
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+
+//==============================================================================
+//The following can be modified by the customer to customise
+//==============================================================================
+#define ATI_RESPONSE_0                            "BL652"
+#define ATI_RESPONSE_10                           "Laird,(c)2018"
+
+//Default device name
+#define DEFAULT_DEVICE_NAME                       "LAIRD BL652"
+
+
+//==============================================================================
+//The following can be modified by the customer to customise - but with care
+//==============================================================================
+//Maximum allowable size of strings (1024 maximum (for BL652)
+#define MaxCmdStringSize                          144
+
+//Maximum allowable size of the advertised device name (additional characters will be clipped off)
+//Do NOT set larger than 20
+#define MaxDevNameSize                            20
+
+//These are min/max connection intervals as peripheral, so basically accepts
+//whatever the master provides and will NOT trigger a connection parameter renegotiation
+#define CONN_INTERVAL_MIN_ASPERIPH_US             7500
+#define CONN_INTERVAL_MAX_ASPERIPH_US             999000
+
+//This defines the maximum number of characteristics we can manage (also see DEFAULT_ATTRIBUTE_SIZE further down)
+//Valid range 20 .. 244 (only tested up to 96)
+#define DLE_ATTRIBUTE_SIZE                        96
+
+//This defines the maximum number of characteristics we can manage
+#define MAX_CHARACTERISTICS                       24
+
+//This defines the maximum number of connections
+//Valid range 2..8
+#define MAX_CONNECTIONS                           8
+
+//******************************************************************************
+// Import module specific defines maintained by Laird
+//******************************************************************************
+#include "$LIB$.defines.Common.sb"
+#include "$LIB$.defines.BL652.sb"
+
+//******************************************************************************
+// Initialisation values for sregister caches ...
+//
+// These values are created by running the application "sreg.defaults.creation.xxxx.sb"
+// and then copy/pasting it's output here - verbatim.
+//
+// This technique is used to reduce the size of the .uwc file of the main sb file
+//******************************************************************************
+//------------------------------------------------------------------------------
+// Max Tx Power (dBm)                4
+// Max Tx Power (dBm)                -20
+//------------------------------------------------------------------------------
+//                  100+    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5  6  7  8  9
+#define SREGINIT_VAL8_0  "\09\04\00\03\00\02\08\00\00\FF\03\04\01\88\05\10\00\00\00\00"
+#define SREGINIT_MIN8_0  "\00\EC\00\00\00\01\01\00\00\FF\01\03\00\88\01\07\00\80\80\80"
+#define SREGINIT_MAX8_0  "\7F\04\03\07\7F\1F\7F\04\03\1F\78\10\01\EC\14\10\01\7F\7F\7F"
+//                  120+    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5  6  7  8  9
+#define SREGINIT_VAL8_1  "\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\1D\1E"
+#define SREGINIT_MIN8_1  "\80\80\80\80\80\80\80\80\80\80\80\80\80\80\80\80\80\80\FF\FF"
+#define SREGINIT_MAX8_1  "\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\1F\1F"
+//                  200+    0     1     2     3     4     5     6     7    8     9
+#define SREGINIT_VAL16_0 "\40\1F\FA\00\00\00\00\00\80\01\00\10\70\17\00\00\FA\00\00\02"
+#define SREGINIT_MIN16_0 "\E8\03\14\00\00\00\00\00\00\01\00\01\64\00\00\00\14\00\00\01"
+#define SREGINIT_MAX16_0 "\20\4E\00\28\00\04\00\04\00\10\00\10\00\7D\FF\7F\00\28\00\08"
+//                  210+    0     1     2     3     4     5     6     7    8     9
+#define SREGINIT_VAL16_1 "\FA\00\50\00\28\00\88\13\00\00\00\00\00\00\00\00\00\00\00\00"
+#define SREGINIT_MIN16_1 "\32\00\28\00\28\00\FA\00\00\80\00\80\00\80\00\80\00\80\00\80"
+#define SREGINIT_MAX16_1 "\D0\07\00\28\00\28\30\75\FF\7F\FF\7F\FF\7F\FF\7F\FF\7F\FF\7F"
+//                  300+    0           1           2           3          4
+#define SREGINIT_VAL32_0 "\4C\1D\00\00\98\3A\00\00\00\C2\01\00\00\20\00\00\01\20\00\00"
+#define SREGINIT_MIN32_0 "\4C\1D\00\00\4C\1D\00\00\B0\04\00\00\01\00\00\00\01\00\00\00"
+#define SREGINIT_MAX32_0 "\1E\04\3D\00\1E\04\3D\00\40\42\0F\00\FF\FF\00\00\FF\FF\00\00"
+//                  305+    0           1           2           3          4
+#define SREGINIT_VAL32_1 "\03\20\00\00\02\20\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
+#define SREGINIT_MIN32_1 "\01\00\00\00\01\00\00\00\00\00\00\80\00\00\00\80\00\00\00\80"
+#define SREGINIT_MAX32_1 "\FF\FF\00\00\FF\FF\00\00\FF\FF\FF\7F\FF\FF\FF\7F\FF\FF\FF\7F"
+//------------------------------------------------------------------------------
+
+//******************************************************************************
+// Launch application
+//******************************************************************************
+#include "$LIB$.AT.interface.sb"
