@@ -162,7 +162,7 @@
     // So comment and uncomment the appropriate 2 lines above
     //=========================================================================
 
-
+#define UART_RTS_STATE_ON_CLOSE                       1  //0=ASSERTED, 1=DEASSERTED
 
 //******************************************************************************
 // Debugging related (conditionally compile based on "#set $cmpif" line above)

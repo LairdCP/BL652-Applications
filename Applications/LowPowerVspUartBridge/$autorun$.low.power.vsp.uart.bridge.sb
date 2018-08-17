@@ -123,7 +123,18 @@
 // Version History
 //******************************************************************************
 //
-#define APP_VERSION                                   "v1.30"
+#define APP_VERSION                                   "v1.40"
+//
+//v1.40 (17 Aug 2018)
+//  - Bug Fix: When sending very long strings, only a portion is sent then it
+//             stops and then the next blocks only came after sending some
+//             characters to trigger the next block. Fixed by adding the event
+//             EVVSPTXEMEPTY to keep the pump primed.
+//  - Enhancement : 
+//             When the uart is closed, the state of the RTS line is specified
+//             via the UART_RTS_STATE_ON_CLOSE in the custom file and that
+//             is now set for 1 so that when uart is closed the peer's CTS
+//             will deassert and so it will know it cannot send any data
 //
 //v1.30 (3 Jan 2018)
 //  - Bug Fix: Using UART_CTS to re-open uart now works (After closing uart_cts
@@ -287,7 +298,7 @@ function UartCloseConditional()
     //closed, so configure the TX and RTS as outputs and adjust outputs
     rc=gpiosetfunc(UART_SIONUM_TX,2,1)   //TX - set high on default
       #cmpif 0x00000003 : AssertRC(rc, 3620)
-    rc=gpiosetfunc(UART_SIONUM_RTS,2,0)   //RTS - set low to leave it assertd
+    rc=gpiosetfunc(UART_SIONUM_RTS,2,UART_RTS_STATE_ON_CLOSE)   //Adjust RTS state on closure
       #cmpif 0x00000003 : AssertRC(rc, 3640)
     rc=GpioSetFunc(UART_SIONUM_RX,1,2)   //RX  - Pull high input & irq on hi2lo transition
       #cmpif 0x00000003 : AssertRC(rc, 3660)
@@ -549,6 +560,28 @@ function HndlrVspRx()
 endfunc 1
 
 //------------------------------------------------------------------------------
+// Vsp tx empty
+//------------------------------------------------------------------------------
+function HndlrVspTxEmpty()
+  select curState
+  case STATE_CONN_UART_CLOSE
+    UartReOpen()
+    NewState(STATE_CONN_UART_OPEN)
+    //Pass data between UART and VSP service
+    BleVspUartBridge()
+    
+  case STATE_CONN_UART_OPEN
+    //Pass data between UART and VSP service
+    BleVspUartBridge()
+    
+  case else
+  endselect
+  
+  //Start the uart inactivity timer
+  TimerStart(STATE_TIMER,idleTimeoutMs,0)
+endfunc 1
+
+//------------------------------------------------------------------------------
 //BLE message has arrived
 //------------------------------------------------------------------------------
 function HndlrBleMsg(nMsgId, nCtx)
@@ -647,6 +680,7 @@ OnEvent EVUARTRX                Call HndlrUartRx
 OnEvent EVUARTTXEMPTY           Call HndlrUartTxEmpty
 onevent EVDETECTCHAN0           call HndlrDetectPinRx
 onEvent EVVSPRX                 call HndlrVspRx
+onEvent EVVSPTXEMPTY            call HndlrVspTxEmpty
 
 //------------------------------------------------------------------------------
 // startup
