@@ -180,9 +180,9 @@ function CreateVSPService()
     RxUUID = BleHandleUuidSibling(BaseUUID, RxUUID)
 
     // Setup Modem characteristics
-    ModemInUUID  = 0x2002
+    ModemInUUID  = 0x2003
     ModemInUUID = BleHandleUuidSibling(BaseUUID, ModemInUUID)
-    ModemOutUUID = 0x2003
+    ModemOutUUID = 0x2002
     ModemOutUUID = BleHandleUuidSibling(BaseUUID, ModemOutUUID)
 
     // Create new VSP service
