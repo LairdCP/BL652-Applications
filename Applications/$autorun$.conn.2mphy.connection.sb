@@ -1,0 +1,124 @@
+// Copyright (c) 2018, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// $autorun$.conn.coded.phy.connection.sb
+//
+// This app connects to a remote device over 2MPHY. The remote device's BT address
+// must be set prior to making the connection
+//
+//******************************************************************************
+//
+//******************************************************************************
+//
+//This is the target Bluetooth device to connect to, 7 bytes in hex
+#define BTAddr "000016A4B75406"
+
+//******************************************************************************
+// Definitions
+//******************************************************************************
+#define BLE_GAP_1M_PHY                    1
+#define BLE_GAP_2M_PHY                    2
+#define BLE_GAP_NORMAL_SCANNING           0
+#define BLE_GAP_EXTENDED_SCANNING         1
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2 // msgCtx = alert level
+#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3 // msgCtx = alert level
+#define BLE_EVBLEMSGID_SERVICE_ERROR                    4 // msgCtx = resultcode
+#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5 // msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6 // msgCtx = not used
+#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7 // msgCtx = new indication state 0=off, 1=on
+#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8 // msgCtx = not used
+#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9 // msgCtx = passcode to display
+#define BLE_EVBLEMSGID_NEW_BOND                        10 // msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                11 // msgCtx = 1 for passkey, 2 for 16 byte OOB data
+#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE          12 // msgCtx = new notification state 0=off, 1=on
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim rc,addr$, nConnPhys
+
+//==============================================================================
+// This handler is called when there is a scan attempt timeout
+//==============================================================================
+function HandlerBlrScanTimOut() as integer
+	print "\nScanning stopped via timeout"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a BLE message
+//==============================================================================
+function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as integer
+	select nMsgId
+	case BLE_EVBLEMSGID_CONNECT
+		    print "\n## Connected"
+
+	case BLE_EVBLEMSGID_DISCONNECT
+        print " ## Disconnected!\n"
+        BleGattcClose()
+
+	case else
+	endselect
+endfunc 1
+
+//------------------------------------------------------------------------------
+// EVBLE_CONN_TIMEOUT - BLE connection timed out
+//------------------------------------------------------------------------------
+FUNCTION HndlrConnTO()
+    print "## Connection attempt timed out.\n"
+ENDFUNC 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+// Set the Connection PHYs bitmask to 3, i.e. 1MPHY or 2MPHY
+nConnPhys = BLE_GAP_1M_PHY | BLE_GAP_2M_PHY
+
+// Set connection PHYs to CODED PHY, enable extended connection
+rc = BleConnectConfig(10,nConnPhys)
+rc = BleConnectConfig(11,BLE_GAP_EXTENDED_SCANNING)
+
+// Set the remote device address
+addr$ = BTAddr
+addr$ = StrDehexize$(addr$)
+
+// Connect to remote device
+rc = BleConnect(addr$, 5000, 7500, 30000, 500000)
+print "\n## Connecting: ";StrHexize$(addr$)
+
+//------------------------------------------------------------------------------
+// Enable synchronous event handlers
+//------------------------------------------------------------------------------
+OnEvent EVBLEMSG                  call HandlerBleMsg
+OnEvent EVBLE_CONN_TIMEOUT        call HndlrConnTO
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+//------------------------------------------------------------------------------
+WaitEvent
+
+

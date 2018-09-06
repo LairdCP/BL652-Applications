@@ -1,0 +1,60 @@
+// Copyright (c) 2018, Laird
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// $autorun$.adv.2mphy.adverts.sb
+//
+// This app is used for advertising over 2MPHY
+//
+//
+//******************************************************************************
+// Definitions
+//******************************************************************************
+#define BLE_GAP_1M_PHY                    1
+#define BLE_GAP_2M_PHY                    2
+
+//******************************************************************************
+// Global Variable Declarations
+//******************************************************************************
+dim rc,addr$
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+// Set the primary PHY to 1MPHY and the secondary PHY to 2MPHY
+rc = BleAdvertConfig(4,BLE_GAP_1M_PHY) 
+rc = BleAdvertConfig(5,BLE_GAP_2M_PHY)
+
+rc = BleAdvertStart(6,addr$,100,30000,0)
+if rc == 0 then
+	print "\n## Started advertising over 2M PHY"
+else 
+	print "\n## Failed to advertise with error code ";integer.h' rc
+endif
+
+//------------------------------------------------------------------------------
+// Wait for a synchronous event.
+//------------------------------------------------------------------------------
+WaitEvent
+
+
