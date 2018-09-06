@@ -1,0 +1,14 @@
+//Example :: WdtIsRunning
+DIM rc, nTimeout
+nTimeout = 60
+// Start a timer for 60 seconds
+rc = WdtStart(nTimeout)
+
+rc = WdtIsRunning()
+if rc == 1 then
+	PRINT "Watchdog is running\n"
+else
+	PRINT "Watchdog is not running\n"
+endif
+
+WaitEvent

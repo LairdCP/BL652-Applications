@@ -1,0 +1,19 @@
+//Example :: WdtReset
+DIM rc, nTimeout
+nTimeout = 60
+// Start a  watchdog timer for 60 seconds
+rc = WdtStart(nTimeout)
+
+// Start a recurring normal timer to reset the watchdog timer every 55 seconds
+Timerstart(1, 55000, 1)
+
+Function HandlerTimer1()
+	rc = WdtReset()
+	if rc == 0 then
+		print "Watchdog timer reset successfully\n"
+	endif
+Endfunc 1
+
+OnEvent EVTMR1 CALL HandlerTimer1
+
+WaitEvent
