@@ -39,7 +39,7 @@
 // -------------------
 // ATinterface Library Version
 // -------------------
-#define LibVer                 "2.00"  //Library version  (ATI23)
+#define LibVer                 "2.10"  //Library version  (ATI23)
 //
 //******************************************************************************
 // Compiler/Debug options
@@ -77,6 +77,10 @@
 // -------------------
 // Application History
 // -------------------
+//
+//  2.10
+//    * Max limit for SReg 109 is 31 for 652 and 47 for 654
+//    * Added SReg117 to add DCD output for VSP operation (Low for connection)
 //
 //  2.00
 //    * Added low power uart operation
@@ -326,6 +330,9 @@
 #define OUTPUT_INIT_LOW                           0
 #define OUTPUT_INIT_HI                            1
 
+#define DCD_ASSERT_STATE                          0
+#define DCD_DEASSERT_STATE                        1
+
 //******************************************************************************
 // Global Variable Declarations
 //******************************************************************************
@@ -400,6 +407,10 @@ dim scanIntervalMs, scanWindowMs, scanType
 //This is the pin to use to enter command mode when in FAST mode. If <0 then it
 //implies FAST mode as been disabled
 dim vspCmdModePin
+
+//This is the pin to use the connection status of VSP like the DCD pin in modems.
+//Which means 0 is for -- there is a connection and 1 is for no connection
+dim vspDcdPin
 
 //Total number of connections active
 dim connCount
@@ -1549,6 +1560,24 @@ sub IdleStartAdverts( advType, adIntervalMs )
 endsub
 
 //------------------------------------------------------------------------------
+// Call this to assert the DCD state when there is a VSP connection
+//------------------------------------------------------------------------------
+sub VspDcdAssert()
+  if vspDcdPin>= 0 then
+    GpioWrite(vspDcdPin,DCD_ASSERT_STATE)
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+// Call this to deassert the DCD state when there is a VSP disconnection
+//------------------------------------------------------------------------------
+sub VspDcdDeassert()
+  if vspDcdPin>= 0 then
+    GpioWrite(vspDcdPin,DCD_DEASSERT_STATE)
+  endif
+endsub
+
+//------------------------------------------------------------------------------
 // Currently only need to initialise the gpio for vspCmdMode Pin in Fast mode
 // or when low power uart operation is compile time enabled then the same pin
 // is used by the host to reopen the uart
@@ -1585,6 +1614,14 @@ sub InitGPIO()
     endif
     #cmpif 0x00000003 : AssertRC(15700)
 
+  endif
+
+  //cache the command mode pin and set as output if one specified
+  vspDcdPin = SRegGet(CfgId_VspDcdPin)
+  if vspDcdPin>= 0 then
+    //set it as an output 
+    rc=GpioSetFunc(vspDcdPin,SIOTYPE_DOUT,DCD_DEASSERT_STATE)
+    #cmpif 0x00000003 : AssertRC(16000)
   endif
 
 endsub
@@ -4193,6 +4230,9 @@ function HndlrDisCon(hndl as integer, rsn as integer)
       //assume a normal disconnection has happenned
       vspDisconSts=CONN_ERROR_USER_DISCON
     endif
+    //Deassert DCD
+    VspDcdDeassert()
+    //Send response
     VspNoCarrierRet(vspDisconSts)
     connHandles[HCONN_VSP] = INVALID_CONN_HANDLE
 
@@ -4215,6 +4255,9 @@ function HndlrDisCon(hndl as integer, rsn as integer)
     endif
 
   case else
+    //Deassert DCD
+    VspDcdDeassert()
+    //Send response
     VspNoCarrierRet(rsn)
     connHandles[HCONN_VSP] = INVALID_CONN_HANDLE
   endselect
@@ -4734,6 +4777,8 @@ function HndlrMessageApp(nMsgId, nCtx)
     #cmpif 0x00000004 :   DbgMsg("Going For VSPOUT")
     //Allow TX
     vspAllowTx=1
+    //Assert DCD
+    VspDcdAssert()
     //send the connect response
     AppendConnRspEnd(CONN_OK, UARTSndBuf$ )
     //Send out data waiting in buffer
@@ -4757,6 +4802,8 @@ function HndlrMessageApp(nMsgId, nCtx)
 
   case MSGAPP_ENTER_VSPIN_CONN_STATE  //nCtx is the new state to enter
     #cmpif 0x00000004 :   DbgMsg("Going For VSPIN")
+    //Assert DCD
+    VspDcdAssert()
     //send the connect response
     AppendConnRspEnd(CONN_OK, UARTSndBuf$ )
     //Send out data waiting in buffer

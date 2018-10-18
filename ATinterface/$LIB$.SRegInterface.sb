@@ -150,7 +150,7 @@ sub SReg8SetCache()
     #cmpif 0x00010000 : offset=CfgId_VspCmdModePin
     #cmpif 0x00010000 : rc=BleEncode8(SregCache8$[0],-1,offset)
     #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[0],-1,offset)
-    #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[0],31,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[0],MAX_SIO_NUM,offset)
 
 //S110 :: ConnTimeoutSec
 #define CfgId_ConnTimeoutSec           10
@@ -202,6 +202,13 @@ sub SReg8SetCache()
     #cmpif 0x00010000 : rc=BleEncode8(SregCache8$[0],0,offset)
     #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[0],0,offset)
     #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[0],1,offset)
+
+//S117 :: DCD output for VSP connection (low when there is a connection)
+#define CfgId_VspDcdPin             17
+    #cmpif 0x00010000 : offset=CfgId_VspDcdPin
+    #cmpif 0x00010000 : rc=BleEncode8(SregCache8$[0],-1,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[0],-1,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[0],MAX_SIO_NUM,offset)
 
 
 //S1xx :: Some Description
