@@ -26,7 +26,7 @@
 // power consumption by setting various SIO as digital outs and
 // closing the UART
 //
-// After running this application you should see < 0.4uA at the current measurement
+// After running this application you should see < 2.4uA at the current measurement
 // header pins (J7). Remove the jumper and place an ammeter in series.
 //
 //******************************************************************************
@@ -69,11 +69,11 @@ uartclose()             //Closes the UART
 rc=gpiosetfunc(6,2,1)   //TX - set high on default
 rc=gpiosetfunc(5,2,0)   //RTS
 
-//Put module into deep sleep, will not go beyond this point if the function succeeds
-rc = SystemStateSet(0)
+//The function below is deliberately commented out. Uncomment it if you want to put module into deep sleep.
+//rc = SystemStateSet(0)
 
 //------------------------------------------------------------------------------
 // Wait for a synchronous event.
-// An application can have multiple <WaitEvent> statements
+// When thr program hits WAITEVENT then it is in standby doze current mode
 //------------------------------------------------------------------------------
 waitevent       //Waits for an event to happen
