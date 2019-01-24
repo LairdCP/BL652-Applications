@@ -17,7 +17,7 @@ ONEVENT EVTMR1 CALL HandlerTimer1
 ONEVENT EVTMR2 CALL HandlerTimer2
 
 TimerStart(0,-500,1)  							//start a -500 millisecond recurring timer
-PRINT "\nStarted Timer 0 with invalid inerval"
+PRINT "\nStarted Timer 0 with invalid interval"
 
 TimerStart(1,500,1)  							//start a 500 millisecond recurring timer
 PRINT "\nWaiting for Timer 1"
