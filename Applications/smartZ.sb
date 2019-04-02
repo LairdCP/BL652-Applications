@@ -1350,7 +1350,7 @@ sub _hciCfg()
             print "\nApp Version: smartZ Version ";mjVersion;".";mnVersion;"\n"
             print "Device Name: ";BleGetDeviceName$();"\n"
             print "Firmware: ";W;".";X;".";Y;".";Z;"\n"
-            print "Manufacturer: Laird Technologies\n"
+            print "Manufacturer: Laird Connectivity\n"
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

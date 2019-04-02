@@ -304,7 +304,7 @@
         //characteristic 569a2010-b87f-490c-92cb-11ba5ea5167c
 #define DEVICENAME                           "Laird iBeacon"
 
-        //Laird Technologies 128 bit Base UUID
+        //Laird Connectivity 128 bit Base UUID
 #define LT_BASE_UUID                         "\56\9a\00\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c\"
         //Service 16 bit UUID
 #define IBEACON_SVC_UUID                     0x1900
@@ -851,7 +851,7 @@ EndSub
 //------------------------------------------------------------------------------
 Sub CreateIBeaconSvc()
     dim bseUuid$ : bseUuid$=LT_BASE_UUID
-    //Laird Technologies Base UUID Handle
+    //Laird Connectivity Base UUID Handle
     dim hBseUuid : hBseUuid=BleHandleUuid128(bseUuid$)
     //iBeacon service UUID handle
     dim hSvcUuid : hSvcUuid=BleHandleUuidSibling(hBseUuid,IBEACON_SVC_UUID)

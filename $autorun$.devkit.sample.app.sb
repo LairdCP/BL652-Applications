@@ -528,7 +528,7 @@ Sub OnStartup()
     endif
 
     //Set the device information service up. Any empty strings will omit them from the listing
-    dim manfNme$ : manfNme$ = "Laird Technologies"
+    dim manfNme$ : manfNme$ = "Laird Connectivity"
     dim mdlNum$ : mdlNum$ = "BL652"
     dim srlNum$ : srlNum$ = ""
     dim hwRev$ : hwRev$ = "1.0"
@@ -574,7 +574,7 @@ Sub OnStartup()
     //Output a message to the UART indicating that the application is running
     #cmpif 0x00000200 : sprint #prn$, "\r\nWelcome to the DVK-BL652 sample smartBASIC application!\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
-    #cmpif 0x00000200 : sprint #prn$, "Full details and an application walkthrough are available at www.lairdtech.com/BL652-Quick-Start and this sample application, plus many more, can be found on Github https://github.com/LairdCP/BL652-Applications\r\n\r\n"
+    #cmpif 0x00000200 : sprint #prn$, "Full details and an application walkthrough are available at https://www.lairdconnect.com/bl652-quick-start and this sample application, plus many more, can be found on Github https://github.com/LairdCP/BL652-Applications\r\n\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )
     #cmpif 0x00000200 : sprint #prn$, "When you have finished with this initial application, you can return to command mode / interactive mode by moving the J12 Autorun jumper to the H position (pins 2-1), unchecking DTR from UwTerminalX and pressing the reset button on the module (or checking and unchecking the BREAK checkbox which results in a reset of the module)\r\n"
     #cmpif 0x00000200 : PrintPrn$( DEFAULT_STARTMSG_BLOCKTIME_MS )

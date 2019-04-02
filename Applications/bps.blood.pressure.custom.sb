@@ -95,7 +95,7 @@
 #define DEVICENAME                                  "LAIRD_BP"
 #define DEVICENAME_WRITABLE                         1
 #define APPEARANCE                                  BLE_APPEARANCE_GENERIC_BLOOD_PRESSURE
-#define MANF_NAME                                   "Laird Technologies"
+#define MANF_NAME                                   "Laird Connectivity"
 #define MODELSTR                                    "BL652"
 #define SERIALNUM                                   "12345"
 #define HWREV                                       "HwRev1.0"

@@ -85,7 +85,7 @@
 #define DEVICENAME                        "LAIRD_HRM"
 #define DEVICENAME_WRITABLE               1
 #define APPEARANCE                        BLE_APPEARANCE_GENERIC_HEART_RATE_SENSOR
-#define MANF_NAME                         "Laird Technologies"
+#define MANF_NAME                         "Laird Connectivity"
 #define MODELSTR                          "BL652"
 #define SERIALNUM                         "12345"
 #define HWREV                             "HwRev1.0"

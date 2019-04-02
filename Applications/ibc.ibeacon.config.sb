@@ -23,7 +23,7 @@
 //
 // Version 1.0, 25/11/2014
 // This application allows you to scan for iBeacons, display the parameters you choose,
-// and connect to iBeacons to edit their parameters via the Laird Technologies iBeacon
+// and connect to iBeacons to edit their parameters via the Laird Connectivity iBeacon
 // service.
 //
 // This app provides for a command interface over the uart and the protocol is
@@ -265,7 +265,7 @@
 #define NUM_OF_S_PARAMS                     (8)
 
 
-        //Laird Technologies 128 bit Base UUID
+        //Laird Connectivity 128 bit Base UUID
 #define LT_BASE_UUID                        "\56\9a\00\00\b8\7f\49\0c\92\cb\11\ba\5e\a5\16\7c\"
         //iBeacon Service 16 bit UUID
 #define IBEACON_SVC_UUID                    0x1900

@@ -68,9 +68,9 @@ DOCUMENTATION
 There are two main documents that are relevant for this application which
 can be found at
 
-  https://www.lairdtech.com/products/bl654-ble-thread-nfc-modules
+  https://www.lairdconnect.com/wireless-modules/bluetooth-modules/bluetooth-5-modules/bl654-series
   or
-  https://www.lairdtech.com/products/bl652-ble-module
+  https://www.lairdconnect.com/wireless-modules/bluetooth-modules/bluetooth-5-modules/bl652-series-bluetooth-v5-nfc
   
    (1) BL65x AT Interface Application User Guide
    (2) AT Interface Quick Start Guide
