@@ -6,15 +6,14 @@ DIM hMyChar,rc,at$,conHndl
 //==============================================================================
 FUNCTION OnStartup()
     DIM rc, hSvc, attr$, adRpt$, addr$, scRpt$ : attr$="Hi"
-    
+
     //commit service
-    rc=BleSvcCommit(1,BleHandleUuid16(0x18EE),hSvc)            
-	rc=BleServiceNew(1, BleHandleUuid16(0x18EE), hSvc)
+    rc=BleServiceNew(1, BleHandleUuid16(0x18EE), hSvc)
     //initialise char, write/read enabled, accept signed writes
     rc=BleCharNew(0x0A,BleHandleUuid16(1),BleAttrMetaData(1,1,20,0,rc),0,0)     
     //commit char initialised above, with initial value "hi" to service 'hSvc'
     rc=BleCharCommit(hSvc,attr$,hMyChar)
-	//commit changes to service
+    //commit changes to service
     rc=BleServiceCommit(hSvc)
     rc=BleScanRptInit(scRpt$) 
     //Add 1 service handle to scan report

@@ -85,7 +85,7 @@ IF OnStartup()==0 THEN
     rc = BleCharValueRead(hMyChar,at$)
     PRINT "\nCharacteristic Value: ";at$
     PRINT "\nYou can write to the SCCD attribute."
-    PRINT "\nThe BL600 will then indicate a new characteristic value"
+    PRINT "\nThe BL652 will then indicate a new characteristic value"
     PRINT "\n--- Press button 1 to exit\n"
 ELSE
     PRINT "\nFailure OnStartup"
