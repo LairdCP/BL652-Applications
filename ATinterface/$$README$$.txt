@@ -1,5 +1,5 @@
 --------
-Jul 2018
+Feb 2020
 --------
 
 This folder contains smartBASIC applications that when loaded in a BL65x 
@@ -14,8 +14,8 @@ if there was a wired uart connection.
      ==============================================================
      The minimum firmware version that you will need is as follows:
      
-                             BL652 : v28.8.4.0
-                             BL654 : v29.1.1.0
+                             BL652 : v28.10.7.0
+                             BL654 : v29.4.6.0
           
       The command 'AT I 3<cr>' will return the version number from
       the module
@@ -27,7 +27,7 @@ extension ".sb"
 For BL652, start testing with file "$autorun$.AT.interface.BL652._.sb"
 For BL654, start testing with file "$autorun$.AT.interface.BL654._.sb"
 
- ------------------------------------------------------------------------
+------------------------------------------------------------------------
    The application files have filenames with the following pattern ..
    
      $autorun$.AT.interface.PPP.FFF.FFF.sb
@@ -68,9 +68,9 @@ DOCUMENTATION
 There are two main documents that are relevant for this application which
 can be found at
 
-  https://www.lairdconnect.com/wireless-modules/bluetooth-modules/bluetooth-5-modules/bl654-series
+  https://www.lairdtech.com/products/bl654-ble-thread-nfc-modules
   or
-  https://www.lairdconnect.com/wireless-modules/bluetooth-modules/bluetooth-5-modules/bl652-series-bluetooth-v5-nfc
+  https://www.lairdtech.com/products/bl652-ble-module
   
    (1) BL65x AT Interface Application User Guide
    (2) AT Interface Quick Start Guide

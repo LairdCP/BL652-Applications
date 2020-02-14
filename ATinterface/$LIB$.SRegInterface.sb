@@ -73,7 +73,7 @@ sub SReg8SetCache()
 //        Bit 0   : Set to VspConnectable - hence populates gatt table then advertises
 //        Bit 1   : Ignored if bit0 is 1 otherwise start advertising with no timeout
 //        Bit 2   : Ignored if bit0 is 1 otherwise start scanning with no timeout
-//        Bit 3   : Set for high throughput (multi packets per connection interval)
+//        Bit 3   : Set for optimised VSP mode (max 1 incoming or 1 outgoing connection)
 //        Bit 4   : Set to use Data Length extension
 //        Bit 6&5 : 00 1MPHY
 //                  01 Long Range 125kbps
@@ -129,11 +129,11 @@ sub SReg8SetCache()
 #define SREG_ScanTimeoutSec_MAX                      127
     #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[0],SREG_ScanTimeoutSec_MAX,offset)
 
-//S107 :: PairingIoCapability (0=JusrWorks, 1=Disp with Y/N, 2=Kboard only, 3=Disp Only 4=Kboard+Disp)
+//S107 :: PairingIoCapability (0=JustWorks, 1=Disp with Y/N, 2=Kboard only, 3=Disp Only 4=Kboard+Disp)
 #define CfgId_PairingIoCapability      7
     #cmpif 0x00010000 : offset=CfgId_PairingIoCapability
     #cmpif 0x00010000 : rc=BleEncode8(SregCache8$[0],0,offset)
-    #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[0],0,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[0],-4,offset)
     #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[0],4,offset)
 
 //S108 :: IdleAdvertType  (0=ADV_IND, 1=ADV_DIRECT_IND, 2=ADV_SCAN_IND, 3=ADV_NONCONN_IND)
@@ -210,6 +210,13 @@ sub SReg8SetCache()
     #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[0],-1,offset)
     #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[0],MAX_SIO_NUM,offset)
 
+//S118 :: VSP incoming max cached packets in vsp rx buffer
+//    see S219 and S307 to tweak throughput
+#define CfgId_VspMaxCachedRxPkts    18
+    #cmpif 0x00010000 : offset=CfgId_VspMaxCachedRxPkts
+    #cmpif 0x00010000 : rc=BleEncode8(SregCache8$[0],8,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[0],1,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[0],48,offset)
 
 //S1xx :: Some Description
 //#define CfgId_xx                    X
@@ -239,6 +246,25 @@ sub SReg8SetCache()
     SregCache8$[1]=SREGINIT_VAL8_1
 
     rc=0
+
+//S121 :: Pinnacle 100 : Newcastle multiplexer sio number (Lo==840, Hi==HL78)
+//S122 :: Pinnacle 100 : Multiplexer Mode 1 default Direction  (0=840 1=HL)
+//S123 :: Pinnacle 100 : Uart FlowControl  (0=None, 1=CTS/RTS)
+//S124 :: Pinnacle 100 : HL78 reset on startup  (0=No-Reset, 1=Reset)
+
+//S125 :: MaxConnsAsSlave  (CFG KEY 205)
+#define CfgId_MaxConnsAsSlave                   (20+5)
+    #cmpif 0x00010000 : offset=(CfgId_MaxConnsAsSlave-20)
+    #cmpif 0x00010000 : rc=BleEncode8(SregCache8$[1],1,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[1],0,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[1],MAX_CONNECTIONS_AS_SLAVE,offset)
+
+//S126 :: MaxConnsAsMaster  (CFG KEY 206)
+#define CfgId_MaxConnsAsMaster                  (20+6)
+    #cmpif 0x00010000 : offset=(CfgId_MaxConnsAsMaster-20)
+    #cmpif 0x00010000 : rc=BleEncode8(SregCache8$[1],DEFAULT_CONNECTIONS_AS_MASTER,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMin8$[1],1,offset)
+    #cmpif 0x00010000 : rc=BleEncode8(  SregMax8$[1],MAX_CONNECTIONS_AS_MASTER,offset)
 
 
 
@@ -309,30 +335,30 @@ sub SReg16SetCache()
 //S202 :: UARTTxBufSize
 #define CfgId_UARTTxBufSize       (0x10000+2)
     #cmpif 0x00010000 : offset=((CfgId_UARTTxBufSize-0x10000)*2)
-    #cmpif 0x00010000 : rc=BleEncode16(SregCache16$[0],0,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(SregCache16$[0],1024,offset)
     #cmpif 0x00010000 : rc=BleEncode16(  SregMin16$[0],0,offset)
-    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[0],1024,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[0],1024*8,offset)  //0x2000
 
 //S203 :: UARTRxBufSize
 #define CfgId_UARTRxBufSize       (0x10000+3)
     #cmpif 0x00010000 : offset=((CfgId_UARTRxBufSize-0x10000)*2)
-    #cmpif 0x00010000 : rc=BleEncode16(SregCache16$[0],0,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(SregCache16$[0],1024,offset)
     #cmpif 0x00010000 : rc=BleEncode16(  SregMin16$[0],0,offset)
-    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[0],1024,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[0],1024*8,offset)  //0x2000
 
 //S204 :: VspTxBufSize
 #define CfgId_VspTxBufSize        (0x10000+4)
     #cmpif 0x00010000 : offset=((CfgId_VspTxBufSize-0x10000)*2)
-    #cmpif 0x00010000 : rc=BleEncode16(SregCache16$[0],384,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(SregCache16$[0],4096,offset)
     #cmpif 0x00010000 : rc=BleEncode16(  SregMin16$[0],256,offset)
-    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[0],4096,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[0],1024*16,offset)  //0x4000
 
 //S205 :: VspRxBufSize
 #define CfgId_VspRxBufSize        (0x10000+5)
     #cmpif 0x00010000 : offset=((CfgId_VspRxBufSize-0x10000)*2)
     #cmpif 0x00010000 : rc=BleEncode16(SregCache16$[0],4096,offset)  //To prevent data loss in DLE
     #cmpif 0x00010000 : rc=BleEncode16(  SregMin16$[0],256,offset)
-    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[0],4096,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[0],1024*16,offset)  //0x4000
 
 //S206 :: LinkSuprvsnToutMs   //Note in milliseconds
 #define CfgId_LinkSuprvsnToutMs  (0x10000+6)
@@ -414,6 +440,20 @@ sub SReg16SetCache()
     #cmpif 0x00010000 : rc=BleEncode16(  SregMin16$[1],250,offset)    //  250=0x00FA
     #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[1],30000,offset)  //30000=0x7530
 
+//S214 :: Unused but ... Pinnacle 100 multiplexer escape detect delay milliseconds
+//S215 :: Unused but ... Pinnacle 100 AuxTxBufSize
+//S216 :: Unused but ... Pinnacle 100 AuxRxBufSize
+
+//S217 :: Unused
+//S218 :: Unused
+
+//S219 :: DLE (Date Length Extension) Attribute Size (20..244)
+//    see S118 and S307 to tweak throughput
+#define CfgId_DleAttributeSize               ((0x10000+10)+9)
+    #cmpif 0x00010000 : offset=((CfgId_DleAttributeSize-(0x10000+10))*2)
+    #cmpif 0x00010000 : rc=BleEncode16(SregCache16$[1],DEFAULT_DLE_ATTRIBUTE_SIZE,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(  SregMin16$[1],20,offset)
+    #cmpif 0x00010000 : rc=BleEncode16(  SregMax16$[1],244,offset)
 
 //S2xx :: CfgId_XX
 //#define CfgId_                    ((0x10000+10)+xx)
@@ -519,6 +559,14 @@ sub SReg32SetCache()
     #cmpif 0x00010000 : rc=BleEncode32(  SregMin32$[1],1,offset)
     #cmpif 0x00010000 : rc=BleEncode32(  SregMax32$[1],0xFFFF,offset)
 
+//S307 :: SetAsideTimeForPktsInConn   (CFG KEY 218)
+//    see S118 and S219 to tweak throughput
+#define CfgId_SetAsideTimeForPktsInConn       ((0x20000+5)+2)
+    #cmpif 0x00010000 : offset=((CfgId_SetAsideTimeForPktsInConn-(0x20000+5))*4)
+    #cmpif 0x00010000 : rc=BleEncode32(SregCache32$[1],15000,offset)  // 0x00003A98
+    #cmpif 0x00010000 : rc=BleEncode32(  SregMin32$[1],7500,offset)   // 0x00001D4C
+    #cmpif 0x00010000 : rc=BleEncode32(  SregMax32$[1],100000,offset) // 0x000186A0
+
 //S3xx :: Some description
 //#define CfgId_XX                    ((0x20000+5)+X)
     //#cmpif 0x00010000 : offset=((CfgId_XX-(0x20000+5))*4)
@@ -549,7 +597,7 @@ sub SRegStrSetCache()
 
 #define CfgIdStr_DeviceName          0
   //%S0 DeviceName
-  offset=0 : mn=1 : mx=12
+  offset=0 : mn=1 : mx=20
   rc=NvRecordGet((SREG_NVRECORDKEY_START_ID_STR+offset),SregStrCache$[offset])
   if (rc<mn)||(rc>mx) then
     SregStrCache$[offset] = DEFAULT_DEVICE_NAME

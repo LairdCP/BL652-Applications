@@ -2,7 +2,7 @@
 // LibFile : "$LIB$.defines.BL652.sb"
 //#############################################################################
 //
-// It is very highly recommended that this file is NOT modified by non-Laird 
+// It is very highly recommended that this file is NOT modified by non-Laird
 // developers unless you request it to be updated in the master file maintained
 // by Laird
 //
@@ -15,12 +15,20 @@
 #define MIN_TXPOWER_DBM                           -20
 
 #define DEFAULT_DEVICE_NAME                       "LAIRD BL652"
- 
+
 #define BUTTON1                                   11
 #define BUTTON2                                   15
 
 //Max SIO number
 #define MAX_SIO_NUM                               31
+
+//This defines the maximum number of characteristics we can manage
+#define DEFAULT_DLE_ATTRIBUTE_SIZE                96
+
+//Max/Default connections allowed by role
+#define MAX_CONNECTIONS_AS_SLAVE                  1
+#define MAX_CONNECTIONS_AS_MASTER                 7
+#define DEFAULT_CONNECTIONS_AS_MASTER             7
 
 //******************************************************************************
 // Global Variable Declarations

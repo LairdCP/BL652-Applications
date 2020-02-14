@@ -2,7 +2,7 @@
 // LibFile : "$LIB$.defines.Common.sb"
 //#############################################################################
 //
-// It is very highly recommended that this file is NOT modified by non-Laird 
+// It is very highly recommended that this file is NOT modified by non-Laird
 // developers unless you request it to be updated in the master file maintained
 // by Laird
 //
@@ -15,7 +15,7 @@
 #define SREGNUM_START_16BIT                       200
 #define SREGNUM_START_32BIT                       300
 #define SREGNUM_START_STR                         0
- 
+
 //AT Response Error
 #define RSP_SUSPEND                               -1
 #define RSP_OK                                    0
@@ -77,6 +77,12 @@
 #define RSP_ERROR_CHAR_NOTSTARTED                   59
 #define RSP_ERROR_NFC_NOT_OPEN                      60
 #define RSP_ERROR_NFC_NDEF_EMPTY                    61
+#define RSP_ERROR_DIRECTED_NOPEERADDR               62
+#define RSP_ERROR_INVALID_CHANMASK                  63
+#define RSP_ERROR_INVALID_REPORTS                   64
+#define RSP_ERROR_INVALID_RPT_DATA                  65
+#define RSP_ERROR_INVALID_RPT_DATA_SIZE             66
+#define RSP_ERROR_INVALID_OOBDATA                   67
 
 #define RSP_ERROR_TO_BE_CODED                       99
 

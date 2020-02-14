@@ -106,7 +106,7 @@ FUNCTION DataLengthExtension()
     rc = NvCfgKeyGet(BLE_MAX_PACKET_LENGTH_KEY_ID, nBleMaxPacketLength)
 
     // Check if these are the values needed to achieve DLE
-    IF  (nAttributeMTU != ATTRIBUTE_MTU_MAXIMUM) || (nAttributeLength != ATTRIBUTE_DATA_LENGTH_MAXIMUM)	|| (nBleMaxPacketLength != BLE_MAX_PACKET_LENGTH) THEN
+    IF  (nAttributeMTU != ATTRIBUTE_MTU_MAXIMUM) || (nAttributeLength != ATTRIBUTE_DATA_LENGTH_MAXIMUM) || (nBleMaxPacketLength != BLE_MAX_PACKET_LENGTH) THEN
         // Change the Attribute MTU to be the maximum allowed by the BL652 (247)
         rc = NvCfgKeySet(ATTRIBUTE_MTU_KEY_ID, ATTRIBUTE_MTU_MAXIMUM)
         // Change the Attribute Data Length to be the maximum allowed by the BL652 (244)
@@ -368,6 +368,11 @@ ENDIF
 rc = CreateVSPService()
 // Start LE Adverts
 rc = BleStartAdverts()
+if rc==0 then
+    print "\n## Started Advertising\n"
+else
+    print "\n## Start Advertising failed rc=";integer.h'rc
+endif
 
 
 //******************************************************************************

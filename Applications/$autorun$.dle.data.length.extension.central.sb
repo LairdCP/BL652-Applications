@@ -162,7 +162,11 @@ ENDIF
 
     //Connect to target device
     rc = BLECONNECT(addr$, 5000, nMinConnInterval, nMaxConnInterval, 500000)
-    print "\n## Connecting: ";StrHexize$(addr$);"\n"
+    if rc==0 then
+        print "\n## Connecting: ";StrHexize$(addr$);"\n"
+    else
+        print "\n## Connecting failed rc=";integer.h'rc
+    endif
 
 ENDFUNC 0
 

@@ -31,16 +31,12 @@
 //******************************************************************************
 //
 //This is the target Bluetooth device to connect to, 7 bytes in hex
-#define BTAddr "000016A4B75406"
+//If Laird device, then AT I 4 command will yield the address.
+#define BTAddr "01EA06E7EF3E5F"
 
 //******************************************************************************
 // Definitions
 //******************************************************************************
-#define BLE_GAP_1M_PHY                    1
-#define BLE_GAP_2M_PHY                    2
-#define BLE_GAP_NORMAL_SCANNING           0
-#define BLE_GAP_EXTENDED_SCANNING         1
-
 //BLE EVENT MSG IDs
 #define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle
@@ -65,23 +61,23 @@ dim rc,addr$, nConnPhys
 // This handler is called when there is a scan attempt timeout
 //==============================================================================
 function HandlerBlrScanTimOut() as integer
-	print "\nScanning stopped via timeout"
+  print "\nScanning stopped via timeout"
 endfunc 1
 
 //==============================================================================
 // This handler is called when there is a BLE message
 //==============================================================================
 function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as integer
-	select nMsgId
-	case BLE_EVBLEMSGID_CONNECT
-		    print "\n## Connected"
+  select nMsgId
+  case BLE_EVBLEMSGID_CONNECT
+        print "\n## Connected"
 
-	case BLE_EVBLEMSGID_DISCONNECT
+  case BLE_EVBLEMSGID_DISCONNECT
         print " ## Disconnected!\n"
         BleGattcClose()
 
-	case else
-	endselect
+  case else
+  endselect
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -95,19 +91,12 @@ ENDFUNC 1
 // Equivalent to main() in C
 //******************************************************************************
 
-// Set the Connection PHYs bitmask to 3, i.e. 1MPHY or 2MPHY
-nConnPhys = BLE_GAP_1M_PHY | BLE_GAP_2M_PHY
-
-// Set connection PHYs to CODED PHY, enable extended connection
-rc = BleConnectConfig(10,nConnPhys)
-rc = BleConnectConfig(11,BLE_GAP_EXTENDED_SCANNING)
-
 // Set the remote device address
 addr$ = BTAddr
 addr$ = StrDehexize$(addr$)
 
-// Connect to remote device
-rc = BleConnect(addr$, 5000, 7500, 30000, 500000)
+// Connect to remote device which will be advertising on 1M Primary and on any secondary PHY.
+rc = BleConnectExtended(addr$, 5000, 7500, 30000, 500000, 0,0)
 print "\n## Connecting: ";StrHexize$(addr$)
 
 //------------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 // LibFile : "$LIB$.debug.code.sb"
 //#############################################################################
 //
-// It is very highly recommended that this file is NOT modified by non-Laird 
+// It is very highly recommended that this file is NOT modified by non-Laird
 // developers unless you request it to be updated in the master file maintained
 // by Laird
 //
@@ -61,7 +61,7 @@
 #cmpif 0x00000003 : endsub
 
 //------------------------------------------------------------------------------
-#cmpif 0x00000004 : dim dbgmsg$  //use this to create a message for DbgMsg() 
+#cmpif 0x00000004 : dim dbgmsg$  //use this to create a message for DbgMsg()
 //------------------------------------------------------------------------------
 #cmpif 0x00000004 : sub DbgMsg(byval msg$ as string)
 #cmpif 0x00000004 :     print "\n## ";msg$
@@ -77,7 +77,7 @@
 //------------------------------------------------------------------------------
 #cmpif 0x00000004 : sub DbgMsgVal$(byval msg$ as string, byref vl$ as string)
 #cmpif 0x00000004 :     print "\n## ";msg$;" ";vl$
-#cmpif 0x00000004 : endsub 
+#cmpif 0x00000004 : endsub
 
 //------------------------------------------------------------------------------
 // This shows the cuttent connection parameters

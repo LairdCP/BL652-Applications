@@ -22,7 +22,6 @@
 //    + AT+GCTM command enabled to query peer's gatt table schema             ++
 //    + If error handler called then module will reset and restart            ++
 //    + VSP Overrun Event is enabled when there is a VSP incoming overrun     ++
-//    + Low Power Uart operation - port closed when there is no activity      ++
 // ************************************************************************** ++
 //                                                                            ++
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -61,7 +60,8 @@
 // Compiler/Debug options
 //******************************************************************************
 //The following is the 'as-deployed' to customer setting
-#set $cmpif, 0x004E0000 //see $LIB$.AT.interface.sb for bitmask description
+//#set $cmpif, 0x008E000F  //see $LIB$.AT.interface.sb for bitmask description
+#set $cmpif, 0x008E0FFF  //see $LIB$.AT.interface.sb for bitmask description
 
 //******************************************************************************
 // Definitions
@@ -75,7 +75,6 @@
 
 //Default device name
 #define DEFAULT_DEVICE_NAME                       "LAIRD BL652"
-
 
 //==============================================================================
 //The following can be modified by the customer to customise - but with care

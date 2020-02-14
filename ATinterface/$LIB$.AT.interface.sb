@@ -39,7 +39,7 @@
 // -------------------
 // ATinterface Library Version
 // -------------------
-#define LibVer                 "2.10"  //Library version  (ATI23)
+#define LibVer                 "3.00"  //Library version  (ATI23)
 //
 //******************************************************************************
 // Compiler/Debug options
@@ -73,10 +73,41 @@
 //   0x00100000 : Enable Long Range Capability  +LRANGE
 //   0x00200000 : Enable NFC    +NFC
 //   0x00400000 : Enable LowPower Uart Operation  +LOWPWR
+//   0x00800000 : Disable auto accept of 2MPHY request
 //   ======================================================
 // -------------------
 // Application History
 // -------------------
+//
+//  3.02
+//    * Added LESC OOB pairing capability
+//
+//  3.00
+//    * Added extended advert commands and long range connection capability
+//
+//  2.40
+//    * Added more configuration options to assist with throughput on VSP connections
+//     - Added SReg 118 : CfgId_VspMaxCachedRxPkts
+//     - Added SReg 219 : CfgId_DleAttributeSize
+//     - Update SReg related regression tests
+//     - Added SReg 125 : CfgId_MaxConnsAsSlave
+//     - Added SReg 126 : CfgId_MaxConnsAsMaster
+//     - Added SReg 307 : CfgId_SetAsideTimeForPktsInConn
+//
+//  2.33
+//    * Prevent change to 2MPHY if SReg100 bits 5&6 are not 11  -- this works now
+//      and tested with iPhoneX
+//
+//  2.32
+//    * Prevent change to 2MPHY if SReg100 bits 5&6 are not 11
+//
+//  2.30
+//    * Added AT+LMTU and AT+LPHY commands for changing MTU and PHY respectively
+//      in non-VSP mode. For +LMTU, async response MT: has been added and for
+//      +LPHY, the async response PU or PF messages have been added.
+//
+//  2.20
+//    * Max device name is now 20 instead of 12 which is accessed via AT%S0
 //
 //  2.10
 //    * Max limit for SReg 109 is 31 for 652 and 47 for 654
@@ -160,6 +191,9 @@
 
 //Maximum length of attibute length in metadata when creating gatt table
 #define MAX_ATTRIBUTE_LEN                         250
+
+//default set-aside time per connection event per connection
+#define DEFAULT_SET_ASIDE_TIME_US                 15000
 
 //Only check for carets in uart buffer if there is at least this
 //much space in the vsp tx buffer
@@ -268,7 +302,8 @@
 //Keytype values that arrive in message BLE_EVBLEMSGID_AUTH_KEY_REQUEST
 #define BLE_GAP_AUTH_KEY_TYPE_NONE        0x00   // No key (may be used to reject)
 #define BLE_GAP_AUTH_KEY_TYPE_PASSKEY     0x01   // 6-digit Passkey
-#define BLE_GAP_AUTH_KEY_TYPE_OOB         0x02   // Out Of Band data
+#define BLE_GAP_AUTH_KEY_TYPE_OOB         0x02   // Out Of Band data - legacy pairing
+#define BLE_GAP_AUTH_KEY_TYPE_LESC_OOB    0x03   // Out Of Band data - lesc pairing
 
 //defines associated with uart low power operation
 #define UART_SIONUM_RX                             8
@@ -283,6 +318,22 @@
 #define CMD_I_PAIR                                 1
 #define CMD_I_LENC                                 2
 #define CMD_I_GCTM                                 3
+#define CMD_I_LMTU                                 4
+#define CMD_I_LPHY                                 5
+
+#define CMD_GCRDWR_GCRD                            0
+#define CMD_GCRDWR_GCWA                            1
+#define CMD_GCRDWR_GCWC                            2
+
+#define CMD_GSSBE_GSSE                             0
+#define CMD_GSSBE_GSSB                             1
+
+#define CMD_MO01_ARST                              0
+#define CMD_MO01_SFMT                              1
+
+#define CMD_ACTTYPE_SIOR                           0
+#define CMD_ACTTYPE_SIOW                           1
+#define CMD_ACTTYPE_SIOC                           2
 
 #define CMD_IS_NOTIFY                              0
 #define CMD_IS_INDICATE                            1
@@ -291,11 +342,14 @@
 #define DEFAULT_ATT_MTU                            23
 #define DEFAULT_ATTRIBUTE_SIZE                     (DEFAULT_ATT_MTU-3)
 
-#define ATTRIBUTE_MTU_KEY_ID                       211    // CFG ID 211
-#define ATTRIBUTE_DATA_LENGTH_KEY_ID               212    // CFG ID 212
-#define USE_STRINT_IN_EVENTS_KEY_ID                213    // CFG ID 213
-#define ENABLE_HIGH_BANDWIDTH_KEY_ID               214    // CFG ID 214
-#define BLE_MAX_PACKET_LENGTH_KEY_ID               216    // CFG ID 216
+#define ATTRIBUTE_MTU_KEY_ID                       211    // CFG ID
+#define ATTRIBUTE_DATA_LENGTH_KEY_ID               212    // CFG ID
+#define USE_STRINT_IN_EVENTS_KEY_ID                213    // CFG ID
+#define ENABLE_HIGH_BANDWIDTH_KEY_ID               214    // CFG ID
+#define BLE_MAX_PACKET_LENGTH_KEY_ID               216    // CFG ID
+#define MAX_CONNS_SLAVE_KEY_ID                     205    // CFG ID
+#define MAX_CONNS_MASTER_KEY_ID                    206    // CFG ID
+#define SET_ASIDE_TIMEus_KEY_ID                    218    // CFG ID
 
 #define FALSE                                      0
 #define TRUE                                       (!0)
@@ -333,6 +387,51 @@
 #define DCD_ASSERT_STATE                          0
 #define DCD_DEASSERT_STATE                        1
 
+#define PHY_AUTO                                  0
+#define PHY_1M                                    1
+#define PHY_2M                                    2
+#define PHY_CODED                                 4
+
+//Following just assist with documentation
+#define IDX_MAX_CONN_AS_SLAVE                     0
+#define IDX_MAX_CONN_AS_MASTER                    1
+#define IDX_SET_ASIDE_TIME                        2
+
+#define MAX_EXTADV_PROPERTY_VALUE                 b'11111111111
+#define MAX_EXTADV_PROPERTY_DEFAULT               0
+#define MAX_EXTADV_PRISECPHY                      b'111
+#define MAX_EXTADV_PRISECPHY_DEFAULT              b'000
+#define EXTADV_MAXCOUNT_NONE                      0
+#define EXTADV_MAXCOUNT_DEFAULT                   0
+#define EXTADV_MAXCOUNT_MAXIMUM                   255
+#define EXTADV_FILTER_NONE                        0
+#define ADV_FILTER_NONE                           0
+
+#define EXTADVPROP_CONNECTABLE                    b'0001
+#define EXTADVPROP_SCANNABLE                      b'0010
+#define EXTADVPROP_DIRECTED                       b'0100
+#define EXTADVPROP_EXTENDED                       b'1000
+#define EXTADVPROP_CONNpEXT                       b'1001
+
+#define EXTADVPRIPHY_1MPHY                        0
+#define EXTADVPRIPHY_LECODED                      1
+
+#define SIZE_OF_BLE_ADDRESS                       7
+#define SIZE_OF_CHANNEL_MASK                      5
+#define SETID_DEFAULT                             0
+#define ADV_DURATION_FOREVER                      0
+#define AUXOFFSET_DEFAULT                         0
+
+//Bitmasks used for scanning using new api
+#define SCANTYPE_1MPHY                            b'0001
+#define SCANTYPE_LECODED                          b'0010
+#define SCANTYPE_EXTENDED                         b'0100
+#define SCANTYPE_PASSIVE_SCANNING                 b'1000
+
+#define NORDICERROR_INVALID_PARM                  0x6207
+#define NORDICERROR_INVALID_DATA                  0x620B
+#define NORDICERROR_INVALID_DATA_SIZE             0x620C
+
 //******************************************************************************
 // Global Variable Declarations
 //******************************************************************************
@@ -344,6 +443,7 @@ dim rc
 dim dontcare
 dim dontcare$
 dim tmpDta$
+dim tmpDta
 
 //Contains current state, see STATE_XXX
 dim curState : curState=STATE_INIT
@@ -357,6 +457,7 @@ dim UARTbaud, UARTTxBuf, UARTRxBuf, UARTFlags$
 
 //Terminator for commands in command mode
 dim termStr$ : termStr$ = "\r"
+dim termlen  : termlen = strlen(termStr$)
 
 //OK or ERROR response strings
 dim ok$ : ok$ = "\nOK"
@@ -473,6 +574,13 @@ dim vspEscString$
 dim vspEscStringLen
 //Following will be non-zero if the VSP connection is outgoing
 dim vspIsOutGoing
+//This is the maximum number of vsp rx packets that can be cached
+dim vspCachedPkts : vspCachedPkts=8
+//Set to 1 if long range VSP connections required which is specified by SReg100
+dim vspLongRange
+
+//define an adress string which is always empty
+dim emptyAddr$ : emptyAddr$=""
 
 //This is the advert report prefix
 dim advPrefix$
@@ -493,6 +601,9 @@ dim charIdx
 //It is used to start a timer so that BleGattcWriteCmd() can be called again.
 dim vspPumpToutMs
 
+//This is the DLE Atribute Size cache read for SReg 219
+dim dleAttrSz
+
 //Following used to help debug Vsp MODEM change activity
 #cmpif 0x00000040 : dim vtxcnt : vtxcnt=0
 #cmpif 0x00000040 : dim vrxcnt : vrxcnt=0
@@ -506,6 +617,14 @@ dim vspPumpToutMs
 dim fLowPowerUart : fLowPowerUart = 0
 #cmpif 0x00400000 : fLowPowerUart = 1
 #cmpif 0x00400000 : dim uartIdleToutMs
+
+//define the prefix identifiers for extended advert and extended scan response async
+//messages to the host
+dim eadvpfx$: eadvpfx$="\nADE:"
+dim escnpfx$: escnpfx$="\nADS:"
+
+//following is updated after a successive call of either BleAdvSetStart() or BleAdvertStart()
+dim fExtAdvertising : fExtAdvertising=FALSE
 
 //******************************************************************************
 // Initialise Global Variable
@@ -571,26 +690,39 @@ sub StrToLower$(byref Text$)
 endsub
 
 //------------------------------------------------------------------------------
-// Returns the single letter AT command from the string
+// Drop all characters with ascii value less than CHR_ASCII_SPACE and >=0
+//------------------------------------------------------------------------------
+sub DropWhiteSpace(byref cmdStr$)
+  dim drop : drop=0
+
+  tmpDta = StrGetChr(cmdStr$,drop)
+  while (tmpDta>=0) && (tmpDta<=CHR_ASCII_SPACE)
+    drop=drop+1
+    tmpDta = StrGetChr(cmdStr$,drop)
+  endwhile
+  StrShiftLeft(cmdStr$,drop)
+endsub
+
+//------------------------------------------------------------------------------
+// Returns the single letter AT command from the string or a -ve value
 //------------------------------------------------------------------------------
 function GetAtCmdLetter(byref cmdStr$) as integer
-  dim drop : drop=0
   dim retVal
 
-  while 1
-    retVal = StrGetChr(cmdStr$,drop)
-    if retVal<0 then
-      StrShiftLeft(cmdStr$,drop)
-      exitfunc RSP_OK
-    elseif retVal>CHR_ASCII_SPACE then
-      drop=drop+1
-      StrShiftLeft(cmdStr$,drop)
-      exitfunc retVal
-    endif
-    //this is a whitespace
-    drop=drop+1
-  endwhile
-endfunc RSP_OK
+  DropWhiteSpace(cmdStr$)
+
+  //at this point cmdStr$ is either empty or has a first character that
+  //is > CHR_ASCII_SPACE
+  retVal = StrGetChr(cmdStr$,0)
+  if retVal>=CHR_ASCII_SPACE then
+    //string was not empty so drop the single character
+    StrShiftLeft(cmdStr$,1)
+  else
+    //assume the string was empty
+    retVal=0
+  endif
+
+endfunc retVal
 
 //------------------------------------------------------------------------------
 // Strip "" from str$ if they exist
@@ -1121,7 +1253,7 @@ endsub
 // keytype=1 for passcode (0 to 999999)
 // keytype=2 for 32 hex digit OOB key
 //------------------------------------------------------------------------------
-sub SendAuthKeyReq(keyType, byref bufferStr$ )
+sub SendAuthInfoReq(keyType, byref bufferStr$ )
   dim tmp$
   select keyType
   case BLE_GAP_AUTH_KEY_TYPE_PASSKEY
@@ -1129,6 +1261,9 @@ sub SendAuthKeyReq(keyType, byref bufferStr$ )
 
   case BLE_GAP_AUTH_KEY_TYPE_OOB
     tmp$ = "\noobkey?\r"
+
+  case BLE_GAP_AUTH_KEY_TYPE_LESC_OOB
+    tmp$ = "\nlescoob?\r"
 
   case else
     tmp$ = "\nxxkey?\r"
@@ -1138,6 +1273,22 @@ sub SendAuthKeyReq(keyType, byref bufferStr$ )
   //Send out data waiting in buffer
   SendUartData()
 endsub
+
+//------------------------------------------------------------------------------
+// This is sent when OOB data is requested by the peer during LESC OOB pairing
+// This data will be retrieved from the UART previously or during pairing attempt
+// using the AT+OOBS command
+//------------------------------------------------------------------------------
+function SubmitRemoteOobData(byref srAddr$, byref srHash$, byref srRand$)
+  if strlen(srAddr$)==7 && strlen(srHash$)==16 && strlen(srRand$)==16 then
+    rc=BleSecMngrLescPeerOobDataSet(srAddr$,srHash$,srRand$)
+    if rc != RSP_OK then
+      exitfunc rc
+    endif
+  else
+    exitfunc RSP_ERROR_INVALID_OOBDATA
+  endif
+endfunc RSP_OK
 
 //------------------------------------------------------------------------------
 // Send 'Encrypt' message
@@ -1366,9 +1517,15 @@ endsub
 //------------------------------------------------------------------------------
 //Stop & restart scanning
 //------------------------------------------------------------------------------
-function ScanningStart(tout, filter$, rsi)
+function ScanningStart(tout, filter$, rsi, scntype)
   ScanningStop()
-  rc = BleScanStart( tout, 0)
+  if scntype & SCANTYPE_USE_SCANEX_FUNC_BITMASK then
+    //use the extended scanning function
+    rc = BleScanStartEx( tout, scntype, "", EXTADV_FILTER_NONE)
+  else
+    //use the legacy scanning function
+    rc = BleScanStart( tout, ADV_FILTER_NONE)
+  endif
   #cmpif 0x00000008 :   AssertRC(13880)
 
   //Set up the filtering parameters for the scan reporting
@@ -1378,14 +1535,14 @@ function ScanningStart(tout, filter$, rsi)
     scnRssi       = rsi
   endif
 
-  #cmpif 0x00000004 : if rc==0 then
-  #cmpif 0x00000004 :   DbgMsg(    "Scanning Started")
-  #cmpif 0x00000004 :   DbgMsgVal( "  Scan Tout (sec)=",tout)
-  #cmpif 0x00000004 :   DbgMsgVal$("  Scan Pattern   =",filter$)
-  #cmpif 0x00000004 :   DbgMsgVal( "  Scan Rssi (dBm)=",rsi)
-  #cmpif 0x00000004 : else
-  #cmpif 0x00000004 :   DbgMsg("Failed to start Scanning")
-  #cmpif 0x00000004 : endif
+//  #cmpif 0x00000004 : if rc==0 then
+//  #cmpif 0x00000004 :   DbgMsg(    "Scanning Started")
+//  #cmpif 0x00000004 :   DbgMsgVal( "  Scan Tout (sec)=",tout)
+//  #cmpif 0x00000004 :   DbgMsgVal$("  Scan Pattern   =",filter$)
+//  #cmpif 0x00000004 :   DbgMsgVal( "  Scan Rssi (dBm)=",rsi)
+//  #cmpif 0x00000004 : else
+//  #cmpif 0x00000004 :   DbgMsg("Failed to start Scanning")
+//  #cmpif 0x00000004 : endif
 
 endfunc rc
 
@@ -1418,10 +1575,10 @@ sub VspGetDefs()
   //Note: Using Magic numbers to make it more difficult as a change will need to be reflected in user guide
   if (startflags&0x78)!=0 then
     //we need to increase the size of the vsp rxbuffer if it is too small
-    dontcare = 8 * DLE_ATTRIBUTE_SIZE
+    dontcare = vspCachedPkts * dleAttrSz
     if dontcare > nArg[2] then
       nArg[2] = dontcare
-      #cmpif 0x00000004 : DbgMsgVal("Increased VSP Rxbuf Size to ",dontcare)
+      //#cmpif 0x00000004 : DbgMsgVal("Increased VSP Rxbuf Size to ",dontcare)
     endif
   endif
 
@@ -1465,8 +1622,8 @@ function VspOpen()
   handleVspServiceUuid = nArg[3]
 
   //Open the VSP service with the provided configuration
-  #cmpif 0x00000004 : DbgMsgVal("VSP Txbuf Size ",nArg[1])
-  #cmpif 0x00000004 : DbgMsgVal("VSP Rxbuf Size ",nArg[2])
+  //#cmpif 0x00000004 : DbgMsgVal("VSP Txbuf Size ",nArg[1])
+  //#cmpif 0x00000004 : DbgMsgVal("VSP Rxbuf Size ",nArg[2])
   rc = BleVSPOpenEx(nArg[1], nArg[2], vspFlags, nArg[3], nArg[4], nArg[5], nArg[6], nArg[7])
   #cmpif 0x00000003 : AssertRC(14680)
   if rc==0 then
@@ -1500,26 +1657,48 @@ sub VspAdvCreateCommit()
 
   GenAdvCreateMinimal(advRpt$, scRpt$)
 
-    #cmpif 0x00000003 : AssertNE(handleVspServiceUuid,0,10950)
-  rc = BleAdvRptAddUuid128(scRpt$, handleVspServiceUuid)
-    #cmpif 0x00000003 : AssertRC(15020)
+  #cmpif 0x00000003 : AssertNE(handleVspServiceUuid,0,16390)
+
+  if vspLongRange then
+    //Advertise for VSP on le_coded
+    rc = BleAdvSetCreate(SETID_DEFAULT ,EXTADVPROP_CONNpEXT ,EXTADVPRIPHY_LECODED ,EXTADV_FILTER_NONE ,emptyAddr$ ,"")
+      #cmpif 0x00000003 : AssertRC(16470)
+    rc = BleExtAdvRptAddUuid128(advRpt$, handleVspServiceUuid,INVALID_UUID_HANDLE,INVALID_UUID_HANDLE,INVALID_UUID_HANDLE,INVALID_UUID_HANDLE,INVALID_UUID_HANDLE)
+      #cmpif 0x00000003 : AssertRC(16490)
+    rc = BleAdvSetNewData(SETID_DEFAULT,advRpt$, scRpt$)
+  else
+    //Advertise for VSP on 1MPHY
+    rc = BleAdvRptAddUuid128(scRpt$, handleVspServiceUuid)
+      #cmpif 0x00000003 : AssertRC(16540)
+    rc = BleAdvRptsCommit(advRpt$, scRpt$)
+  endif
+    #cmpif 0x00000003 : AssertRC(16570)
 
   #cmpif 0x00000001 : print "\n## VspAdv ";strhexize$(advRpt$)
   #cmpif 0x00000001 : print "\n## VspScn ";strhexize$(scRpt$)
 
-  rc = BleAdvRptsCommit(advRpt$, scRpt$)
-    #cmpif 0x00000003 : AssertRC(15050)
 endsub
 
 //------------------------------------------------------------------------------
 // Ble advertising for central devices to connect to for VSP service
 //------------------------------------------------------------------------------
 sub VspStartAdverts()
-  dim Addr$
-  Addr$ = ""
 
-  rc = BleAdvertStart(0, Addr$, SRegGet(CfgId_VspAdvertIntvlMs), 0, 0)
-    #cmpif 0x00000003 : AssertRC(15160)
+  tmpDta=SRegGet(CfgId_VspAdvertIntvlMs)
+  if vspLongRange then
+    //Advertise for VSP on le_coded
+    rc = BleAdvSetStart(SETID_DEFAULT ,tmpDta ,ADV_DURATION_FOREVER ,EXTADV_MAXCOUNT_NONE ,AUXOFFSET_DEFAULT)
+    if rc==0 then
+      fExtAdvertising=TRUE
+    endif
+  else
+    //Advertise for VSP on 1MPHY
+    rc = BleAdvertStart(ADV_IND, emptyAddr$, tmpDta, ADV_DURATION_FOREVER, ADV_FILTER_NONE)
+    if rc==0 then
+      fExtAdvertising=FALSE
+    endif
+  endif
+    #cmpif 0x00000003 : AssertRC(16810)
     #cmpif 0x00000004 : DbgMsg("Vsp Adverts Started")
 endsub
 
@@ -1538,7 +1717,11 @@ sub IdleAdvCommit()
   #cmpif 0x00000001 : print "\n## IdlAdv ";strhexize$(idleAdvRpt$)
   #cmpif 0x00000001 : print "\n## IdlScn ";strhexize$(idleScnRpt$)
 
-  rc = BleAdvRptsCommit(idleAdvRpt$, idleScnRpt$)
+  if fExtAdvertising then
+    rc = BleAdvSetNewData(SETID_DEFAULT,idleAdvRpt$, idleScnRpt$)
+  else
+    rc = BleAdvRptsCommit(idleAdvRpt$, idleScnRpt$)
+  endif
     #cmpif 0x00000003 : AssertRC(15320)
 endsub
 
@@ -1546,12 +1729,13 @@ endsub
 // Ble advertising for central devices to connect to for VSP service
 //------------------------------------------------------------------------------
 sub IdleStartAdverts( advType, adIntervalMs )
-  dim Addr$
-  Addr$ = ""
 
-  rc = BleAdvertStart(advType, Addr$, idleAdvIntvlMs , 0, 0)
+  rc = BleAdvertStart(advType, emptyAddr$, idleAdvIntvlMs , ADV_DURATION_FOREVER, ADV_FILTER_NONE)
   #cmpif 0x00000003 : AssertRC(15430)
   #cmpif 0x00000004 : DbgMsg("Idle Adverts Started")
+  if rc==0 then
+    fExtAdvertising=FALSE
+  endif
 
   //save in cache
   idleAdvType    = advType
@@ -1619,7 +1803,7 @@ sub InitGPIO()
   //cache the command mode pin and set as output if one specified
   vspDcdPin = SRegGet(CfgId_VspDcdPin)
   if vspDcdPin>= 0 then
-    //set it as an output 
+    //set it as an output
     rc=GpioSetFunc(vspDcdPin,SIOTYPE_DOUT,DCD_DEASSERT_STATE)
     #cmpif 0x00000003 : AssertRC(16000)
   endif
@@ -1631,8 +1815,8 @@ endsub
 //------------------------------------------------------------------------------
 sub IdleReturnAction()
   dim scanPat$
-  #cmpif 0x00000004 : DbgMsgVal("IdleReturn - Radio", sysinfo(2016))
-  #cmpif 0x00000004 : DbgMsgVal("OldIdleState=",oldIdleState)
+  //#cmpif 0x00000004 : DbgMsgVal("IdleReturn - Radio", sysinfo(2016))
+  //#cmpif 0x00000004 : DbgMsgVal("OldIdleState=",oldIdleState)
 
   select oldIdleState
   case STATE_IDLE_VSP
@@ -1646,7 +1830,7 @@ sub IdleReturnAction()
 
   case else
     //nothing to do
-    #cmpif 0x00000004 : DbgMsg("IdleReturn - unknown")
+    //#cmpif 0x00000004 : DbgMsg("IdleReturn - unknown")
   endselect
 
   //change state
@@ -1705,10 +1889,10 @@ function IsTrustedPeer(hConn)
 
   if klen > 0 then
     //it is trusted and for Phase 1 ignore the authentication stuff
-    #cmpif 0x00000004 : print "\n## Peer is trusted "
-    #cmpif 0x00000004 : if (kInfo & BONDING_KEYINFO_MITM_AUTHENTICATED)!=0 then
-    #cmpif 0x00000004 :   print "(Authenticated)"
-    #cmpif 0x00000004 : endif
+    //#cmpif 0x00000004 : print "\n## Peer is trusted "
+    //#cmpif 0x00000004 : if (kInfo & BONDING_KEYINFO_MITM_AUTHENTICATED)!=0 then
+    //#cmpif 0x00000004 :   print "(Authenticated)"
+    //#cmpif 0x00000004 : endif
 
     if (kInfo & BONDING_KEYINFO_MITM_AUTHENTICATED)!=0 then
       //it is an authenticated bond, reuse kInfo variable for return value
@@ -1734,11 +1918,11 @@ function GattClientOpen()
       rc=CONN_ERROR_OUTOFMEM
     else
       fGattClient=1
-      #cmpif 0x00000004 : DbgMsg("GattClientOpen")
+      //#cmpif 0x00000004 : DbgMsg("GattClientOpen")
     endif
   else
     rc=RSP_OK
-      #cmpif 0x00000004 : DbgMsg("GattClient was Open")
+      //#cmpif 0x00000004 : DbgMsg("GattClient was Open")
   endif
 endfunc rc
 
@@ -1873,8 +2057,13 @@ endsub
 //------------------------------------------------------------------------------
 sub OnVspConnCommon(hConn)
   connHandles[HCONN_VSP] = hConn
+
   vspDisconSts=-1 //assume normal disconnection will happen
   vspEscCount=0
+
+  //Set default chuck size, it will be negotiated and updated after there is a VSP connection
+  vspChunkLen = DEFAULT_ATTRIBUTE_SIZE
+
 endsub
 
 //------------------------------------------------------------------------------
@@ -1890,7 +2079,7 @@ sub OnNonVspConnection(hConn)
   else
     //cache the connection handle
     connHandles[nodeIdx]=hConn
-    //send an DISCON response
+    //send an CONNECT response
     SendNonVspConnect(nodeIdx, UARTSndBuf$)
     //change state
     NewState(STATE_nonVSP_CONNECTED)
@@ -2068,10 +2257,19 @@ sub OnAuthKeyRequest(nCtx)
     NewState(STATE_VSP_DISCONNECTING)
 
   case STATE_nonVSP_CONNECTED
-    SendAuthKeyReq(nCtx, UARTSndBuf$)
+    SendAuthInfoReq(nCtx, UARTSndBuf$)
 
   case else
   endselect
+endsub
+
+//------------------------------------------------------------------------------
+//Called when LESC OOB data is requested
+//------------------------------------------------------------------------------
+sub OnLescOobRequest(byref buffer$,hConn)
+
+  SendAuthInfoReq(BLE_GAP_AUTH_KEY_TYPE_LESC_OOB, UARTSndBuf$ )
+
 endsub
 
 //------------------------------------------------------------------------------
@@ -2289,10 +2487,17 @@ endfunc rc
 // Configure the pairing capability as set via the S registers
 //------------------------------------------------------------------------------
 sub PairingConfig()
-  //set the iocapability
-  pairIoCapCache = SRegGet(CfgId_PairingIoCapability)
+  //set the iocapability, -ve value mean OOB pairing is prefered
+  dontcare = SRegGet(CfgId_PairingIoCapability)
+  pairIoCapCache = abs(dontcare)
   rc=BleSecMngrIoCap(pairIoCapCache)
   #cmpif 0x00000003 : AssertRC(22340)
+
+  if dontcare<0 then
+    //OOB pairing is prefered
+    rc=BleSecMngrOOBPref(1)
+    #cmpif 0x00000003 : AssertRC(24700)
+  endif
 
   //Enable LESC preference
   rc=BleSecMngrLescPairingPref(1)
@@ -2340,8 +2545,10 @@ endfunc RSP_OK
 
 //------------------------------------------------------------------------------
 // Extract addr and load other connection related variables
+// if the address has prefix 'l' then a long range connection will be performed
 //------------------------------------------------------------------------------
 function ConnSetup(byref cmdStr$)
+  dim lngRange
 
   //Stop adverts if on
   AdvertsStop()
@@ -2353,6 +2560,18 @@ function ConnSetup(byref cmdStr$)
   if rc!=0 then
     exitfunc rc
   endif
+
+  //Check if the 'L' prefix exists
+  DropWhiteSpace(cmdStr$)
+  tmpDta=StrGetChr(cmdStr$,0)
+  select tmpDta
+  case 0x4C,0x6C  //l or L
+    #cmpif 0x00000004 : DbgMsg("Long Range Conn Selected")
+    lngRange=1
+    StrShiftLeft(cmdStr$,1)
+  case else
+    lngRange=0
+  endselect
 
   //Extract the mac address of the peer to connect to
   rc = ExtractAddr(cmdStr$) //sArg$[0] is updated with address
@@ -2384,7 +2603,12 @@ function ConnSetup(byref cmdStr$)
   #cmpif 0x00000004 :  DbgMsgVal("  Link Suprvsn   =",nArg[3])
 
   //OK to start an outgoing connection
-  rc=BleConnect(sArg$[0], nArg[0] , nArg[1],nArg[2],nArg[3] )
+  if lngRange then
+    rc=BleConnectExtended(sArg$[0], nArg[0] , nArg[1],nArg[2],nArg[3],lngRange,EXTADV_FILTER_NONE )
+    #cmpif 0x00000004 : DbgMsg("Called BleConnectExtended()")
+  else
+    rc=BleConnect(sArg$[0], nArg[0] , nArg[1],nArg[2],nArg[3] )
+  endif
   if rc!=0 then
     #cmpif 0x00000004 : DbgMsgVal ("BleConnect failed with",rc)
     exitfunc CONN_ERROR_BLECONNECT
@@ -2617,13 +2841,13 @@ function _atPlusSIO(byval actType, byref cmdStr$, byref rspBuf$)
   //At this point rc==RSP_OK
 
   select actType
-  case 0 //READ
+  case CMD_ACTTYPE_SIOR //READ
     //append to buffer
     //#cmpif 0x00000004 :  print "\n## SIO read ";nArg[0]
     sprint #dontcare$,GpioRead(nArg[0])
     rspBuf$ = rspBuf$ + "\n" + dontcare$ + "\r"
 
-  case 1 //WRITE
+  case CMD_ACTTYPE_SIOW //WRITE
     if args==2 then
       rc = SArgConvertToInt(1,0,0,0x7FFF)
       if rc!=RSP_OK then
@@ -2636,7 +2860,7 @@ function _atPlusSIO(byval actType, byref cmdStr$, byref rspBuf$)
       rc=RSP_ERROR_SYNTAX_ERROR
     endif
 
-  case 2 //CONFIG
+  case CMD_ACTTYPE_SIOC //CONFIG
     if args==3 then
       rc = SArgConvertToInt(1,1,1,3)
       if rc!=RSP_OK then
@@ -2661,13 +2885,13 @@ function _atPlusSIO(byval actType, byref cmdStr$, byref rspBuf$)
 endfunc rc
 
 //------------------------------------------------------------------------------
-//:/ at+lscn<timeout_seconds><,"escaped_pattern"><,rssi>
+//:/ at+lscn<timeout_seconds><,"escaped_pattern"><,rssi><,scantype>
 //:/ at+lscn<x>
 //------------------------------------------------------------------------------
 function _atPlusLSCN(byref cmdStr$, byref rspBuf$)
   dim args
   sArg$[0]=""
-  rc=ExtractArgsCSV(cmdStr$,args, 0,3)
+  rc=ExtractArgsCSV(cmdStr$,args, 0,4)
   if rc!=RSP_OK then
     exitfunc rc
   endif
@@ -2692,11 +2916,17 @@ function _atPlusLSCN(byref cmdStr$, byref rspBuf$)
     exitfunc rc
   endif
 
-  //Get Scan Pattern
+  //Get Scan Pattern into sArg$[1]
   StrDeEscape(sArg$[1])  //ensure escaped characters are converted to binary
 
-  //Get minimum RSSI threshold
+  //Get minimum RSSI threshold into nArg[2]
   rc=SArgConvertToInt(2,-128,-128,20)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  //Get scantype into nArg[3]
+  rc=SArgConvertToInt(3,SCANTYPE_1MPHY,1,SCANTYPE_ALL)
   if rc!=RSP_OK then
     exitfunc rc
   endif
@@ -2706,14 +2936,14 @@ function _atPlusLSCN(byref cmdStr$, byref rspBuf$)
   case STATE_IDLE_nonVSP
     //Scan timeout has to be specified in milliseconds
     //now start scanning with new parameters
-    rc = ScanningStart( (nArg[0]* 1000), sArg$[1], nArg[2])
+    rc = ScanningStart( (nArg[0]* 1000), sArg$[1], nArg[2], nArg[3])
     advPrefix$ = "\nAD0:"
     rc=RSP_OK
 
   case STATE_IDLE_VSP
     if nArg[0]== 0 then
       //permanent scanning requested
-      rc=ScanningStart(0, sArg$[1], nArg[2])
+      rc=ScanningStart(0, sArg$[1], nArg[2], nArg[3])
       //change state
       advPrefix$ = "\nAD0:"
       NewState(STATE_IDLE_nonVSP)
@@ -2723,7 +2953,7 @@ function _atPlusLSCN(byref cmdStr$, byref rspBuf$)
       //if advertising and/or scanning in progress stop them
       AdvertsStop()
       //now start scanning with new parameters
-      rc = ScanningStart( (nArg[0]* 1000), sArg$[1], nArg[2])
+      rc = ScanningStart( (nArg[0]* 1000), sArg$[1], nArg[2], nArg[3])
       if rc==0 then
         //successfully started scanning
         advPrefix$ = "\nAD1:"
@@ -2742,7 +2972,7 @@ function _atPlusLSCN(byref cmdStr$, byref rspBuf$)
       //if advertising and/or scanning in progress stop them
       AdvertsStop()
       //now start scanning with new parameters
-      rc = ScanningStart( (nArg[0]* 1000), sArg$[1], nArg[2])
+      rc = ScanningStart( (nArg[0]* 1000), sArg$[1], nArg[2], nArg[3])
       if rc==0 then
         //successfully started scanning
         advPrefix$ = "\nAD2:"
@@ -2757,6 +2987,23 @@ function _atPlusLSCN(byref cmdStr$, byref rspBuf$)
 endfunc rc
 
 //------------------------------------------------------------------------------
+// Returns 1 if args==1 and sArgs[0] is X or x  and the adverts has been stopped
+//------------------------------------------------------------------------------
+function CheckStopAdverts(args)
+  if (args==1) then
+    StrToLower$(sArg$[0])
+    if strcmp(sArg$[0],"x")==0 then
+      AdvertsStop()
+      if curState==STATE_IDLE_VSP then
+        //only change state if we are in VSP Idle
+        NewState(STATE_IDLE_nonVSP)
+      endif
+      exitfunc 1
+    endif
+  endif
+endfunc 0
+
+//------------------------------------------------------------------------------
 //:/ at+ladv<advType><,advIntervalMs>
 //:/ at+ladv<x>
 //------------------------------------------------------------------------------
@@ -2769,16 +3016,8 @@ function _atPlusLADV(byref cmdStr$, byref rspBuf$)
   endif
 
   //Check if this is to stop advertising ( AT+LADVX )
-  if (args==1) then
-    StrToLower$(sArg$[0])
-    if strcmp(sArg$[0],"x")==0 then
-      AdvertsStop()
-      if curState==STATE_IDLE_VSP then
-        //only change state if we are in VSP Idle
-        NewState(STATE_IDLE_nonVSP)
-      endif
-      exitfunc RSP_OK
-    endif
+  if CheckStopAdverts(args) then
+    exitfunc RSP_OK
   endif
 
   //Get advtype into nArg[0]
@@ -2802,6 +3041,113 @@ function _atPlusLADV(byref cmdStr$, byref rspBuf$)
   IdleAdvCommit()
   //Start Advertising
   IdleStartAdverts(nArg[0], nArg[1])
+  if curState==STATE_IDLE_VSP then
+    //only change state if we are in VSP Idle
+    NewState(STATE_IDLE_nonVSP)
+  endif
+
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+//:/ at+eadv<advProp><,advIntervalMs><,MaxCount><,advPriSecPhy><,peerAddr><,chanMask>
+//:/ at+eadv<x>
+//------------------------------------------------------------------------------
+function _atPlusEADV(byref cmdStr$, byref rspBuf$)
+  dim args
+  //This command has from 1 to 5 parameters
+  rc=ExtractArgsCSV(cmdStr$,args, 1,5)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  //Check if this is to stop advertising ( AT+LADVX )
+  if CheckStopAdverts(args) then
+    exitfunc RSP_OK
+  endif
+
+  //Get mandatory advProp into nArg[0]
+  rc=SArgConvertToInt(0,MAX_EXTADV_PROPERTY_DEFAULT,0,MAX_EXTADV_PROPERTY_VALUE) //See BleAdvSetCreate() and advProp description
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  //Get optional adv interval milliseconds into nArg[1]
+  rc=SArgConvertToInt(1,idleAdvIntvlMs,SREG_IdleAdvertIntvlMs_MIN,SREG_IdleAdvertIntvlMs_MAX)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  //Get optional maxCount nArg[2] - default 0
+  rc=SArgConvertToInt(2,EXTADV_MAXCOUNT_DEFAULT,0,EXTADV_MAXCOUNT_MAXIMUM)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  //Get optional primary and secondary PHY into nArg[3] - default 1MPHY
+  rc=SArgConvertToInt(3,MAX_EXTADV_PRISECPHY_DEFAULT,0,MAX_EXTADV_PRISECPHY)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  //Get optional peeraddress which must be empty if directed bit in advprop is clear
+  tmpDta=strlen(sArg$[4])
+  if tmpDta==0 then
+    //peer address not specified
+    if nArg[0] & EXTADVPROP_DIRECTED then
+      //directed advert
+      exitfunc RSP_ERROR_DIRECTED_NOPEERADDR
+    endif
+  else
+    //non-empty string so dehexize
+    sArg$[4]=StrDehexize$(sArg$[4])
+    tmpDta=strlen(sArg$[4])
+    if tmpDta!=SIZE_OF_BLE_ADDRESS then
+      //not a valid ble address
+      exitfunc RSP_ERROR_INVALID_ADDRESS
+    endif
+  endif
+
+  //Get optional channel mask which can be empty or exactly 5 bytes long
+  tmpDta=strlen(sArg$[5])
+  if tmpDta!=0 then
+    //chan mask specified
+    sArg$[5]=StrDehexize$(sArg$[5])
+    tmpDta=strlen(sArg$[5])
+    if tmpDta!=SIZE_OF_CHANNEL_MASK then
+      //not a valid ble address
+      exitfunc RSP_ERROR_INVALID_CHANMASK
+    endif
+  endif
+
+      //------------------------------------------------------------------------------
+      //      0          1             2          3              4           5
+      // <advProp><,advIntervalMs><,MaxCount><,advPriSecPhy><,peerAddr><,chanMask>
+      //------------------------------------------------------------------------------
+
+  //if advertising in progress stop it
+  AdvertsStop()
+  //Create Advert Set
+  rc=BleAdvSetCreate(SETID_DEFAULT,nArg[0],nArg[3],EXTADV_FILTER_NONE,sArg$[4],sArg$[5])
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+  //Attach data to the advert set
+  rc = BleAdvSetNewData(SETID_DEFAULT,idleAdvRpt$, idleScnRpt$)
+  if rc==NORDICERROR_INVALID_PARM then
+    exitfunc RSP_ERROR_INVALID_REPORTS
+  elseif rc==NORDICERROR_INVALID_DATA then
+    exitfunc RSP_ERROR_INVALID_RPT_DATA
+  elseif rc==NORDICERROR_INVALID_DATA_SIZE then
+    exitfunc RSP_ERROR_INVALID_RPT_DATA_SIZE
+  elseif rc!=RSP_OK then
+    exitfunc rc
+  endif
+  rc = BleAdvSetStart(SETID_DEFAULT,nArg[1],ADV_DURATION_FOREVER,nArg[2],AUXOFFSET_DEFAULT)
+  if rc!=RSP_OK then
+    exitfunc rc
+  else
+    fExtAdvertising=TRUE
+  endif
   if curState==STATE_IDLE_VSP then
     //only change state if we are in VSP Idle
     NewState(STATE_IDLE_nonVSP)
@@ -2919,7 +3265,8 @@ endfunc RSP_OK
 
 //------------------------------------------------------------------------------
 // Process ATD command
-//:/ATDmacaddress14hexbytes
+//:/ATD macaddress14hexbytes
+//:/ATD L macaddress14hexbytes      //for long range connection
 //:/====
 //:/
 //:/
@@ -2961,7 +3308,8 @@ endfunc CONN_SUSPEND
 
 //------------------------------------------------------------------------------
 // Process AT_LCON command
-//:/AT_LCONmacaddress14hexbytes
+//:/AT_LCON macaddress14hexbytes
+//:/AT_LCON L macaddress14hexbytes  //for long range connection
 //:/====
 //:/
 //:/
@@ -3009,9 +3357,27 @@ function _atPlusCMD_I(cmdId, byref cmdStr$)
   //:/AT+LDSCnn
   //:/====
   case CMD_I_LDSC
-    if connHandles[nArg[0]) then
+    if hConn then
       rc=BleDisconnect(hConn)
       #cmpif 0x00000003 : AssertRC(29370)
+    endif
+
+  // Process AT+LMTU command
+  //:/AT+LMTUnn
+  //:/====
+  case CMD_I_LMTU
+    if hConn then
+      rc=BleGattcAttributeMtuRequest(hConn)
+      #cmpif 0x00000001 :  print "\n## BleGattcAttributeMtuRequest() ret:";integer.h' rc
+    endif
+
+  // Process AT+LPHY command
+  //:/AT+LPHYnn
+  //:/====
+  case CMD_I_LPHY
+    if hConn then
+      rc=ChangePhy(hConn)
+      #cmpif 0x00000001 :  print "\n## ChangePhy() ret:";integer.h' rc
     endif
 
   case CMD_I_PAIR
@@ -3085,6 +3451,49 @@ function _atPlusPRSP(byref cmdStr$)
 endfunc rc
 
 //------------------------------------------------------------------------------
+// Host has supplied the OOB data for remote device
+//------------------------------------------------------------------------------
+function _atPlusOOBR(byref cmdStr$)
+  dim args
+
+  rc=ExtractArgsCSV(cmdStr$,args,3,3)
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  //Submit remote address, OOB Hash and OOB Rand as received over OOB link from the remote device
+  if strlen(sArg$[0])!=14 || strlen(sArg$[1])!=32 || strlen(sArg$[2])!=32 then
+    exitfunc RSP_ERROR_INVALID_HEXSTR
+  endif
+
+  //dehexize the data first
+  sArg$[0]=strdehexize$(sArg$[0])    //address
+  sArg$[1]=strdehexize$(sArg$[1])    //hash
+  sArg$[2]=strdehexize$(sArg$[2])    //rand
+
+endfunc SubmitRemoteOobData(sArg$[0],sArg$[1],sArg$[2])
+
+//------------------------------------------------------------------------------
+// Host is requesting local OOB data so that it can send to remote out-of-band
+//------------------------------------------------------------------------------
+function _atPlusOOBL(byref cmdStr$, byref rbuf$)
+
+  rc=BleSecMngrLescOwnOobDataGet(sArg$[0],sArg$[1],sArg$[2])
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+
+  //Hexize the data
+  sArg$[0]=strhexize$(sArg$[0])    //address
+  sArg$[1]=strhexize$(sArg$[1])    //hash
+  sArg$[2]=strhexize$(sArg$[2])    //rand
+
+  rbuf$=rbuf$ + "\nOL:" + sArg$[0] + "," + sArg$[1] + "," + sArg$[2] + "\r"
+  //send data waiting in UART buffer
+  SendUartData()
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 function _atPlusGCRD_WR(cmdType, byref cmdStr$)
   dim args,hConn
@@ -3109,14 +3518,14 @@ function _atPlusGCRD_WR(cmdType, byref cmdStr$)
   endif
 
   select cmdType
-  case 0  // GATTC Read
+  case CMD_GCRDWR_GCRD  // GATTC Read
     //Convert offset to integer and save in nArg[2]
     rc=SArgConvertToInt(2, 0, 0, 511)
     if rc!=RSP_OK then
       exitfunc rc
     endif
 
-  case 1,2
+  case CMD_GCRDWR_GCWA,CMD_GCRDWR_GCWC
     dontcare$=strdehexize$(sArg$[2])
     if (strlen(dontcare$)*2) != strlen(sArg$[2]) then
       exitfunc RSP_ERROR_INVALID_HEXSTR
@@ -3128,13 +3537,13 @@ function _atPlusGCRD_WR(cmdType, byref cmdStr$)
   hConn = connHandles[nArg[0]]
 
   select cmdType
-  case 0  // GATTC Read
+  case CMD_GCRDWR_GCRD  // GATTC Read
     rc=BleGattcRead(hConn,nArg[1],nArg[2])
 
-  case 1  //GATTC Write Acked
+  case CMD_GCRDWR_GCWA  //GATTC Write Acked
     rc=BleGattcWrite(hConn,nArg[1],dontcare$)
 
-  case 2  //GATTC Write NOT Acked
+  case CMD_GCRDWR_GCWC  //GATTC Write NOT Acked
     rc=BleGattcWriteCmd(hConn,nArg[1],dontcare$)
 
   case else
@@ -3300,6 +3709,7 @@ function _atPlusGSSB_E(fNew, byref cmdStr$)
   dim args
 
   if fNew then
+    //CMD_GSSBE_GSSB
     rc=ExtractArgsCSV(cmdStr$,args, 1,1)  //extract the uuid handle index
     if rc!=RSP_OK then
       exitfunc rc
@@ -3319,6 +3729,7 @@ function _atPlusGSSB_E(fNew, byref cmdStr$)
     rc=BleServiceNew(1,uuidHandles[nArg[0]],svcHandle)
 
   else
+    //CMD_GSSBE_GSSE
     //The end of a service definition
     rc=BleServiceCommit(svcHandle)
     svcHandle=0
@@ -3682,7 +4093,7 @@ function _atPlusAxRA(cmdStr$, rpt$)
     //de-escape the data
     StrDeEscape(sArg$[1])
     //finally append to the report
-    rc=BleAdvRptAppendAD(rpt$,nArg[0],sArg$[1])
+    rc=BleExtAdvRptAppendAD(rpt$,nArg[0],sArg$[1])
   endif
 endfunc rc
 
@@ -3708,14 +4119,14 @@ function _atPlusM0O1(byref cmdStr$,cmdId,defval,mn,mx)
   endif
 
   select cmdId
-  case 0 //arst
+  case CMD_MO01_ARST //arst
     GenAdvCreateMinimal(idleAdvRpt$, idleScnRpt$)
     if nArg[0]==0 then
       //not connectable advert so we can remove all AD elements from the ADV report
       idleAdvRpt$ = idleScnRpt$
     endif
 
-  case 1 //sfmt
+  case CMD_MO01_SFMT //sfmt
     scnFmt = nArg[0]
 
   case else
@@ -3735,13 +4146,13 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
   StrToLower$(tmp$)
   //check what command it is
   if strcmp(tmp$,"sior")==0 then
-    rc=_atPlusSIO(0,cmdStr$,rspBuf$)
+    rc=_atPlusSIO(CMD_ACTTYPE_SIOR,cmdStr$,rspBuf$)
 
   elseif strcmp(tmp$,"siow")==0 then
-    rc=_atPlusSIO(1,cmdStr$,rspBuf$)
+    rc=_atPlusSIO(CMD_ACTTYPE_SIOW,cmdStr$,rspBuf$)
 
   elseif strcmp(tmp$,"sioc")==0 then
-    rc=_atPlusSIO(2,cmdStr$,rspBuf$)
+    rc=_atPlusSIO(CMD_ACTTYPE_SIOC,cmdStr$,rspBuf$)
 
   elseif strcmp(tmp$,"lscn")==0 then
     rc=_atPlusLSCN(cmdStr$,rspBuf$)
@@ -3751,6 +4162,9 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
 
   elseif strcmp(tmp$,"ladv")==0 then
     rc=_atPlusLADV(cmdStr$,rspBuf$)
+
+  elseif strcmp(tmp$,"eadv")==0 then
+    rc=_atPlusEADV(cmdStr$,rspBuf$)
 
   elseif strcmp(tmp$,"bndt")==0 then
     rc=_atPlusBNDT(cmdStr$,rspBuf$)
@@ -3770,6 +4184,12 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
   elseif strcmp(tmp$,"ldsc")==0 then
     rc=_atPlusCMD_I(CMD_I_LDSC, cmdStr$)
 
+  elseif strcmp(tmp$,"lmtu")==0 then
+    rc=_atPlusCMD_I(CMD_I_LMTU, cmdStr$)
+
+  elseif strcmp(tmp$,"lphy")==0 then
+    rc=_atPlusCMD_I(CMD_I_LPHY, cmdStr$)
+
   elseif strcmp(tmp$,"pair")==0 then
     rc=_atPlusCMD_I(CMD_I_PAIR, cmdStr$)
 
@@ -3779,14 +4199,20 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
   elseif strcmp(tmp$,"prsp")==0 then
     rc=_atPlusPRSP(cmdStr$)
 
+  elseif strcmp(tmp$,"oobr")==0 then
+    rc = _atPlusOOBR(cmdStr$)
+
+  elseif strcmp(tmp$,"oobl")==0 then
+    rc = _atPlusOOBL(cmdStr$,rspBuf$)
+
   elseif strcmp(tmp$,"gcrd")==0 then
-    rc=_atPlusGCRD_WR(0,cmdStr$)
+    rc=_atPlusGCRD_WR(CMD_GCRDWR_GCRD,cmdStr$)
 
   elseif strcmp(tmp$,"gcwa")==0 then    //write acked
-    rc=_atPlusGCRD_WR(1,cmdStr$)
+    rc=_atPlusGCRD_WR(CMD_GCRDWR_GCWA,cmdStr$)
 
   elseif strcmp(tmp$,"gcwc")==0 then    //write cmd (not acked)
-    rc=_atPlusGCRD_WR(2,cmdStr$)
+    rc=_atPlusGCRD_WR(CMD_GCRDWR_GCWC,cmdStr$)
 
   elseif strcmp(tmp$,"gcfa")==0 then    //find attribute of characteristic value or descriptor
     rc=_atPlusGCFA(cmdStr$)
@@ -3801,10 +4227,10 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
     rc=_atPlusCMD_IS(CMD_IS_INDICATE,cmdStr$)
 
   elseif strcmp(tmp$,"gssb")==0 then
-    rc=_atPlusGSSB_E(1,cmdStr$)
+    rc=_atPlusGSSB_E(CMD_GSSBE_GSSB,cmdStr$)
 
   elseif strcmp(tmp$,"gsse")==0 then
-    rc=_atPlusGSSB_E(0,cmdStr$)
+    rc=_atPlusGSSB_E(CMD_GSSBE_GSSE,cmdStr$)
 
   elseif strcmp(tmp$,"gsmd")==0 then
     rc=_atPlusGSMD(cmdStr$)
@@ -3819,7 +4245,7 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
     rc=_atPlusCMD_IS(CMD_IS_LOCALWRITE,cmdStr$)
 
   elseif strcmp(tmp$,"arst")==0 then
-    rc=_atPlusM0O1(cmdStr$,0,1,0,1)
+    rc=_atPlusM0O1(cmdStr$,CMD_MO01_ARST,1,0,1)
 
   elseif strcmp(tmp$,"acmt")==0 then
     rc=_atPlusACMT()
@@ -3831,7 +4257,7 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
     rc=_atPlusAxRA(cmdStr$, idleScnRpt$)
 
   elseif strcmp(tmp$,"sfmt")==0 then
-    rc=_atPlusM0O1(cmdStr$,1,0,0,1)
+    rc=_atPlusM0O1(cmdStr$,CMD_MO01_SFMT,0,0,1)
 
 //  --------------------------------------------------
 // Following only to be added when custom descriptor requirement
@@ -3946,7 +4372,7 @@ sub ProcessCommands(byref ORIGRecBuf$,byref RSPSndBuf$)
       cmdStr$=StrSplitLeft$(ORIGRecBuf$, 1)
     else
       //non empty string
-      termPos = termPos + 1
+      termPos = termPos + termlen
       cmdStr$=StrSplitLeft$(ORIGRecBuf$, termPos)
 
       //Parse and run AT command
@@ -3991,25 +4417,40 @@ sub Startup()
   //get startup flags
   startflags=SRegGet(CfgId_StartupFlags)
 
-  //Update config keys and reset if required
-  dim nUpdated,newVal : nUpdated=0
+  //get the DLE Atribute length
+  dleAttrSz=SRegGet(CfgId_DleAttributeSize)
 
-  //Configure for high bandwidth
+  //get the maximum number of vsp packets that can be cached
+  vspCachedPkts=SRegGet(CfgId_VspMaxCachedRxPkts)
+
+  //Update config keys and reset if required
+  dim nUpdated,newVal[3] : nUpdated=0
+
+  //Configure for high bandwidth - which is now always set to 0 as we have finer control
+  //and it is actually a legacy artifact
+  SetConfigKey(ENABLE_HIGH_BANDWIDTH_KEY_ID,0,nUpdated)       //Force config to 0
+
+  //Update config keys that affect throughput if enabled
   //Note: Using Magic numbers to make it more difficult as a change will need to be reflected in user guide
-  #cmpif 0x00100000 : if (((startflags>>5) & 0x00000003) == 0x01) then
-  #cmpif 0x00100000 :   //if long range is enabled then highbandwidth needs to be forced to enabled
-  #cmpif 0x00100000 :   newVal = 1
-  #cmpif 0x00100000 : else
-    //Else use bit 3 of startflags to define highbandwidth
-    //Note: Using Magic numbers to make it more difficult as a change will need to be reflected in user guide
-    newVal = ((startflags>>3) & 0x00000001)
-  #cmpif 0x00100000 : endif
-  SetConfigKey(ENABLE_HIGH_BANDWIDTH_KEY_ID,newVal,nUpdated)       //Bandwidth set
+  if ((startflags>>3)&0x00000001) then
+    //Set for optimised VSP mode (max 1 incoming or 1 outgoing connection)
+    newVal[IDX_MAX_CONN_AS_SLAVE]=1  //Max connection as slave
+    newVal[IDX_MAX_CONN_AS_MASTER]=1  //Max connection as master
+    newVal[IDX_SET_ASIDE_TIME]=SRegGet(CfgId_SetAsideTimeForPktsInConn)  //Max time aside for packet transmission in vsp conn
+  else
+    //not set for optimised VSP mode (max 1 incoming or 1 outgoing connection)
+    newVal[IDX_MAX_CONN_AS_SLAVE]=SRegGet(CfgId_MaxConnsAsSlave)  //Max connection as slave
+    newVal[IDX_MAX_CONN_AS_MASTER]=SRegGet(CfgId_MaxConnsAsMaster)  //Max connection as master
+    newVal[IDX_SET_ASIDE_TIME]=DEFAULT_SET_ASIDE_TIME_US  //Max time aside for packet transmission in vsp conn
+  endif
+  SetConfigKey(MAX_CONNS_SLAVE_KEY_ID,  newVal[IDX_MAX_CONN_AS_SLAVE],  nUpdated)
+  SetConfigKey(MAX_CONNS_MASTER_KEY_ID, newVal[IDX_MAX_CONN_AS_MASTER], nUpdated)
+  SetConfigKey(SET_ASIDE_TIMEus_KEY_ID, newVal[IDX_SET_ASIDE_TIME],     nUpdated)
 
   //Update Data Length Extension related config keys
   //Note: Using Magic numbers to make it more difficult as a change will need to be reflected in user guide
   if ((startflags>>4)&0x00000001) then
-    vspAttrMaxLen = DLE_ATTRIBUTE_SIZE
+    vspAttrMaxLen = dleAttrSz
   else
     vspAttrMaxLen = DEFAULT_ATTRIBUTE_SIZE
   endif
@@ -4022,6 +4463,14 @@ sub Startup()
     reset(0)
   endif
 
+  //cache the long range vsp flag
+  vspLongRange=0
+  if ((startflags>>5) & 0x00000003) == 1 then
+    vspLongRange=1
+  endif
+
+  //Set default chuck size, it will be negotiated and updated after there is a VSP connection.
+  //It will also be reset to the default when there is a vsp connection.
   vspChunkLen = DEFAULT_ATTRIBUTE_SIZE
 
   //Setup the uart
@@ -4066,6 +4515,10 @@ sub Startup()
   vspEscStringLen = strlen(vspEscString$)+1 //Added 1 to ensure that if we get 1 more byte then
                                             //we have NOT received the escape sequence
 
+  //Manage 2MPHY change request via app rather than just auto accept the change
+  #cmpif    0x00800000 : rc = BleConnectConfig(9,1)
+  #cmpifand 0x00800103 : AssertRC(41060)
+
   //Get startup flags
   vspAdded = 0
   //Check if need to make connectable for VSP
@@ -4107,7 +4560,7 @@ sub Startup()
     if ((startflags & 0x00000004)==0x00000004) then
       //need to start scanning in idle
       scanPat$=SRegGetStr$( CfgIdStr_ScanPattern )
-      rc = ScanningStart(0,scanPat$,SRegGet(CfgId_ScanRssiMinimum))
+      rc = ScanningStart(0,scanPat$,SRegGet(CfgId_ScanRssiMinimum),SCANTYPE_VSP_MODE)
       //#cmpif 0x00000004 : DbgMsg("IDLE_ADV_SCN scanning started")
     endif
     //change state
@@ -4181,40 +4634,67 @@ function HndlrConnTout()
 endfunc 1
 
 //------------------------------------------------------------------------------
-// This handler is called when there at least one scan response waiting to be read
+// Helper routine to display the advert information
 dim _display, _adType  //To only be used by the following functions
+//------------------------------------------------------------------------------
+sub HelperShowReport(adtyp,prefix$)
+  #cmpif 0x00000400 : print "\n## Adv=";strhexize$(advData$)
+  _display=0
+  if nRssi > scnRssi then
+    if scnPatternLen>0 then
+      if strpos(advData$,scnPattern$,0) >= 0 then
+        //rssi is above threshold and pattern found
+        _display=1
+      endif
+    else
+      //rssi is above threshold and no pattern specified
+      _display=1
+    endif
+  endif
+  if _display then
+    #cmpif 0x00400000 : UartReOpen()
+    print prefix$;adtyp;" ";StrHexize$(periphAddr$);" ";nRssi
+    select scnFmt
+    case 1
+      print " \22"; StrHexize$(advData$);"\22\r"
+
+    case else
+      rc = BleGetADBytag(advData$, 0x09, nme$)
+      print " \22"; nme$ ; "\22\r";
+    endselect
+  endif
+endsub
+
+//------------------------------------------------------------------------------
+// This handler is called when there at least one scan response waiting to be read
 //------------------------------------------------------------------------------
 function HndlrAdvReport()
   //Read all cached advert reports
   rc=BleScanGetAdvReportEx(_adType,periphAddr$, advData$, nDiscarded, nRssi, dontcare)
   while (rc == 0)
-    #cmpif 0x00000400 : print "\n## Adv=";strhexize$(advData$)
-    _display=0
-    if nRssi > scnRssi then
-      if scnPatternLen>0 then
-        if strpos(advData$,scnPattern$,0) >= 0 then
-          //rssi is above threshold and pattern found
-          _display=1
-        endif
-      else
-        //rssi is above threshold and no pattern specified
-        _display=1
-      endif
-    endif
-    if _display then
-      #cmpif 0x00400000 : UartReOpen()
-      print advPrefix$;_adType;" ";StrHexize$(periphAddr$);" ";nRssi
-      select scnFmt
-      case 1
-        print " \22"; StrHexize$(advData$);"\22\r"
-
-      case else
-        rc = BleGetADBytag(advData$, 0x09, nme$)
-        print " \22"; nme$ ; "\22\r";
-      endselect
-    endif
+    HelperShowReport(_adType,advPrefix$)
     rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
   endwhile
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is an extended advert report
+//------------------------------------------------------------------------------
+function HndlrExtAdvRpt(byval ad$,byval dta$,rsi,byval metadata$)
+  advData$=dta$
+  periphAddr$=ad$
+  nRssi=rsi
+  HelperShowReport(0,eadvpfx$)
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is an extended advert report
+//------------------------------------------------------------------------------
+function HndlrExtScnRpt(byval ad$,byval dta$,rsi,byval metadata$)
+  advData$=dta$
+  periphAddr$=ad$
+  nRssi=rsi
+  HelperShowReport(0,escnpfx$)
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -4632,11 +5112,15 @@ function HndlrBleMsg(nMsgId, nCtx)
     #cmpif 0x00000004 :   DbgMsgVal("Auth Key Request, type=",nCtx)
     OnAuthKeyRequest(nCtx)
 
+  case BLE_EVBLEMSGID_LESC_OOB_REQUEST
+    #cmpif 0x00000004 :   DbgMsgVal("LESC OOB Request",nCtx)
+    SendAuthInfoReq(BLE_GAP_AUTH_KEY_TYPE_LESC_OOB, UARTSndBuf$ )
+
   #cmpif 0x00000004 : case BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER
   #cmpif 0x00000004 :   DbgMsg("Conn to Bonded Master ")
 
-  #cmpif 0x00000004 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
-  #cmpif 0x00000004 :   ShowConnParms(nCtx)
+  #cmpif 0x00000008 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
+  #cmpif 0x00000008 :   ShowConnParms(nCtx)
 
   #cmpif 0x00000004 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
   #cmpif 0x00000004 :   DbgMsg("Conn Parm Negotiation FAILED")
@@ -4858,13 +5342,41 @@ endfunc 1
 function HandlerAttrMTU(BYVAL hCOnn AS INTEGER, BYVAL nSize AS INTEGER)
   #cmpif 0x00000010 :  print "\n## Attribute MTU Changed to Size:";nSize
   vspChunkLen = nSize-3
+
+  //get connection index from conn handle and send async response if non-vsp
+  dontcare = GetIdxFromHConn(hConn)
+  if dontcare!=HCONN_VSP then
+    sprint #dontcare$,"\nMT:";dontcare;" ";vspChunkLen;"\r"
+    SendUartDataEx(dontcare$)
+  endif
 endfunc 1
 
 //==============================================================================
 // This handler is called when remote is requesting a switch to a different PHY
 //==============================================================================
 function  HandlerPhyRequest(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
-#cmpif 0x00000010 :    print "\n## BLE PHY REQUEST: (PhyTx=";PhyTx;" PhyRx =";PhyRx;")"
+#cmpif    0x00000010 :print "\n## BLE PHY REQUEST: (PhyTx=";PhyTx;" PhyRx =";PhyRx;")"
+
+#cmpif    0x00800000 :if (((startflags>>5) & 0x00000003) != 0x03) then
+#cmpif    0x00800000 :  //Only allow 2M if SReg100 has bits 5&6 set (SReg100 is cached in var startflags)
+#cmpif    0x00800000 :  if (PhyTx & PHY_2M) == PHY_2M then
+#cmpif    0x00800000 :    PhyTx=PhyTx & (~PHY_2M)
+#cmpif    0x00800000 :  endif
+#cmpif    0x00800000 :  if PhyRx==PHY_2M then
+#cmpif    0x00800000 :    PhyRx=PhyRx & (~PHY_2M)
+#cmpif    0x00800000 :  endif
+#cmpif    0x00800000 :endif
+#cmpif    0x00800000 ://Prevent AUTO value in PhyTx and PhyRx
+#cmpif    0x00800000 :if PhyTx==PHY_AUTO then
+#cmpif    0x00800000 :  PhyTx=PHY_1M
+#cmpif    0x00800000 :endif
+#cmpif    0x00800000 :if PhyRx==PHY_AUTO then
+#cmpif    0x00800000 :  PhyRx=PHY_1M
+#cmpif    0x00800000 :endif
+#cmpif    0x00000010 :print "\n## BlePhySet(PhyTx=";PhyTx;" PhyRx =";PhyRx;")"
+#cmpif    0x00800000 :rc=BlePhySet(hConn,PhyTx,PhyRx,0)
+#cmpifand 0x00800103 :AssertRC(49290)
+
 endfunc 1
 
 //==============================================================================
@@ -4876,6 +5388,25 @@ function  HandlerPhyUpdated(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx
 #cmpif 0x00000010 :     else
 #cmpif 0x00000010 :       print "\n## BLE PHY UPDATE FAIL: ";integer.h' nStatus
 #cmpif 0x00000010 :     endif
+
+  //get connection index from conn handle and send async response if non-vsp
+  dontcare = GetIdxFromHConn(hConn)
+  if dontcare!=HCONN_VSP then
+    if nStatus==0 then
+      sprint #dontcare$,"\nPU:";dontcare;" ";PhyTx;" ";PhyRx;"\r"
+    else
+      sprint #dontcare$,"\nPF:";dontcare;" ";nStatus;"\r"
+    endif
+    SendUartDataEx(dontcare$)
+  endif
+endfunc 1
+
+//==============================================================================
+// This handler is called when extended adverts have stopped because of max count
+//==============================================================================
+function HndlrExtAdvEnd(setid,reason) as integer
+  dontcare$="\nAE:\r"
+  SendUartDataEx(dontcare$)
 endfunc 1
 
 //==============================================================================
@@ -4980,6 +5511,10 @@ OnEvent EVCHARVAL               call HndlrCharVal
 OnEvent EVCHARCCCD              call HndlrCharCccd
 OnEvent EVCHARSCCD              call HndlrCharSccd
 //OnEvent EVCHARDESC              call HndlrCharDesc   //FUTURE
+
+OnEvent  EVBLE_EXTADV_RPT       call HndlrExtAdvRpt
+OnEvent  EVBLE_EXTSCN_RPT       call HndlrExtScnRpt
+OnEvent  EVBLE_EXTADV_END       call HndlrExtAdvEnd
 
 OnEvent EVTMR1                  call HndlrTmrVspPump
 
