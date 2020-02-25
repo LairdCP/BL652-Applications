@@ -141,7 +141,7 @@
 //******************************************************************************
 
 //This is the target Bluetooth device to connect to, 7 bytes in hex
-#define BTAddr "000016A4093D8A"
+#define BTAddr "01F8DEBF388613"
 
 //******************************************************************************
 // Definitions
