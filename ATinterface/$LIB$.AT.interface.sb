@@ -1,5 +1,5 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Copyright (c) 2017, Laird                                                  ++
+// Copyright (c) 2020, Laird Connectivity                                                  ++
 //                                                                            ++
 // Permission to use, copy, modify, and/or distribute this software for any   ++
 // purpose with or without fee is hereby granted, provided that the above     ++
@@ -78,6 +78,10 @@
 // -------------------
 // Application History
 // -------------------
+//
+//  3.10
+//    * Added correction for number of parameters for AT+EADV command
+//    * Added support for static passkey handling 
 //
 //  3.02
 //    * Added LESC OOB pairing capability
@@ -3054,8 +3058,8 @@ endfunc RSP_OK
 //------------------------------------------------------------------------------
 function _atPlusEADV(byref cmdStr$, byref rspBuf$)
   dim args
-  //This command has from 1 to 5 parameters
-  rc=ExtractArgsCSV(cmdStr$,args, 1,5)
+  //This command has from 1 to 6 parameters
+  rc=ExtractArgsCSV(cmdStr$,args, 1,6)
   if rc!=RSP_OK then
     exitfunc rc
   endif
@@ -3450,6 +3454,28 @@ function _atPlusPRSP(byref cmdStr$)
   endif
 endfunc rc
 
+//------------------------------------------------------------------------------
+// Host has supplied a static passkey to use in future passkey pairing
+//------------------------------------------------------------------------------
+function _atPlusPKEY(byref cmdStr$)
+  dim args
+  
+  rc=ExtractArgsCSV(cmdStr$,args,1,1)  //extract the passkey
+  
+  if strlen(sArg$[0])!=6 then
+	exitfunc RSP_ERROR_VALUE_NOT_VALID
+  endif
+  
+  rc=SArgConvertToInt(0,0,0,999999)
+  if rc==RSP_OK then
+	rc=BlePairingStaticPasskey(sArg$[0])
+  endif
+  
+  if rc!=RSP_OK then
+    exitfunc rc
+  endif
+endfunc rc
+	
 //------------------------------------------------------------------------------
 // Host has supplied the OOB data for remote device
 //------------------------------------------------------------------------------
@@ -4198,6 +4224,9 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
 
   elseif strcmp(tmp$,"prsp")==0 then
     rc=_atPlusPRSP(cmdStr$)
+	
+  elseif strcmp(tmp$,"pkey")==0 then
+    rc=_atPlusPKEY(cmdStr$)
 
   elseif strcmp(tmp$,"oobr")==0 then
     rc = _atPlusOOBR(cmdStr$)
