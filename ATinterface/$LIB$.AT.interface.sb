@@ -1,5 +1,5 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Copyright (c) 2020, Laird Connectivity                                                  ++
+// Copyright (c) 2020, Laird Connectivity                                     ++
 //                                                                            ++
 // Permission to use, copy, modify, and/or distribute this software for any   ++
 // purpose with or without fee is hereby granted, provided that the above     ++
@@ -39,7 +39,7 @@
 // -------------------
 // ATinterface Library Version
 // -------------------
-#define LibVer                 "3.00"  //Library version  (ATI23)
+#define LibVer                 "3.11"  //Library version  (ATI23)
 //
 //******************************************************************************
 // Compiler/Debug options
@@ -78,6 +78,9 @@
 // -------------------
 // Application History
 // -------------------
+//
+//  3.11
+//    * Fixed static passkey not being set properly
 //
 //  3.10
 //    * Added correction for number of parameters for AT+EADV command
@@ -3465,10 +3468,13 @@ function _atPlusPKEY(byref cmdStr$)
   if strlen(sArg$[0])!=6 then
 	exitfunc RSP_ERROR_VALUE_NOT_VALID
   endif
-  
+
+  dim tmpPassKeyStr$
+  tmpPassKeyStr$ = sArg$[0]
+
   rc=SArgConvertToInt(0,0,0,999999)
   if rc==RSP_OK then
-	rc=BlePairingStaticPasskey(sArg$[0])
+	rc=BlePairingStaticPasskey(tmpPassKeyStr$)
   endif
   
   if rc!=RSP_OK then

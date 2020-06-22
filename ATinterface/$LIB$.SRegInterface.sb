@@ -564,7 +564,7 @@ sub SReg32SetCache()
 #define CfgId_SetAsideTimeForPktsInConn       ((0x20000+5)+2)
     #cmpif 0x00010000 : offset=((CfgId_SetAsideTimeForPktsInConn-(0x20000+5))*4)
     #cmpif 0x00010000 : rc=BleEncode32(SregCache32$[1],15000,offset)  // 0x00003A98
-    #cmpif 0x00010000 : rc=BleEncode32(  SregMin32$[1],7500,offset)   // 0x00001D4C
+    #cmpif 0x00010000 : rc=BleEncode32(  SregMin32$[1],500,offset)    // 0x000001F4
     #cmpif 0x00010000 : rc=BleEncode32(  SregMax32$[1],100000,offset) // 0x000186A0
 
 //S3xx :: Some description

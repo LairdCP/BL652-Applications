@@ -1,5 +1,5 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Copyright (c) 2017, Laird                                                  ++
+// Copyright (c) 2020, Laird Connectivity                                     ++
 //                                                                            ++
 // Permission to use, copy, modify, and/or distribute this software for any   ++
 // purpose with or without fee is hereby granted, provided that the above     ++
@@ -144,7 +144,7 @@
 #define SREGINIT_MAX32_0 "\1E\04\3D\00\1E\04\3D\00\40\42\0F\00\FF\FF\00\00\FF\FF\00\00"
 //                  300+    5           6           7           8          9
 #define SREGINIT_VAL32_1 "\03\20\00\00\02\20\00\00\98\3A\00\00\00\00\00\00\00\00\00\00"
-#define SREGINIT_MIN32_1 "\01\00\00\00\01\00\00\00\4C\1D\00\00\00\00\00\80\00\00\00\80"
+#define SREGINIT_MIN32_1 "\01\00\00\00\01\00\00\00\F4\01\00\00\00\00\00\80\00\00\00\80"
 #define SREGINIT_MAX32_1 "\FF\FF\00\00\FF\FF\00\00\A0\86\01\00\FF\FF\FF\7F\FF\FF\FF\7F"
 
 //******************************************************************************
