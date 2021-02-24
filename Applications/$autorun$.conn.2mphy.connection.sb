@@ -1,4 +1,4 @@
-// Copyright (c) 2018, Laird
+// Copyright (c) 2018-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -40,17 +40,8 @@
 //BLE EVENT MSG IDs
 #define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2 // msgCtx = alert level
-#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3 // msgCtx = alert level
 #define BLE_EVBLEMSGID_SERVICE_ERROR                    4 // msgCtx = resultcode
-#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5 // msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6 // msgCtx = not used
-#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7 // msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8 // msgCtx = not used
-#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9 // msgCtx = passcode to display
 #define BLE_EVBLEMSGID_NEW_BOND                        10 // msgCtx = connection handle
-#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                11 // msgCtx = 1 for passkey, 2 for 16 byte OOB data
-#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE          12 // msgCtx = new notification state 0=off, 1=on
 
 //******************************************************************************
 // Global Variable Declarations

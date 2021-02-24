@@ -149,17 +149,17 @@ endsub
 #cmpif 0x00000001 : function InitPins()
 #cmpif 0x00000001 :     //Set all of the LCD pins as digital outputs
 #cmpif 0x00000001 :     rc=GpioSetFunc(RS_PIN, DIGITAL_OUT, 0)
-#cmpif 0x00000100 :     AssertRC(rc, 150)
-#cmpif 0x00000001 :     rc=GpioSetFunc(ENABLE_PIN, DIGITAL_OUT, 0)
 #cmpif 0x00000100 :     AssertRC(rc, 152)
-#cmpif 0x00000001 :     rc=GpioSetFunc(D0_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000001 :     rc=GpioSetFunc(ENABLE_PIN, DIGITAL_OUT, 0)
 #cmpif 0x00000100 :     AssertRC(rc, 154)
-#cmpif 0x00000001 :     rc=GpioSetFunc(D1_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000001 :     rc=GpioSetFunc(D0_PIN, DIGITAL_OUT, 0)
 #cmpif 0x00000100 :     AssertRC(rc, 156)
-#cmpif 0x00000001 :     rc=GpioSetFunc(D2_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000001 :     rc=GpioSetFunc(D1_PIN, DIGITAL_OUT, 0)
 #cmpif 0x00000100 :     AssertRC(rc, 158)
-#cmpif 0x00000001 :     rc=GpioSetFunc(D3_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000001 :     rc=GpioSetFunc(D2_PIN, DIGITAL_OUT, 0)
 #cmpif 0x00000100 :     AssertRC(rc, 160)
+#cmpif 0x00000001 :     rc=GpioSetFunc(D3_PIN, DIGITAL_OUT, 0)
+#cmpif 0x00000100 :     AssertRC(rc, 162)
 #cmpif 0x00000001 : endfunc rc
 
 //==============================================================================
@@ -304,7 +304,7 @@ FUNCTION OnStartup()
 
     //Scan for devices
     rc = BleScanStart(0,0)
-#cmpif 0x00000100 :     AssertRC(rc, 338)
+#cmpif 0x00000100 :     AssertRC(rc, 307)
 ENDFUNC 1
 
 //==============================================================================
@@ -312,7 +312,7 @@ ENDFUNC 1
 //==============================================================================
 SUB CloseConnections()
     rc = BleDisconnect(conHndl)
-#cmpif 0x00000100 :     AssertRC(rc, 346)
+#cmpif 0x00000100 :     AssertRC(rc, 315)
 ENDSUB
 
 //==============================================================================
@@ -345,7 +345,7 @@ ENDFUNC 1
 function HndlrAttrWrite(cHndl, aHndl, nSts) as integer
 #cmpif 0x00000100 :     if nSts != 0 then
 #cmpif 0x00000100 :         //Failed to write attribute
-#cmpif 0x00000100 :         AssertRC(rc, 379)
+#cmpif 0x00000100 :         AssertRC(rc, 348)
 #cmpif 0x00000100 :     endif
 endfunc 1
 
@@ -525,9 +525,9 @@ function HndlrAdvRpt() as integer
                 s$ = strhexize$(addr$)
                 LcdPrint(s$)
                 rc=BleScanStop()
-#cmpif 0x00000100 :                 AssertRC(rc, 559)
+#cmpif 0x00000100 :                 AssertRC(rc, 528)
                 rc=BleConnect(addr$,5000, 20000, 75000, 5000000)
-#cmpif 0x00000100 :                 AssertRC(rc, 561)
+#cmpif 0x00000100 :                 AssertRC(rc, 530)
                 rc = BleGattcOpen(0, 0)
             endif
         endif
@@ -572,7 +572,7 @@ sub GpioSetup()
 rc = 0
 #cmpif 0x00000008 :    //Set SIO_3 to 10-bit, 1/6 scaling analog in
 #cmpif 0x00000008 :    rc = gpiosetfunc(3, ANALOG_IN, 0x16)
-#cmpif 0x00000100 :    AssertRC(rc, 606)
+#cmpif 0x00000100 :    AssertRC(rc, 575)
 
 #cmpif 0x00000008 :    //Work out the floating input (no buttons pressed) and the step between each button voltage
 #cmpif 0x00000008 :    dim VDist, FloatingV
@@ -607,11 +607,11 @@ rc = 0
 rc = 0
 #cmpif 0x00000004 :    //DVK button 1 (weak pull up)
 #cmpif 0x00000004 :    rc = gpiosetfunc(BUTTON_01, DIGITAL_IN, 0x02)
-#cmpif 0x00000100 :    AssertRC(rc, 641)
+#cmpif 0x00000100 :    AssertRC(rc, 610)
 
 #cmpif 0x00000004 :    //DVK button 2 (weak pull up)
 #cmpif 0x00000004 :    rc = gpiosetfunc(BUTTON_02, DIGITAL_IN, 0x02)
-#cmpif 0x00000100 :    AssertRC(rc, 645)
+#cmpif 0x00000100 :    AssertRC(rc, 614)
 endsub
 
 //==============================================================================

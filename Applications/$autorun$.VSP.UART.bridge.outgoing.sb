@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Laird
+// Copyright (c) 2015-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -185,17 +185,8 @@
 //BLE EVENT MSG IDs
 #define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
-#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2    //msgCtx = alert level
-#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3    //msgCtx = alert level
 #define BLE_EVBLEMSGID_SERVICE_ERROR                    4    //msgCtx = resultcode
-#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5    //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6    //msgCtx = not used
-#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7    //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8    //msgCtx = not used
-#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9    //msgCtx = passcode to display
 #define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                 11   //msgCtx = 1 for passkey, 2 for 16 byte OOB data
-#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE           12   //msgCtx = new notification state 0=off, 1=on
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE                14   //msgCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL           15   //msgCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER            16   //msgCtx = connection handle
@@ -348,14 +339,14 @@ FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
             UUID1$ = BASEUUID
             UUID2$ = RXUUID
             rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-            AssertRC(rc, 325)
+            AssertRC(rc, 342)
         ELSE
             MIHandle = hVal
             Mode = 2
             UUID1$ = BASEUUID
             UUID2$ = MOUUID
             rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-            AssertRC(rc, 332)
+            AssertRC(rc, 349)
         ENDIF
     ELSEIF (Mode == 2) THEN
         //Modem out
@@ -364,7 +355,7 @@ FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
         UUID1$ = BASEUUID
         UUID2$ = RXUUID
         rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-        AssertRC(rc, 341)
+        AssertRC(rc, 358)
     ELSEIF (Mode == 3) THEN
         //RX
         IF (cProp == 0 && hVal == 0 && isUuid == 0) THEN
@@ -378,7 +369,7 @@ FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
             UUID1$ = BASEUUID
             UUID2$ = TXUUID
             rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-            AssertRC(rc, 355)
+            AssertRC(rc, 372)
         ENDIF
     ELSEIF (Mode == 4) THEN
         //TX
@@ -393,7 +384,7 @@ FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
             UUID1$ = BASEUUID
             UUID2$ = MOUUID
             rc = BLEGATTCFINDDESC(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0, 0xFE012902, 0)
-            AssertRC(rc, 370)
+            AssertRC(rc, 387)
         ENDIF
     ENDIF
 ENDFUNC 1
@@ -404,7 +395,7 @@ ENDFUNC 1
 FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
     if (nSts !=0) then
         rc = BlePair(cHndl,1)
-        AssertRC(rc, 381)
+        AssertRC(rc, 398)
         exitfunc 1
     endif
 
@@ -413,7 +404,7 @@ FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
         Mode = 8
         UUID1$ = "\01\00"
         rc = BLEGATTCWRITE(BleHandle, TXCCCDHandle, UUID1$)
-        AssertRC(rc, 390)
+        AssertRC(rc, 407)
     ELSEIF (Mode == 8) THEN
         //Write to Modem In
         IF (ModemInOutExists == 1) THEN
@@ -421,7 +412,7 @@ FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
             UUID1$ = "\01"
             BufferFull = 0
             rc = BLEGATTCWRITE(BleHandle, MIHandle, UUID1$)
-            AssertRC(rc, 398)
+            AssertRC(rc, 415)
         ELSE
             BufferFull = 0
             BufferState = 0
@@ -529,13 +520,13 @@ FUNCTION HndlrFindDesc(nCtx, Hndl)
             //Enable modem out notifications
             UUID1$ = "\01\00"
             rc = BLEGATTCWRITE(BleHandle, MOCCCDHandle, UUID1$)
-            AssertRC(rc, 506)
+            AssertRC(rc, 523)
         ELSE
             //Modem in doesn't exist - enable TX notifications
             Mode = 8
             UUID1$ = "\01\00"
             rc = BLEGATTCWRITE(BleHandle, TXCCCDHandle, UUID1$)
-            AssertRC(rc, 512)
+            AssertRC(rc, 529)
         ENDIF
     ENDIF
 ENDFUNC 1
@@ -588,14 +579,14 @@ FUNCTION HndlrBleMsg(nMsgId, nCtx)
 
         //Opening the GATT client only when connected to save memory
         rc = BleGattcOpen(256, 0)
-        AssertRC(rc, 565)
+        AssertRC(rc, 582)
         BleHandle = nCtx
         Mode = 1
         dim UUID1$, UUID2$
         UUID1$ = BASEUUID
         UUID2$ = MIUUID
         rc = BLEGATTCFINDCHAR(nCtx, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-        AssertRC(rc, 572)
+        AssertRC(rc, 589)
         PRINT "Connected!\n"
         InConnection = 1
 
@@ -981,6 +972,15 @@ function HndlrGpioChan0()
 endfunc 1
 
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+sub Initialise()
+  //Use 'Just Works' pairing
+  rc = BleSecMngrIoCap(0)
+  //Bond when pairing
+  rc = BleSecMngrBondReq(1)
+endsub
+
+//------------------------------------------------------------------------------
 // This handler is called when the BLE PHY is changed
 //------------------------------------------------------------------------------
 function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
@@ -997,17 +997,6 @@ function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
     // Accept incoming PHY request by default
     rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
 endfunc 1
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-sub Initialise()
-  //Just works pairing will work without confirmation
-  rc = BleSecMngrJustWorksConf(0)
-  //Use 'Just Works' pairing
-  rc = BleSecMngrIoCap(0)
-  //Bond when pairing
-  rc = BleSecMngrBondReq(1)
-endsub
 
 //******************************************************************************
 // Equivalent to main() in C

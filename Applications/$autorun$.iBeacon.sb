@@ -1,4 +1,4 @@
-// Copyright (c) 2013, Laird
+// Copyright (c) 2013-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -252,9 +252,9 @@
 #define BEACON_MAJOR                         0x1234
         //Default Minor value for beacon (16 bit number)
 #define BEACON_MINOR                         0x5678
-        //Default TxPower, one of (4,0,-4,-8,-12,-16,-20,-30,-55) 
+        //Default TxPower, one of (4,3,0,-4,-8,-12,-16,-20,-40) 
 #define BEACON_TXPOWER_DBM                   4
-        //RSSI at 1m from BL600 when tx power = 4 
+        //RSSI at 1m from BL600 when tx power = 4
         //Set this by advertising at 4 dBm and measuring the RSSI 1m from the BL600
 #define CALIBRTD_VALUE_DBM                   -60
         //Default value for iBeacon format
@@ -266,7 +266,7 @@
 
         //Default time to remain connectible : 1-255
 #define REMAIN_CONN_TME_SEC                  20
-        //Min time to remain connectible when updated over the air : 3-255 
+        //Min time to remain connectible when updated over the air : 3-255
 #define REMAIN_CONN_TME_SEC_MIN              3
 
         //Default advertising interval -- higher the number, lower the current consumption
@@ -295,7 +295,7 @@
 // The following information is for the DEVICE INFO service (UUID = 0x180A)
 // Feel free to modify to suite your need
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#define MANF_NAME                            "Laird Technologies"
+#define MANF_NAME                            "Laird Connectivity"
 #define MODELSTR                             "BL652"
 #define SERIALNUM                            "12345"
 #define HWREV                                "1.0"
@@ -320,7 +320,7 @@
 #define DVC_NME_INDEX                        0
         //Array index for format
 #define FORMAT_INDEX                         1
-        //Array index for UUID value 
+        //Array index for UUID value
 #define UUID_INDEX                           2
         //Array index for Major value
 #define MAJOR_INDEX                          3
@@ -332,7 +332,7 @@
 #define ADV_INTVL_INDEX                      6
         //Array index for Time out (supplied as minutes)
 #define ADV_TMT_INDEX                        7
-        //Array index for Calibration Value 
+        //Array index for Calibration Value
 #define CAL_VAL_INDEX                        8
         //Array index for Remain Connectible Time (supplied in seconds)
 #define REM_CONN_TME_INDEX                   9
@@ -356,11 +356,11 @@
 #define DEVICENAME_WRITTEN                   21
         //Record number for device name
 #define DEVICENAME_REC_NUM                   20
-        //Number of characteristics 
+        //Number of characteristics
 #define NUM_OF_CHARS                         10
 
         //Min/max device names allowed to arrive via characteristic DVC_NME_INDEX
-#define MIN_DEVICENAME_LEN                   4 
+#define MIN_DEVICENAME_LEN                   4
 #define MAX_DEVICENAME_LEN                   20
 
         //Ble is connected error
@@ -446,7 +446,7 @@ batlvl$ ="\64"
 //------------------------------------------------------------------------------
 Function GetCharIndex(ByVal cHndl)
    dim i
-    for i=0 to NUM_OF_CHARS-1 
+    for i=0 to NUM_OF_CHARS-1
         if charHndles[i]==cHndl then
             ExitFunc i                 //Return the index of given handle
         endif
@@ -460,19 +460,19 @@ EndFunc -1                             //At this point, whole array has been sea
 Function ValidateTxPwr(tp$)
     //Array of valid tx power values
     dim txp[9],tp  
-    txp[0]=4 : txp[1]=0 : txp[2]=-4 : txp[3]=-8 : txp[4]=-12: txp[5]=-16: txp[6]=-20: txp[7]=-40
+    txp[0]=4 : txp[1]=3 : txp[2]=0 : txp[3]=-4 : txp[4]=-8 : txp[5]=-12: txp[6]=-16: txp[7]=-20: txp[8]=-40
 
     //Convert tx power to integer
     rc=BleDecodeS8(tp$,tp,0)
 
     dim i
-    for i = 0 to 7
+    for i = 0 to 8
         //Take given TxPower and return the nearest valid TxPower value
         if tp >=txp[i] then
             ExitFunc txp[i]
         endif
     next
-Endfunc txp[7]   //Just return minimum power
+Endfunc txp[8]   //Just return minimum power
 
 
 //------------------------------------------------------------------------------
@@ -555,7 +555,7 @@ Function CreateIBeaconAD$()
     // 4C00 02 15 E2C56DB5DFFB48D2B060D0F5A71096E0 0000 0000 C5
     // ---
     dim mad$                                               //Octet string for the AD (advertising record)
-    rc=BleEncode16(mad$,COMPANY_ID,0)                      //Write company id to string 
+    rc=BleEncode16(mad$,COMPANY_ID,0)                      //Write company id to string
     AssertRC(rc, 559)
     rc=BleEncode8(mad$,BEACON_DATA_TYPE,2)                 //Write data type to string
     AssertRC(rc, 561)
@@ -564,18 +564,18 @@ Function CreateIBeaconAD$()
     dim calVal : rc=BleDecodeS8(dta$[CAL_VAL_INDEX],calVal,0)
     //Convert Tx Power to integer
     dim txPwr : rc=BleDecodeS8(dta$[TXPOWER_INDEX],txPwr,0)
-    
+
     //Calculate Measured RSSI (appears at end of the AD)
     dim mesTxPwr : mesTxPwr = calVal - (4 - txPwr)
     //Write Measured RSSI to string
     dim mesTxPwr$ : rc=BleEncode8(mesTxPwr$,mesTxPwr,0)
     AssertRC(rc, 572)
-    
+
     //Put together AD depending on selected format
     dim len$                                                //Number of bytes to follow in AD
     dim bcnFrmt                                             //To select AD format
     rc=BleDecodeU8(dta$[FORMAT_INDEX],bcnFrmt,0)            //Convert format char value to integer
-    
+
     select bcnFrmt
         case 1
             rc=BleEncode8(len$,0x14,0)                      //Length = 20 bytes
@@ -592,7 +592,7 @@ Function CreateIBeaconAD$()
             AssertRC(rc, 592)
             //Full AD
             mad$=mad$+len$+dta$[UUID_INDEX]+dta$[MAJOR_INDEX]+dta$[MINOR_INDEX]+mesTxPwr$
-    endselect 
+    endselect
 EndFunc mad$
 
 
@@ -637,7 +637,7 @@ function AddCharBatLevel(byval btlvl as integer, byval fNfy as integer) as integ
   dim mdAttr
   dim mdCccd
   dim mdSccd
-  dim chProp 
+  dim chProp
   dim format : format = 0x04            //uint8 - Unsigned 8-bit integer
   dim exponent : exponent = 0
   dim unit : unit = 0x27AD              //Percentage
@@ -728,7 +728,7 @@ function RegBatService(byval btlvl as integer, byval fNfy as integer) as integer
   //Create the Battery Level Characteristic which has a UUID of 0x2A19
   rc = AddCharBatLevel(btlvl,fNfy)
   AssertRC(rc, 730)
-  
+
   //Commit battery service to GATT table
   rc=BleServiceCommit(shBat)
   AssertRC(rc, 734)
@@ -757,7 +757,7 @@ function VerifyBattLevel(battLvl)
   elseif battLvl > 100 then
     battLvl = 100
   endif
-endfunc battLvl  
+endfunc battLvl
 
 
 //==============================================================================
@@ -795,7 +795,7 @@ Sub MakeAdvertRpts()
     rc=BleAdvRptInit(advRpt$, DISCOVERY_MODE, 0, MAX_DEVNAME_CHRS_IN_ADVERT)
     AssertRC(rc, 796)
 
-    //Create and append the apple iBeacon AD element 
+    //Create and append the apple iBeacon AD element
     dim adElmnt$ : adElmnt$=CreateIBeaconAD$()
     rc=BleAdvRptAppendAD(advRpt$,0xFF,adElmnt$)
     AssertRC(rc, 801)
@@ -811,7 +811,7 @@ Sub MakeAdvertRpts()
     //Initialise the Battery Service and add uuid to scan report - only if it hasn't been done already (timer 0 not running)
     if TimerRunning(0)==0 then
         InitBatService(GetBattLevel(),0)
-        TimerStart(0,60000*BATT_LEVEL_POLL_MIN,1)   //So we can update the battery level every BATT_LEVEL_POLL_MIN minutes 
+        TimerStart(0,60000*BATT_LEVEL_POLL_MIN,1)   //So we can update the battery level every BATT_LEVEL_POLL_MIN minutes
     endif
 
     //Commit the reports to stack
@@ -828,7 +828,7 @@ Sub NewChar(ByRef hBsUuid, ByVal chrUuid,  ByVal index)
     rc=BleCharNew(0x0A, BleHandleUuidSibling(hBsUuid,(chrUuid)), BleAttrMetaData(1,1,dtaLen[index],1,rc),0,0)
     AssertRC(rc, 829)
     //Commit this new characteristic to the GATT table as part of iBeacon service
-    rc=BleCharCommit(hSvc,dta$[index],charHndles[index])  
+    rc=BleCharCommit(hSvc,dta$[index],charHndles[index])
     AssertRC(rc, 832)
 EndSub
 
@@ -856,20 +856,20 @@ Sub CreateIBeaconSvc()
     //iBeacon service UUID handle
     dim hSvcUuid : hSvcUuid=BleHandleUuidSibling(hBseUuid,IBEACON_SVC_UUID)
 
-    //Initialise iBeacon service 
+    //Initialise iBeacon service
     rc=BleServiceNew(1,hSvcUuid,hSvc)
     AssertRC(rc, 861)
 
-    //Create and commit Characteristics   
+    //Create and commit Characteristics
     NewChar(hBseUuid,0x2010,DVC_NME_INDEX)        //Device Name
     //NewChar(hBseUuid,0x2011,FORMAT_INDEX)       //iBeacon Format
-    NewChar(hBseUuid,0x2012,UUID_INDEX)           //iBeacon UUID 
-    NewChar(hBseUuid,0x2013,MAJOR_INDEX)          //iBeacon Major  
+    NewChar(hBseUuid,0x2012,UUID_INDEX)           //iBeacon UUID
+    NewChar(hBseUuid,0x2013,MAJOR_INDEX)          //iBeacon Major
     NewChar(hBseUuid,0x2014,MINOR_INDEX)          //iBeacon Minor
-    NewCharAdptd(0x2A07,TXPOWER_INDEX)            //iBeacon Tx Power (Adopted) 
+    NewCharAdptd(0x2A07,TXPOWER_INDEX)            //iBeacon Tx Power (Adopted)
     NewChar(hBseUuid,0x2015,ADV_INTVL_INDEX)      //Advertising Interval
-    NewChar(hBseUuid,0x2016,ADV_TMT_INDEX)        //Advertising Timeout  
-    NewChar(hBseUuid,0x2017,CAL_VAL_INDEX)        //Calibration Value 
+    NewChar(hBseUuid,0x2016,ADV_TMT_INDEX)        //Advertising Timeout
+    NewChar(hBseUuid,0x2017,CAL_VAL_INDEX)        //Calibration Value
     NewChar(hBseUuid,0x2018,REM_CONN_TME_INDEX)   //Remain Connectable Time
 
     //Commit the iBeacon service to GATT table
@@ -900,7 +900,7 @@ Sub StartAdvertising(ByVal advType)
 
     //Convert advertising interval to integer
     rc=BleDecodeU8(dta$[ADV_INTVL_INDEX],advIntvl,0)
-    //Convert to ms 
+    //Convert to ms
     advIntvl=advIntvl*ADV_INTERVAL_SCALER
 
     //Set time out based on advert type
@@ -910,7 +910,7 @@ Sub StartAdvertising(ByVal advType)
         //Convert to ms
         advTmt=advTmt*1000
     else
-        //Convert advertising time out to integer 
+        //Convert advertising time out to integer
         rc=BleDecodeU8(dta$[ADV_TMT_INDEX],advTmt,0)
         //Convert to ms
         advTmt=advTmt*60*1000
@@ -926,24 +926,24 @@ EndSub
 //------------------------------------------------------------------------------
 // This subroutine will be executed first
 //------------------------------------------------------------------------------
-Sub OnStartup() 
+Sub OnStartup()
     //Initialise dta$[] with default data in case there is nothing to read from memory
     InitGattCharData()
     //Initialise dta$[] with data from nv memory
     LoadSavedData()
-    
-    //Initialise the Gap Service 
+
+    //Initialise the Gap Service
     rc=BleGapSvcInit(dta$[DVC_NME_INDEX],0,APPEARANCE,MIN_CONN_INTERVAL,MAX_CONN_INTERVAL,CONN_SUP_TIMEOUT,SLAVE_LATENCY)
     AssertRC(rc, 937)
-    
+
     //Initialise the Device Information service
     rc=BleSvcRegDevInfo(MANF_NAME,MODELSTR,SERIALNUM,HWREV,APP_VERSION,"","","")
-   
+
     //Create and commit iBeacon service and characteristics
     CreateIBeaconSvc()
 
     //Start advertising with type 0 = connectible
-    StartAdvertising(ADV_IND) 
+    StartAdvertising(ADV_IND)
 EndSub
 
 
@@ -965,7 +965,7 @@ EndSub
 //------------------------------------------------------------------------------
 Function HndlrCharVal(ByVal charHndl, ByVal offset, ByVal len)
 
-    dim i : i=GetCharIndex(charHndl)        //Get array index of char handle 
+    dim i : i=GetCharIndex(charHndl)        //Get array index of char handle
     dim s$                                  //Temporary string to hold char value
     dim l                                   //Will hold length of string
 
@@ -1012,7 +1012,7 @@ Function HndlrCharVal(ByVal charHndl, ByVal offset, ByVal len)
                     rc=BleCharValueWrite(charHndles[i],s$)
                     AssertRC(rc, 1013)
 
-                //Validate if remain connectible time  
+                //Validate if remain connectible time
                 case REM_CONN_TME_INDEX
                     dim remConn
                     //Convert remain connectible char value to integer
@@ -1067,7 +1067,7 @@ EndFunc 1
 Function HndlrBleAdvTmt()
     //Start a type 2 advertisement
     StartAdvertising(ADV_SCAN_IND)
-EndFunc 1 
+EndFunc 1
 
 
 //------------------------------------------------------------------------------

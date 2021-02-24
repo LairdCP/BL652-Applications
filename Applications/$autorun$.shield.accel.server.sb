@@ -273,16 +273,16 @@ SUB initSensor()
     dim chip_ID
     //Initialise the interrupt pin as an input with a weak pull-up resistor
     rc = GpioSetFunc(INT_PIN, 1, 0x02)
-#cmpif 0x00000100 :     AssertRC(rc, 273)
+#cmpif 0x00000100 :     AssertRC(rc, 276)
     //Initialise the reset pin as an output with initial output set to HIGH
     rc = GpioSetFunc(RESET_PIN, 2, 1)
-#cmpif 0x00000100 :     AssertRC(rc, 276)
+#cmpif 0x00000100 :     AssertRC(rc, 279)
     Delay(500)
     //Reset the sensor for initial use
     resetSensor()
     Delay(2000)
     rc = I2COpen(100000,0,nHandle)
-#cmpif 0x00000100 :     AssertRC(rc, 282)
+#cmpif 0x00000100 :     AssertRC(rc, 285)
     rc = I2CReadReg8(BNO055_ADDRESS,CHIP_ID_ADDRESS,chip_ID)
 //    PRINT "Chip ID: 0x"; INTEGER.H'chip_ID ;"\n"
 ENDSUB
@@ -292,7 +292,7 @@ ENDSUB
 FUNCTION setPowMode(Mode)
     //Sets the operating mode of the BNO055
     rc = I2CWriteReg8(PWR_MODE_ADDRESS, OPR_MODE_ADDRESS, Mode)
-#cmpif 0x00000100 :     AssertRC(rc, 292)
+#cmpif 0x00000100 :     AssertRC(rc, 295)
     Delay(FROM_CONFIG)
 ENDFUNC 1
 
@@ -301,7 +301,7 @@ ENDFUNC 1
 FUNCTION setOprMode(Mode)
     //Sets the operating mode of the BNO055
     rc = I2CWriteReg8(BNO055_ADDRESS, OPR_MODE_ADDRESS, Mode)
-#cmpif 0x00000100 :     AssertRC(rc, 301)
+#cmpif 0x00000100 :     AssertRC(rc, 304)
     Delay(FROM_CONFIG)
 ENDFUNC 1
 
@@ -312,7 +312,7 @@ SUB setUnits(temp, euler, angular, accel)
     dim units
     units = (temp << 4) | (euler << 2) | (angular << 1) | (accel)
     rc = I2CWriteReg8(BNO055_ADDRESS, UNIT_SEL_ADDRESS, units)
-#cmpif 0x00000100 :     AssertRC(rc, 312)
+#cmpif 0x00000100 :     AssertRC(rc, 315)
 ENDSUB
 
 //===============================================================================
@@ -323,7 +323,7 @@ FUNCTION configAccel(op_mode, bandwidth, range)
     dim config
     config = (op_mode << 5) | (bandwidth << 2) | range
     rc = I2CWriteReg8(BNO055_ADDRESS, ACC_CONFIG, config)
-#cmpif 0x00000100 :     AssertRC(rc, 323)    
+#cmpif 0x00000100 :     AssertRC(rc, 326)    
 ENDFUNC 1
 //===============================================================================
 //===============================================================================
@@ -331,25 +331,25 @@ SUB getAccelData(byref x, byref y, byref z)
     //Retrieve the current accelerometer sensor data
     dim xUpBit, xLowBit, yUpBit, yLowBit, zUpBit, zLowBit, tempx, tempy, tempz
     rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_X_MSB, xUpBit)
-#cmpif 0x00000100 :     AssertRC(rc, 331)
+#cmpif 0x00000100 :     AssertRC(rc, 334)
     rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_X_LSB, xLowBit)
-#cmpif 0x00000100 :     AssertRC(rc, 333)
+#cmpif 0x00000100 :     AssertRC(rc, 336)
     tempx = (xUpBit << 8) | xLowBit
     conv_16_32Int(tempx)
     x = tempx
     
     rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_Y_MSB, yUpBit)
-#cmpif 0x00000100 :     AssertRC(rc, 339)
+#cmpif 0x00000100 :     AssertRC(rc, 342)
     rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_Y_LSB, yLowBit)
-#cmpif 0x00000100 :     AssertRC(rc, 341)
+#cmpif 0x00000100 :     AssertRC(rc, 344)
     tempy = (yUpBit << 8) | yLowBit
     conv_16_32Int(tempy)
     y = tempy
     
     rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_Z_MSB, zUpBit)
-#cmpif 0x00000100 :     AssertRC(rc, 347)
+#cmpif 0x00000100 :     AssertRC(rc, 350)
     rc = I2CReadReg8(BNO055_ADDRESS, ACC_DATA_Z_LSB, zLowBit)
-#cmpif 0x00000100 :     AssertRC(rc, 349)
+#cmpif 0x00000100 :     AssertRC(rc, 352)
     tempz = (zUpBit << 8) | zLowBit
     conv_16_32Int(tempz)
     z = tempz
@@ -364,19 +364,19 @@ sub GattInit()
     uuid$ = LT_BASE_UUID
     hUuidS1 = BleHandleUuid128(uuid$)
     rc = BleServiceNew(BLE_SERVICE_PRIMARY, hUuidS1, hSvc)
-#cmpif 0x00000100 :     AssertRC(rc, 364)
+#cmpif 0x00000100 :     AssertRC(rc, 367)
 
     //Creates the first characteristic, which is used to send the accelerometer value
     dim mdAttr, mdCccd, mdSccd, chProp
     mdAttr = BleAttrMetadataEx(BLE_ATTR_ACCESS_OPEN,BLE_ATTR_ACCESS_NONE,10,0,rc)
-#cmpif 0x00000100 :     AssertRC(rc, 369)
+#cmpif 0x00000100 :     AssertRC(rc, 372)
     mdCccd = BleAttrMetadataEx(BLE_ATTR_ACCESS_OPEN,BLE_ATTR_ACCESS_OPEN,2,0,rc)
-#cmpif 0x00000100 :     AssertRC(rc, 371)
+#cmpif 0x00000100 :     AssertRC(rc, 374)
     mdSccd = BLE_CHAR_METADATA_ATTR_NOT_PRESENT
     chProp = BLE_CHAR_PROPERTIES_NOTIFY + BLE_CHAR_PROPERTIES_READ
     hUuidC1 = BleHandleUuidSibling(hUuidS1, 0x2A6E)
     rc = BleCharNew(chProp, hUuidC1, mdAttr, mdCccd, mdSccd)
-#cmpif 0x00000100 :     AssertRC(rc, 376)
+#cmpif 0x00000100 :     AssertRC(rc, 379)
     attrX$ = "\00\00\00\00"
     rc = BleCharCommit(hSvc, attrX$, hUuidC1)
 endsub
@@ -397,7 +397,7 @@ endsub
 //******************************************************************************
 FUNCTION HndlrBlrAdvTimOut() 
     rc = BleAdvertStart(0, addr$, 500, 0, 0)
-#cmpif 0x00000100 :     AssertRC(rc, 397)
+#cmpif 0x00000100 :     AssertRC(rc, 400)
 ENDFUNC 1
 
 //*******************************************************************************
@@ -408,7 +408,7 @@ FUNCTION HndlrBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER)
         ntfyEnabled=0
         TimerCancel(0)
         rc = BleAdvertStart(0, addr$, 500, 0, 0)
-#cmpif 0x00000100 :         AssertRC(rc, 408)
+#cmpif 0x00000100 :         AssertRC(rc, 411)
     ENDIF
 ENDFUNC 1
 
@@ -424,21 +424,21 @@ function HndlrTimer0() as integer
             sprint #attrX$, x
             attrX$ = "x:" + attrX$
             rc=BleCharValueNotify(hUuidC1,attrX$)
-#cmpif 0x00000100 :             AssertRC(rc, 424)
+#cmpif 0x00000100 :             AssertRC(rc, 427)
 '            TimerStart(0,measIntvl,0)
             i = 1
         elseif i == 1 then
             sprint #attrY$, y
             attrY$ = "y:" + attrY$
             rc=BleCharValueNotify(hUuidC1,attrY$)
-#cmpif 0x00000100 :             AssertRC(rc, 431)
+#cmpif 0x00000100 :             AssertRC(rc, 434)
 '            TimerStart(0,measIntvl,0)
             i = 2
         elseif i == 2 then
             sprint #attrZ$, z
             attrZ$ = "z:" + attrZ$
             rc=BleCharValueNotify(hUuidC1,attrZ$)
-#cmpif 0x00000100 :             AssertRC(rc, 438)
+#cmpif 0x00000100 :             AssertRC(rc, 441)
 '            TimerStart(0, measIntvl,0)
             i = 0
         endif
@@ -470,17 +470,17 @@ sub AppInit()
     dim advRpt$, scnRpt$, uuid$
     uuid$ = LT_BASE_UUID
     rc = BleGapSvcInit(dvcNme$, nmeWrtble, BLE_APPEARANCE_UNKNOWN, MinConnInt, MaxConnInt, ConnSupTO, sL)
-#cmpif 0x00000100 :     AssertRC(rc, 470)
+#cmpif 0x00000100 :     AssertRC(rc, 473)
     rc = BleAdvRptInit(advRpt$, 0, 512, 12)
-#cmpif 0x00000100 :     AssertRC(rc, 472)
+#cmpif 0x00000100 :     AssertRC(rc, 475)
     rc = BleScanRptInit(scnRpt$)
-#cmpif 0x00000100 :     AssertRC(rc, 474)
+#cmpif 0x00000100 :     AssertRC(rc, 477)
     rc = BleAdvRptAddUuid128(scnRpt$, BleHandleUuid128(uuid$))
-#cmpif 0x00000100 :     AssertRC(rc, 476)
+#cmpif 0x00000100 :     AssertRC(rc, 479)
     rc = BleAdvRptsCommit(advRpt$,scnRpt$)
-#cmpif 0x00000100 :     AssertRC(rc, 478)
+#cmpif 0x00000100 :     AssertRC(rc, 481)
     rc = BleAdvertStart(0, addr$, 500, 0, 0)
-#cmpif 0x00000100 :     AssertRC(rc, 480)
+#cmpif 0x00000100 :     AssertRC(rc, 483)
 endsub
 
 //******************************************************************************

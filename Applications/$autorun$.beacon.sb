@@ -1,4 +1,4 @@
-// Copyright (c) 2014, Laird
+// Copyright (c) 2014-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -15,7 +15,7 @@
 // SPDX-License-Identifier:ISC
 //
 // This script will send alternating iBeacon and EddyStone advertisements, it shows how to
-// format both iBeacon and EddyStone UID and URL AD records. 
+// format both iBeacon and EddyStone UID and URL AD records.
 //
 // These adverts are static and any changes need to be made to the #define values below and the 
 //  script will need to be recompiled and loaded to either a BT900, BL600 or BL652 module. 
@@ -23,7 +23,7 @@
 // To calibrate the beacon you will use nRF Master Control Panel for Android and iOS. Measure the
 // TX power at 1m for iBeacon and at 0m for EddyStone and enter the resulting values at lines 
 // 55 and 56 below.
-// 
+//
 //******************************************************//
 // Device Name
 //******************************************************//
@@ -63,7 +63,7 @@
 // TX power
 // Required for both EddyStone (@0m) and iBeacon (@1m)
 //=======================================================//
-// Valid values: -90 to +8dBm in hexadecimal using a 
+// Valid values: -90 to +8dBm in hexadecimal using a
 // 2's complement value for negative numbers
 // Example: +4dBm = 0x04
 //          -4dBm = 0xFC
@@ -86,8 +86,8 @@
 #define EID                0x30
 
 //EddyStone UID NameSpace
-//First 10 bytes SHA-1 Hash Conversion of 'lairdtech.com'
-#define EDDY_NAMESPACE     "\A0\14\C1\89\8B\D7\AB\0A\56\B0"
+//First 10 bytes SHA-1 Hash Conversion of 'lairdconnect.com'
+#define EDDY_NAMESPACE     "\FA\6C\C1\DA\11\BF\F4\0D\2F\5B"
 
 //EddyStone UID Instance
 #define EDDY_INSTANCE      "\01\02\03\04\05\06"
@@ -123,9 +123,9 @@
 //======================================================//
 
 //EddyStone URL
-#define EDDY_URL           "lairdtech"
+#define EDDY_URL           "lairdconnect"
 
-//AD Record Tags    
+//AD Record Tags
 #define FLAGS              0x01
 #define COMPLETE_LCL_NAME  0x09
 
@@ -137,7 +137,7 @@
 
 //Advert Type ADV_SCAN
 //Could be ADV_NONCONN if no scan reports are used
-//Could also be ADV_IND if connectable for configuration 
+//Could also be ADV_IND if connectable for configuration
 #define ADV_TYPE           2
 
 //Advert Interval, time between successive Adverts
@@ -154,19 +154,19 @@
 //General Discoverability; Limited Discoverability == 1
 #define DISCOVER_MODE      2
 
-//Connection values needed for GAP service regardless 
+//Connection values needed for GAP service regardless
 //of whether connectable or not
-#define MIN_CONN_INTVL     15000    
+#define MIN_CONN_INTVL     15000
 #define MAX_CONN_INTVL     25000
 #define CONN_SUP_TIMEOUT   750000
 #define SLAVE_LATENCY      5
 
 //Device Information Service info
-#define MANF_NAME          "Laird"
+#define MANF_NAME          "Laird Connectivity"
 #define MODEL              "Beacons"
 #define SERIAL_NUM         "1234"
 #define HW_REV             "1.0"
-#define APP_REV            "1.0" 
+#define APP_REV            "1.0"
 #define SYSID              ""
 #define REGLST             ""
 #define PPID               ""
@@ -189,7 +189,7 @@ Endfunc ((v>>8)&0xFF) + ((v<<8)&0xFF00)
 
 Function iBeacon$()
 // Build iBeacon String, Only building Full string no options for partial strings in this example
-//---------------------------------------------------------------------------------------- 
+//----------------------------------------------------------------------------------------
 //Format:
     // 0 1  2  3  4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9  0 1  2 3  4
     // CompanyID
@@ -212,18 +212,18 @@ Function iBeacon$()
     fibeac$ = ibeac$ + APPLE_UUID + maj$ + min$ + txpwr$
 endfunc fibeac$
 
-    
+
 Function EddyStone1$()
 // Build EddyStone UID String
 //----------------------------------------------------
 //Format:
-    // 0 1  2  3  4 5 6 7 8 9 0 1 2 3  4 5 6 7 8 9  
+    // 0 1  2  3  4 5 6 7 8 9 0 1 2 3  4 5 6 7 8 9
     // EddyStone_Svc_UUID
     //      Frame_Type
-    //         TX_Power    
+    //         TX_Power
     //            EddyStone_Namespace
     //                                 EddyStone_Instance
-    // AAFE 00 E2 A014C1898BD7AB0A56B0 010203040506 
+    // AAFE 00 E2 A014C1898BD7AB0A56B0 010203040506
 //----------------------------------------------------
     dim eddy1$, feddy1$
 

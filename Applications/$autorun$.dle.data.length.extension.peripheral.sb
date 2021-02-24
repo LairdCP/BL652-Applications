@@ -1,5 +1,5 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Copyright (c) 2016, Laird                                                  ++
+// Copyright (c) 2016-2021, Laird Connectivity                                ++
 //                                                                            ++
 // Permission to use, copy, modify, and/or distribute this software for any   ++
 // purpose with or without fee is hereby granted, provided that the above     ++
@@ -81,17 +81,21 @@ endsub
 
 //-------------------------------------------------------------------------------
 // Definitions for attribute values needed to achieve Data Length Extension
-#define ATTRIBUTE_MTU_KEY_ID                    211    // CFG ID 211
-#define ATTRIBUTE_DATA_LENGTH_KEY_ID            212    // CFG ID 212
-#define USE_STRINT_IN_EVENTS_KEY_ID             213    // CFG ID 213
-#define ENABLE_HIGH_BANDWIDTH_KEY_ID            214    // CFG ID 214
-#define BLE_MAX_PACKET_LENGTH_KEY_ID            216    // CFG ID 216
+#define BLE_MAX_CONNECTIONS_AS_PERIPHERAL_KEY_ID 205    // CFG ID 205
+#define BLE_MAX_CONNECTIONS_AS_CENTRAL_KEY_ID    206    // CFG ID 205
+#define ATTRIBUTE_MTU_KEY_ID                     211    // CFG ID 211
+#define ATTRIBUTE_DATA_LENGTH_KEY_ID             212    // CFG ID 212
+#define USE_STRING_IN_EVENTS_KEY_ID              213    // CFG ID 213
+#define BLE_MAX_PACKET_LENGTH_KEY_ID             216    // CFG ID 216
+#define BLE_EVENT_LENGTH_KEY_ID                  219    // CFG ID 219
 
-#define ATTRIBUTE_DATA_LENGTH_MAXIMUM           244 // Gatt Server Attribute Maximum Length - Range:20-244
-#define ATTRIBUTE_MTU_MAXIMUM                   247 // Attribut Maximum Trnasmission Unit - Range:23-247
-#define BLE_MAX_PACKET_LENGTH                   251 // BLE Maximum packet length - Range: 27:251
-#define USE_STRING_IN_EVENTS                    1   // 0: use EVATTRNOTIFY, 1: use EVATTRNOTIFYEX (See user manual)
-#define BLE_ENABLE_HIGH_BANDWIDTH               1   // 0: 3 packets/interval (default), 1: 6 packets/interval
+#define BLE_MAX_CONNECTIONS_AS_PERIPHERAL        1      // Maximum of 1 peripheral connections - Range:0-1
+#define BLE_MAX_CONNECTIONS_AS_CENTRAL           1      // Maximum of 1 central connections - Range:1-8
+#define ATTRIBUTE_MTU_MAXIMUM                    247    // Attribut Maximum Trnasmission Unit - Range:23-247
+#define ATTRIBUTE_DATA_LENGTH_MAXIMUM            244    // Gatt Server Attribute Maximum Length - Range:20-244
+#define USE_STRING_IN_EVENTS                     1      // 0: use EVATTRNOTIFY, 1: use EVATTRNOTIFYEX (See user manual)
+#define BLE_MAX_PACKET_LENGTH                    251    // BLE Maximum packet length - Range: 27:251
+#define BLE_EVENT_LENGTH                         800    // Maximum of 800 packets per connection interval - Range: 2-800
 
 //-------------------------------------------------------------------------------
 // This function is used to configure the BL652 to use the maximum Attribute
@@ -99,28 +103,110 @@ endsub
 // packet length
 //-------------------------------------------------------------------------------
 FUNCTION DataLengthExtension()
+    dim MaxPeripheralConnections, MaxCentralConnections, UseStringsInEvents, EventLength, PerformReset, HasError
 
-    // Get current attribute MTU, attribute data length, and maximum packet length values
+    // Get current configuration values
+    rc = NvCfgKeyGet(BLE_MAX_CONNECTIONS_AS_PERIPHERAL_KEY_ID, MaxPeripheralConnections)
+    AssertRC(rc, 110)
+    rc = NvCfgKeyGet(BLE_MAX_CONNECTIONS_AS_CENTRAL_KEY_ID, MaxCentralConnections)
+    AssertRC(rc, 112)
     rc = NvCfgKeyGet(ATTRIBUTE_MTU_KEY_ID, nAttributeMTU)
+    AssertRC(rc, 114)
     rc = NvCfgKeyGet(ATTRIBUTE_DATA_LENGTH_KEY_ID, nAttributeLength)
+    AssertRC(rc, 116)
+    rc = NvCfgKeyGet(USE_STRING_IN_EVENTS_KEY_ID, UseStringsInEvents)
+    AssertRC(rc, 118)
     rc = NvCfgKeyGet(BLE_MAX_PACKET_LENGTH_KEY_ID, nBleMaxPacketLength)
+    AssertRC(rc, 120)
+    rc = NvCfgKeyGet(BLE_EVENT_LENGTH_KEY_ID, EventLength)
+    AssertRC(rc, 122)
 
-    // Check if these are the values needed to achieve DLE
-    IF  (nAttributeMTU != ATTRIBUTE_MTU_MAXIMUM) || (nAttributeLength != ATTRIBUTE_DATA_LENGTH_MAXIMUM) || (nBleMaxPacketLength != BLE_MAX_PACKET_LENGTH) THEN
+    PerformReset = 0
+    HasError = 0
+
+    IF (MaxPeripheralConnections != BLE_MAX_CONNECTIONS_AS_PERIPHERAL) THEN
+        rc = NvCfgKeySet(BLE_MAX_CONNECTIONS_AS_PERIPHERAL_KEY_ID, BLE_MAX_CONNECTIONS_AS_PERIPHERAL)
+        AssertRC(rc, 129)
+        IF (rc != 0) THEN
+            HasError = 1
+        ENDIF
+
+        PerformReset = 1
+    ENDIF
+
+    IF (MaxCentralConnections != BLE_MAX_CONNECTIONS_AS_CENTRAL) THEN
+        rc = NvCfgKeySet(BLE_MAX_CONNECTIONS_AS_CENTRAL_KEY_ID, BLE_MAX_CONNECTIONS_AS_CENTRAL)
+        AssertRC(rc, 139)
+        IF (rc != 0) THEN
+            HasError = 1
+        ENDIF
+
+        PerformReset = 1
+    ENDIF
+
+    IF (nAttributeMTU != ATTRIBUTE_MTU_MAXIMUM) THEN
         // Change the Attribute MTU to be the maximum allowed by the BL652 (247)
         rc = NvCfgKeySet(ATTRIBUTE_MTU_KEY_ID, ATTRIBUTE_MTU_MAXIMUM)
+        AssertRC(rc, 150)
+        IF (rc != 0) THEN
+            HasError = 1
+        ENDIF
+
+        PerformReset = 1
+    ENDIF
+
+    IF (nAttributeLength != ATTRIBUTE_DATA_LENGTH_MAXIMUM) THEN
         // Change the Attribute Data Length to be the maximum allowed by the BL652 (244)
         rc = NvCfgKeySet(ATTRIBUTE_DATA_LENGTH_KEY_ID, ATTRIBUTE_DATA_LENGTH_MAXIMUM)
+        AssertRC(rc, 161)
+        IF (rc != 0) THEN
+            HasError = 1
+        ENDIF
+
+        PerformReset = 1
+    ENDIF
+
+    IF (UseStringsInEvents != USE_STRING_IN_EVENTS) THEN
         // Allow data to be thrown in messages (i.e. Use EVATTRNOTIFYEX instead of EVATTRNOTIFY)
-        rc = NvCfgKeySet(USE_STRINT_IN_EVENTS_KEY_ID, USE_STRING_IN_EVENTS)
-        // Change the bandwidth configuration to HIGH (6 packets per interval)
-        rc = NvCfgKeySet(ENABLE_HIGH_BANDWIDTH_KEY_ID, BLE_ENABLE_HIGH_BANDWIDTH)
+        rc = NvCfgKeySet(USE_STRING_IN_EVENTS_KEY_ID, USE_STRING_IN_EVENTS)
+        AssertRC(rc, 172)
+        IF (rc != 0) THEN
+            HasError = 1
+        ENDIF
+
+        PerformReset = 1
+    ENDIF
+
+    IF (nBleMaxPacketLength != BLE_MAX_PACKET_LENGTH) THEN
         // Change the maximum packet length to 251 bytes
         rc = NvCfgKeySet(BLE_MAX_PACKET_LENGTH_KEY_ID, BLE_MAX_PACKET_LENGTH)
+        AssertRC(rc, 183)
+        IF (rc != 0) THEN
+            HasError = 1
+        ENDIF
+
+        PerformReset = 1
+    ENDIF
+
+    IF (EventLength != BLE_EVENT_LENGTH) THEN
+        rc = NvCfgKeySet(BLE_EVENT_LENGTH_KEY_ID, BLE_EVENT_LENGTH)
+        AssertRC(rc, 193)
+        IF (rc != 0) THEN
+            HasError = 1
+        ENDIF
+
+        PerformReset = 1
+    ENDIF
+
+    IF (PerformReset == 1) THEN
+        IF (HasError == 1) THEN
+            PRINT "\n## Module configuration upgrade failed - Application in-operable"
+            EXITFUNC 0
+        ENDIF
+
         // Reset the module so that the data is overwritten
         Reset(0)
     ENDIF
-
 ENDFUNC 0
 //------------------------------------------------------------------------------
 // Start LE Adverts
@@ -177,9 +263,9 @@ function CreateVSPService()
     RxUUID = BleHandleUuidSibling(BaseUUID, RxUUID)
 
     // Setup Modem characteristics
-    ModemInUUID  = 0x2003
+    ModemInUUID  = 0x2002
     ModemInUUID = BleHandleUuidSibling(BaseUUID, ModemInUUID)
-    ModemOutUUID = 0x2002
+    ModemOutUUID = 0x2003
     ModemOutUUID = BleHandleUuidSibling(BaseUUID, ModemOutUUID)
 
     // Create new VSP service
@@ -217,10 +303,7 @@ endfunc 0
 #define BLE_EVBLEMSGID_CONNECT                  0   //nCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT               1   //nCtx = connection handle
 #define BLE_EVBLEMSGID_SERVICE_ERROR            4   //nCtx = resultcode
-#define BLE_EVBLEMSGID_DISPLAY_PASSKEY          9   //nCtx = passcode to display
 #define BLE_EVBLEMSGID_NEW_BOND                 10  //nCtx = connection handle
-#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST         11  //nCtx = 1 for passkey, 2 for 16 byte OOB data
-#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE   12  //nCtx = new notification state 0=off, 1=on
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE        14  //nCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL   15  //nCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER    16  //nCtx = connection handle
@@ -379,18 +462,17 @@ endif
 //Setup event handlers
 //******************************************************************************
 // UART events
-ONEVENT EVUARTRX        CALL HndlrUartRx
+ONEVENT EVUARTRX          CALL HndlrUartRx
 // Generic BLE events
-ONEVENT EVBLEMSG        CALL HndlrBleMsg
-ONEVENT EVCHARVAL       CALL HndlrCharVal           // Used if AT+CFG 213=0
-ONEVENT EVCHARVALUE     CALL HndlrCharValue         // Used if AT+CFG 213=1
-ONEVENT EVNOTIFYBUF     CALL HndlrNtfyBuf
+ONEVENT EVBLEMSG          CALL HndlrBleMsg
+ONEVENT EVCHARVAL         CALL HndlrCharVal           // Used if AT+CFG 213=0
+ONEVENT EVCHARVALUE       CALL HndlrCharValue         // Used if AT+CFG 213=1
+ONEVENT EVNOTIFYBUF       CALL HndlrNtfyBuf
 // Data Length Extenstion events
-ONEVENT EVATTRIBUTEMTU  CALL HandlerAttrMTUchng
-ONEVENT EVPACKETLENGTH  CALL HandlerPacketLength
-// Phy related changes
-OnEvent EVBLE_PHY_UPDATED   call HandlerPhyChngd
-OnEvent EVBLE_PHY_REQUEST   call HandlerPhyReq
+ONEVENT EVATTRIBUTEMTU    CALL HandlerAttrMTUchng
+ONEVENT EVPACKETLENGTH    CALL HandlerPacketLength
+ONEVENT EVBLE_PHY_UPDATED CALL HandlerPhyChngd        // PHY changed
+ONEVENT EVBLE_PHY_REQUEST CALL HandlerPhyReq          // PHY change request
 
 //******************************************************************************
 //Wait in a lower-power mode for an event to occur

@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016, Laird
+// Copyright (c) 2015-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -208,7 +208,7 @@ FUNCTION HndlrCharVal(charHandle, offset, len)
             ENDIF
         ELSEIF charHandle == MIchar THEN
             rc = BleCharValueRead(MIchar, Rd$)
-            AssertRC(rc, 202)
+            AssertRC(rc, 211)
             IF strcmp(Rd$, "\01") == 0 THEN
                 rc = HndlrUartRx()
             ENDIF

@@ -1,5 +1,5 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Copyright (c) 2016, Laird                                                  ++
+// Copyright (c) 2016-2021, Laird Connectivity                                ++
 //                                                                            ++
 // Permission to use, copy, modify, and/or distribute this software for any   ++
 // purpose with or without fee is hereby granted, provided that the above     ++
@@ -69,11 +69,11 @@
 //    use vsp functions to pass data through
 //
 //on connect + APP_CMD_MODE
-//    receive data, when \n (or \r?) is detected use cmd-application style 
+//    receive data, when \n (or \r?) is detected use cmd-application style
 //    command parsing (optionally string insensitive?)
 //    option to erase module?
-//    if settings updated then on disconnect do not readvertise, destroy VSP 
-//    instance, re-run OpenVSPService - do not update APP_*_MODE variable, 
+//    if settings updated then on disconnect do not readvertise, destroy VSP
+//    instance, re-run OpenVSPService - do not update APP_*_MODE variable,
 //    restart advertising
 //
 //******************************************************************************
@@ -81,8 +81,8 @@
 //******************************************************************************
 
 
-//Defines for default variables if not found in the non-volatile configuration, 
-//default vaules will also be used if loading data from non-volatile storage fails 
+//Defines for default variables if not found in the non-volatile configuration,
+//default vaules will also be used if loading data from non-volatile storage fails
 //and NvReadFailMode is set to continue operation
 
 //Default length of Tx buffer (0 = default, 1024 maximum (for BL652) or 512 maximum (for BL600))
@@ -94,81 +94,81 @@
     #define VspRxBufConfigMin        0
     #define VspRxBufConfigMax        1024
 //If modem characteristics should be enabled or disabled by default (0 = disable, 1 = enable)
-#define ModemCharsConfigDef      1                                  
+#define ModemCharsConfigDef      1
     #define ModemCharsConfigMin      0
     #define ModemCharsConfigMax      1
-//Encrypted without MITM    
-#define VspFlagsConfigDef        8                                  
+//Encrypted without MITM
+#define VspFlagsConfigDef        8
     #define VspFlagsConfigMin        4
     #define VspFlagsConfigMax        0x1C
 //Default UUID of Tx characteristic (sibling of Base UUID)
-#define TxUUIDConfigDef          0x2000                             
+#define TxUUIDConfigDef          0x2000
     #define TxUUIDConfigMin          0
     #define TxUUIDConfigMax          0xFFFF
 //Default UUID of Rx characteristic (sibling of Base UUID)
-#define RxUUIDConfigDef          0x2001                             
+#define RxUUIDConfigDef          0x2001
     #define RxUUIDConfigMin          0
     #define RxUUIDConfigMax          0xFFFF
 //Default UUID of Modem-In characteristic (sibling of Base UUID)
-#define ModemInUUIDConfigDef     0x2003                             
+#define ModemInUUIDConfigDef     0x2003
     #define ModemInUUIDConfigMin     0
     #define ModemInUUIDConfigMax     0xFFFF
 //Default UUID of Modem-Out characteristic (sibling of Base UUID)
-#define ModemOutUUIDConfigDef    0x2002                             
+#define ModemOutUUIDConfigDef    0x2002
     #define ModemOutUUIDConfigMin    0
     #define ModemOutUUIDConfigMax    0xFFFF
 //Default Advertising interval (lower will raise the power consumption)
-#define AdvIntConfigDef          250                                
+#define AdvIntConfigDef          250
     #define AdvIntConfigMin          20
     #define AdvIntConfigMax          10240
 //Default Minimum connection interval
-#define MinCntIntConfigDef       7500                               
+#define MinCntIntConfigDef       7500
     #define MinCntIntConfigMin       7500
     #define MinCntIntConfigMax       3998750
 //Default Maximum connection interval
-#define MaxCntIntConfigDef       40000                              
+#define MaxCntIntConfigDef       40000
     #define MaxCntIntConfigMin       7500
     #define MaxCntIntConfigMax       3998750
 //Default UART baud rate
-#define UARTSpeedConfigDef       115200                             
+#define UARTSpeedConfigDef       115200
     #define UARTSpeedConfigMin       1200
     #define UARTSpeedConfigMax       1000000
 //Default UART Tx buffer length
-#define UARTTxBufConfigDef       0                                  
+#define UARTTxBufConfigDef       0
     #define UARTTxBufConfigMin       0
     #define UARTTxBufConfigMax       4096
 //Default UART Rx buffer length
-#define UARTRxBufConfigDef       0                                  
+#define UARTRxBufConfigDef       0
     #define UARTRxBufConfigMin       0
     #define UARTRxBufConfigMax       4096
 //Default disconnect time (if device does not encrypt connection - VSP flag must be set to encrypted) in ms
-#define DisconnectTimeConfigDef  8000                               
+#define DisconnectTimeConfigDef  8000
     #define DisconnectTimeConfigMin  1000
     #define DisconnectTimeConfigMax  20000
-//Default selection if the BT address is appended to the advertised device name 
-//   0 = none, 
-//   1 = full BT address including address type, 
-//   2 = full BT address excluding address type, 
-//   3 = last 4 characters, 
+//Default selection if the BT address is appended to the advertised device name
+//   0 = none,
+//   1 = full BT address including address type,
+//   2 = full BT address excluding address type,
+//   3 = last 4 characters,
 //   4 = last 6 characters
-#define DeviceNameTypeConfigDef  0                                  
+#define DeviceNameTypeConfigDef  0
     #define DeviceNameTypeConfigMin  0
     #define DeviceNameTypeConfigMax  4
 //Default action of CONN pin (-1 for no gpio indication, otherwise the GPIO selected)
-#define CONNPinConfigDef         29                                  
+#define CONNPinConfigDef         29
     #define CONNPinConfigMin         -1
     #define CONNPinConfigMax         31
 //Default action of ENCR pin (-1 for no gpio indication, otherwise the GPIO selected)
-#define ENCRPinConfigDef         30                                  
+#define ENCRPinConfigDef         30
     #define ENCRPinConfigMin         -1
     #define ENCRPinConfigMax         31
 
 //VSP default
-#define BaseUUIDConfigDef        "569a1101b87f490c92cb11ba5ea5167c" 
+#define BaseUUIDConfigDef        "569a1101b87f490c92cb11ba5ea5167c"
     #define BaseUUIDConfigMinLen     32
     #define BaseUUIDConfigMaxLen     32
 //Default UART flags
-#define UARTFlagsConfigDef       "CN81H"                            
+#define UARTFlagsConfigDef       "CN81H"
     #define UARTFlagsConfigMinLen    5
     #define UARTFlagsConfigMaxLen    5
 //Default advertised name of device
@@ -238,24 +238,15 @@
 #define CONFIG_KEY_ID_START_STR   100                             //The start ID in nvrecord non-vol space for string config keys
 #define CONFIG_KEY_ID_MAX_STR     10                              //Maximum number of string config keys
 
-        
-#define NUM_OF_I_PARAMS           (8)                             // size of i[]        
+
+#define NUM_OF_I_PARAMS           (8)                             // size of i[]
 #define NUM_OF_S_PARAMS           (8)                             // size of s$[]
 
 //BLE EVENT MSG IDs
 #define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
-#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2    //msgCtx = alert level
-#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3    //msgCtx = alert level
 #define BLE_EVBLEMSGID_SERVICE_ERROR                    4    //msgCtx = resultcode
-#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5    //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6    //msgCtx = not used
-#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7    //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8    //msgCtx = not used
-#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9    //msgCtx = passcode to display
 #define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                 11   //msgCtx = 1 for passkey, 2 for 16 byte OOB data
-#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE           12   //msgCtx = new notification state 0=off, 1=on
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE                14   //msgCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL           15   //msgCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER            16   //msgCtx = connection handle
@@ -303,7 +294,7 @@ dim CONNPin, ENCRpin, AppModeGPIOPin
 #cmpif 0x00000002 : dim GPIOLED1Pin
 #cmpif 0x0000000C : dim GPIOLED2Pin
 
-//Holds the timeout value that will disconnect a device that connects but doesn't 
+//Holds the timeout value that will disconnect a device that connects but doesn't
 //encrypt the connection within the time (if the encryption flag is enabled)
 dim DisconnectTime
 
@@ -387,13 +378,13 @@ endif
 //------------------------------------------------------------------------------
 sub NvFailure()
     //Non-volatile storage failure and application set to not continue when this is detected
-    #cmpif 0x00000001 : AssertRC(rc, 3550)
+    #cmpif 0x00000001 : AssertRC(rc, 381)
 
     //Enable LED2 flashing if set to do so
     rc = 0
     #cmpif 0x00000008 : rc = GPIOSetFunc(GPIOLED2Pin, 2, 3) //Set as frequency output
     #cmpif 0x00000008 : GPIOWrite(GPIOLED2Pin, 2)
-    #cmpif 0x00000001 : AssertRC(rc, 3610)
+    #cmpif 0x00000001 : AssertRC(rc, 387)
 endsub
 
 //------------------------------------------------------------------------------
@@ -402,7 +393,7 @@ endsub
 // This function gets the default for the key of INTEGER type
 // Valid keyID values are 0 to (CONFIG_KEY_ID_MAX_NUM-1)
 //------------------------------------------------------------------------------
-function ConfigKeyGetDef( keyID as integer) as integer
+function ConfigKeyGetDef(keyID as integer) as integer
     dim defVal
     
     #cmpif 0x00000001 : AssertBound(keyID, 0, (CONFIG_KEY_ID_MAX_NUM-1), 3730 )
@@ -447,7 +438,7 @@ function ConfigKeyGetDef( keyID as integer) as integer
     case else
         defVal=0
     endselect
-    
+
 endfunc defVal
 
 //------------------------------------------------------------------------------
@@ -457,14 +448,14 @@ endfunc defVal
 // Valid keyID values are 0 to (CONFIG_KEY_ID_MAX_NUM-1)
 // Integer config keys are stored beginning at ID = CONFIG_KEY_ID_START_NUM
 //------------------------------------------------------------------------------
-function ConfigKeyGet( keyID as integer) as integer
+function ConfigKeyGet(keyID as integer) as integer
     dim keyVal,tmpStr$
-    
+
     if (keyID<0)||(keyID>=CONFIG_KEY_ID_MAX_NUM) then
         exitfunc ConfigKeyGetDef(keyID)
     endif
-    
-    if (NvRecordGet((keyID + CONFIG_KEY_ID_START_NUM), tmpStr$) <= 0 ) then
+
+    if (NvRecordGet((keyID + CONFIG_KEY_ID_START_NUM), tmpStr$) <= 0) then
         //The key is empty or does not exist yet
         exitfunc ConfigKeyGetDef(keyID)
     else
@@ -490,7 +481,7 @@ endfunc 1
 // This function checks if the integer type key value is valid
 // Return 0 if not valid !0 if valid
 //------------------------------------------------------------------------------
-function ConfigKeyIsValid( keyID as integer, byref newVal as integer) as integer
+function ConfigKeyIsValid(keyID as integer, byref newVal as integer) as integer
     dim isValid
     
     #cmpif 0x00000001 : AssertBound(keyID, 0, (CONFIG_KEY_ID_MAX_NUM-1), 4480 )
@@ -498,13 +489,13 @@ function ConfigKeyIsValid( keyID as integer, byref newVal as integer) as integer
     select keyID
     case VspTxBufConfigID
         isValid=InRange(newVal,VspTxBufConfigMin,VspTxBufConfigMax)
-        
+
     case VspRxBufConfigID
         isValid=InRange(newVal,VspRxBufConfigMin,VspRxBufConfigMax)
-        
+
     case ModemCharsConfigID
         isValid=InRange(newVal,ModemCharsConfigMin,ModemCharsConfigMax)
-        
+
     case VspFlagsConfigID
         isValid=InRange(newVal,VspFlagsConfigMin,VspFlagsConfigMax)
         if isValid then
@@ -520,82 +511,82 @@ function ConfigKeyIsValid( keyID as integer, byref newVal as integer) as integer
                 endif
             endif
         endif
-        
+
     case TxUUIDConfigID
         isValid=InRange(newVal,TxUUIDConfigMin,TxUUIDConfigMax)
-        
+
     case RxUUIDConfigID
         isValid=InRange(newVal,RxUUIDConfigMin,RxUUIDConfigMax)
-        
+
     case ModemInUUIDConfigID
         isValid=InRange(newVal,ModemInUUIDConfigMin,ModemInUUIDConfigMax)
-        
+
     case ModemOutUUIDConfigID
         isValid=InRange(newVal,ModemOutUUIDConfigMin,ModemOutUUIDConfigMax)
-        
+
     case AdvIntConfigID
         isValid=InRange(newVal,AdvIntConfigMin,AdvIntConfigMax)
-        
+
     case MinCntIntConfigID
         isValid=InRange(newVal,MinCntIntConfigMin,ConfigKeyGet(MaxCntIntConfigID))
-        
+
     case MaxCntIntConfigID
         isValid=InRange(newVal,ConfigKeyGet(MinCntIntConfigID),MaxCntIntConfigMax)
-        
+
     case UARTSpeedConfigID
         select newVal
           case 1200,2400,4800,9600,14400,19200,28800,38400,57600,76800,115200,230400,250000,460800,921600,1000000
               isValid=1
           case else
-              isValid=0  
+              isValid=0
         endselect
-        
+
     case UARTTxBufConfigID
         isValid=InRange(newVal,UARTTxBufConfigMin,UARTTxBufConfigMax)
-        
+
     case UARTRxBufConfigID
         isValid=InRange(newVal,UARTRxBufConfigMin,UARTRxBufConfigMax)
-        
+
     case DisconnectTimeConfigID
         isValid=InRange(newVal,DisconnectTimeConfigMin,DisconnectTimeConfigMax)
-        
+
     case DeviceNameTypeConfigID
         isValid=InRange(newVal,DeviceNameTypeConfigMin,DeviceNameTypeConfigMax)
-        
+
     case CONNPinConfigID
         isValid=InRange(newVal,CONNPinConfigMin,CONNPinConfigMax)
-        
+
     case ENCRPinConfigID
         isValid=InRange(newVal,ENCRPinConfigMin,ENCRPinConfigMax)
-        
+
     case else
         isValid=0
     endselect
-    
+
 endfunc isValid
 
 //------------------------------------------------------------------------------
 // There are 2 types of non-volatile config keys. One type stores integer values
 // and the other stores string values.
-// This function sets the INTEGER variety and validates against min/max 
+// This function sets the INTEGER variety and validates against min/max
 // Valid keyID values are 0 to (CONFIG_KEY_ID_MAX_NUM-1)
 // returns 0 if successful, 1 invalid key, 2 invalid value, 3 if NvRecordSet fails
 //------------------------------------------------------------------------------
 function ConfigKeySet(keyID as integer, newVal as integer)as integer
     dim tmpStr$
-    
+
     if (keyID<0)||(keyID>=CONFIG_KEY_ID_MAX_NUM) then
         exitfunc 1
     endif
-    
+
     if ConfigKeyIsValid(keyID,newVal)==0 then
         //new value is not valid
         exitfunc 2
     endif
-    
+
     sprint #tmpStr$, newVal
     rc = NvRecordSet((keyID + CONFIG_KEY_ID_START_NUM),tmpStr$)
-    
+
     if (rc <= 0 && (NvReadFailMode & 1) == 1) then
         //Failed to write non-volatile record and application set to not continue
         NvFailure()
@@ -609,10 +600,10 @@ endfunc 0
 // This function gets the default for the key of STRING type
 // Valid keyID values are 0 to (CONFIG_KEY_ID_MAX_STR-1)
 //------------------------------------------------------------------------------
-sub ConfigKeyGetDef$( keyID as integer, byref defVal$ as string)
-    
+sub ConfigKeyGetDef$(keyID as integer, byref defVal$ as string)
+
     #cmpif 0x00000001 : AssertBound(keyID, 0, (CONFIG_KEY_ID_MAX_STR-1), 5550 )
-    
+
     select keyID
     case BaseUUIDConfigID
         defVal$=BaseUUIDConfigDef
@@ -629,7 +620,7 @@ sub ConfigKeyGetDef$( keyID as integer, byref defVal$ as string)
     case else
         defVal$=""
     endselect
-    
+
 endsub
 
 //------------------------------------------------------------------------------
@@ -639,16 +630,16 @@ endsub
 // Valid keyID values are 0 to (CONFIG_KEY_ID_MAX_STR-1)
 // String config keys are stored beginning at ID = CONFIG_KEY_ID_START_STR
 //------------------------------------------------------------------------------
-function ConfigKeyGet$(keyID as integer) as string
+function ConfigKeyGet$(keyID as integer) as string
     dim keyVal$
     if (keyID<0)||(keyID>=CONFIG_KEY_ID_MAX_STR) then
         //invalid key id
-        ConfigKeyGetDef$(keyID,keyVal$)   
-        
-    elseif (NvRecordGet((keyID+CONFIG_KEY_ID_START_STR), keyVal$) <= 0 ) then
+        ConfigKeyGetDef$(keyID,keyVal$)
+
+    elseif (NvRecordGet((keyID+CONFIG_KEY_ID_START_STR), keyVal$) <= 0) then
         //the key does not exist yet
-        ConfigKeyGetDef$(keyID,keyVal$)   
-        
+        ConfigKeyGetDef$(keyID,keyVal$)
+
     endif
 endfunc keyVal$
 
@@ -658,42 +649,42 @@ endfunc keyVal$
 // This function checks if the string type key value is valid
 // Return 0 if not valid !0 if valid
 //------------------------------------------------------------------------------
-function ConfigKey$IsValid( keyID as integer, newVal$ as string) as integer
+function ConfigKey$IsValid(keyID as integer, newVal$ as string) as integer
     dim isValid, tmpStr1$, nlen
-    
+
     #cmpif 0x00000001 : AssertBound(keyID, 0, (CONFIG_KEY_ID_MAX_STR-1), 6000 )
-    
+
     isValid = 0 // assume invalid
     nlen = strlen(newVal$) //get length of new value
-    
+
     select keyID
     case BaseUUIDConfigID
         tmpStr1$=StrDehexize$(newVal$)
-        if( strlen(tmpStr1$) == 16 ) then
+        if(strlen(tmpStr1$) == 16) then
             isValid=1
         endif
-        
+
     case UARTFlagsConfigID
       if (strcmp(newVal$, "CN81H")== 0) || (strcmp(newVal$, "CN81N")== 0) then
           //match of options
           isValid=1
       endif
-    
+
     case DeviceNameConfigID
-        if( (nlen>=DeviceNameConfigMinLen) && (nlen<=DeviceNameConfigMaxLen) ) then
+        if((nlen>=DeviceNameConfigMinLen) && (nlen<=DeviceNameConfigMaxLen)) then
             //valid length
             isValid=1
         endif
-    
+
     case else
     endselect
-    
+
 endfunc isValid
 
 //------------------------------------------------------------------------------
 // There are 2 types of non-volatile config keys. One type stores integer values
 // and the other stores string values.
-// This function sets the INTEGER variety and validates against min/max 
+// This function sets the INTEGER variety and validates against min/max
 // Valid keyID values are 0 to (CONFIG_KEY_ID_MAX_STR-1)
 // returns 0 if successful, 1 invalid key, 2 invalid value, 3 if NvRecordSet fails
 //------------------------------------------------------------------------------
@@ -701,14 +692,14 @@ function ConfigKeySet$(keyID as integer, newVal$ as string)as integer
     if (keyID<0)||(keyID>=CONFIG_KEY_ID_MAX_STR) then
         exitfunc 1
     endif
-    
+
     if ConfigKey$IsValid(keyID,newVal$)==0 then
         //new value is not valid
         exitfunc 2
     endif
-    
+
     rc = NvRecordSet((keyID + CONFIG_KEY_ID_START_STR),newVal$)
-    
+
     if (rc <= 0 && (NvReadFailMode & 1) == 1) then
         //Failed to write non-volatile record and application set to not continue
         NvFailure()
@@ -739,7 +730,7 @@ endfunc 0
 // Returns 0 if all 'num' string tokens are successfyully extracted, and 4 if not
 //------------------------------------------------------------------------------
 sub TrimQuotes(str$)
-    dim len 
+    dim len
     if strgetchr(str$,0)==0x22 then  //check for beginning "
         len = strlen(str$)
         if len > 2 then
@@ -783,40 +774,40 @@ function OpenVSPService()
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //Load the configuration from non-voltatile storage
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
+
     //Tx buffer size
-    vspTxBufLen = ConfigKeyGet( VspTxBufConfigID )
+    vspTxBufLen = ConfigKeyGet(VspTxBufConfigID)
     //Rx buffer size
-    vspRxBufLen = ConfigKeyGet( VspRxBufConfigID)
-    
+    vspRxBufLen = ConfigKeyGet(VspRxBufConfigID)
+
     //Base UUID
-    TmpStr$ = ConfigKeyGet$( BaseUUIDConfigID )
+    TmpStr$ = ConfigKeyGet$(BaseUUIDConfigID)
     TmpStr$ = StrDehexize$(TmpStr$)
     BaseUUID = BleHandleUuid128(TmpStr$)
     //Tx UUID handles
-    TxUUID = ConfigKeyGet( TxUUIDConfigID)
+    TxUUID = ConfigKeyGet(TxUUIDConfigID)
     TxUUID = BleHandleUuidSibling(BaseUUID, TxUUID)
     //Rx UUID handles
-    RxUUID = ConfigKeyGet( RxUUIDConfigID)
+    RxUUID = ConfigKeyGet(RxUUIDConfigID)
     RxUUID = BleHandleUuidSibling(BaseUUID, RxUUID)
-    
+
     //Modem characteristics enabled/disabled
-    ModemChars = ConfigKeyGet( ModemCharsConfigID)
+    ModemChars = ConfigKeyGet(ModemCharsConfigID)
     if (ModemChars != 0) then
         //Modem IN
-        ModemInUUID = ConfigKeyGet( ModemInUUIDConfigID)
+        ModemInUUID = ConfigKeyGet(ModemInUUIDConfigID)
         ModemInUUID = BleHandleUuidSibling(BaseUUID, ModemInUUID)
         //Modem OUT
-        ModemOutUUID = ConfigKeyGet( ModemOutUUIDConfigID)
+        ModemOutUUID = ConfigKeyGet(ModemOutUUIDConfigID)
         ModemOutUUID = BleHandleUuidSibling(BaseUUID, ModemOutUUID)
     endif
 
     //VspFlags
-    VspFlags = ConfigKeyGet( VspFlagsConfigID)
+    VspFlags = ConfigKeyGet(VspFlagsConfigID)
     //Read the disconnection timeout value (if the encryption flag is set)
     if ((VspFlags & 0x8) == 0x8 || (VspFlags & 0x10) == 0x10) then
         //VSP encryption is enabled, get timer value
-        DisconnectTime = ConfigKeyGet( DisconnectTimeConfigID)
+        DisconnectTime = ConfigKeyGet(DisconnectTimeConfigID)
     else
         //VSP encryption is disabled, disable timer
         DisconnectTime = 0
@@ -824,7 +815,7 @@ function OpenVSPService()
 
     //Open the VSP service with the provided configuration
     rc = BleVSPOpenEx(vspTxBufLen, vspRxBufLen, VspFlags, BaseUUID, RxUUID, TxUUID, ModemInUUID, ModemOutUUID)
-    #cmpif 0x00000001 : AssertRC(rc, 7680)
+    #cmpif 0x00000001 : AssertRC(rc, 818)
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -834,16 +825,16 @@ function SetupGAPService()
     dim TmpStr$, TmpVal, MinCntInt, MaxCntInt, DevName$
 
     //Read the minimum connection interval and check sensible value
-    MinCntInt = ConfigKeyGet( MinCntIntConfigID)   
-    
+    MinCntInt = ConfigKeyGet(MinCntIntConfigID)
+
     //Read the maximum connection interval and check sensible value
-    MaxCntInt = ConfigKeyGet( MaxCntIntConfigID)
+    MaxCntInt = ConfigKeyGet(MaxCntIntConfigID)
 
     //Get device name
-    DevName$ = ConfigKeyGet$( DeviceNameConfigID)
+    DevName$ = ConfigKeyGet$(DeviceNameConfigID)
     //Append part of module BT address if required
-    TmpVal = ConfigKeyGet( DeviceNameTypeConfigID)
-    //Default selection if the BT address is appended to the advertised device name 
+    TmpVal = ConfigKeyGet(DeviceNameTypeConfigID)
+    //Default selection if the BT address is appended to the advertised device name
     //(0 = none, 1 = full BT address, 2 = last 4 characters, 3 = last 6 characters)
     if (TmpVal > 0 && TmpVal < 4) then
         //Get device address
@@ -865,11 +856,11 @@ function SetupGAPService()
 
     //Initialise the GAP service with the connection interval data and device name
     rc = BleGapSvcInit(DevName$, 0, 0, MinCntInt, MaxCntInt, 4000000,  0)
-    #cmpif 0x00000001 : AssertRC(rc, 8220)
+    #cmpif 0x00000001 : AssertRC(rc, 859)
 
     //Read the advertising interval and check that the value is sane
-    AdvInt = ConfigKeyGet( AdvIntConfigID)
-    
+    AdvInt = ConfigKeyGet(AdvIntConfigID)
+
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -879,13 +870,13 @@ sub CreateAdverts()
     //Add device name to advert report and service UUID to scan report
     dim advRpt$, scRpt$
     rc = BleAdvRptInit(advRpt$, 2, 0, MaxDevNameSize)
-    #cmpif 0x00000001 : AssertRC(rc, 8440)
+    #cmpif 0x00000001 : AssertRC(rc, 873)
     rc = BleScanRptInit(scRpt$)
-    #cmpif 0x00000001 : AssertRC(rc, 8460)
+    #cmpif 0x00000001 : AssertRC(rc, 875)
     rc = BleAdvRptAddUuid128(scRpt$, BaseUUID)
-    #cmpif 0x00000001 : AssertRC(rc, 8480)
+    #cmpif 0x00000001 : AssertRC(rc, 877)
     rc = BleAdvRptsCommit(advRpt$, scRpt$)
-    #cmpif 0x00000001 : AssertRC(rc, 8500)
+    #cmpif 0x00000001 : AssertRC(rc, 879)
 endsub
 
 //------------------------------------------------------------------------------
@@ -899,7 +890,7 @@ sub StartAdvertising()
 
         //Start advertising over BLE
         rc = BleAdvertStart(0, Addr$, AdvInt, 0, 0)
-        #cmpif 0x00000001 : AssertRC(rc, 8640)
+        #cmpif 0x00000001 : AssertRC(rc, 893)
     endif
 endsub
 
@@ -909,7 +900,7 @@ endsub
 #cmpif 0x80000000 : sub ShowConnParms(nCtx)
 #cmpif 0x80000000 :   dim intrvl,sprvto,slat
 #cmpif 0x80000000 :   rc = BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
-#cmpif 0x80000001 :   AssertRC(rc, 8740)
+#cmpif 0x80000001 :   AssertRC(rc, 903)
 #cmpif 0x80000000 :   if rc==0 then
 #cmpif 0x80000000 :     print "\n## Conn :: Interval=";intrvl;",Supervision Tout=";sprvto;",Slave Latency=";slat
 #cmpif 0x80000000 :   endif
@@ -943,7 +934,7 @@ function HndlrBleMsg(nMsgId, nCtx)
             //Start timer for disconnect if connection does not become encrypted
             TimerStart(0, DisconnectTime, 0)
         endif
-        
+
     case BLE_EVBLEMSGID_DISCONNECT
         //Disconnection
         #cmpif 0x80000000 : DbgMsg("## Disconnected")
@@ -960,7 +951,7 @@ function HndlrBleMsg(nMsgId, nCtx)
             //Cancel disconnect timer
             TimerCancel(0)
         endif
-        
+
     case BLE_EVBLEMSGID_ENCRYPTED
         //Encrypted connection
         #cmpif 0x80000000 :  DbgMsg("## Encrypted")
@@ -973,9 +964,6 @@ function HndlrBleMsg(nMsgId, nCtx)
             //Update ENCR status due to connection becoming encrypted
             GPIOWrite(ENCRPin, 1)
         endif
-        
-    #cmpif 0x80000000 : case BLE_EVBLEMSGID_DISPLAY_PASSKEY
-    #cmpif 0x80000000 :     DbgMsgVal("## Display Pairing Passkey ",nCtx)
 
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_NEW_BOND
     #cmpif 0x80000000 :     DbgMsg("## New Bond")
@@ -988,16 +976,16 @@ function HndlrBleMsg(nMsgId, nCtx)
 
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
     #cmpif 0x80000000 :     DbgMsgVal("## Auth Key Request, type=",nCtx)
-      
+
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
     #cmpif 0x80000000 :     ShowConnParms(nCtx)
-        
+
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
     #cmpif 0x80000000 :     DbgMsg("## Conn Parm Negotiation FAILED")
-        
-    case else        
+
+    case else
     endselect
-    
+
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -1062,7 +1050,7 @@ endfunc 1
 //------------------------------------------------------------------------------
 // returns an integer with number of bits set to 1 from right
 //------------------------------------------------------------------------------
-function GetBitMask( bits as integer) as integer
+function GetBitMask(bits as integer) as integer
     dim i,j,bm
     bm=0
     i=1
@@ -1074,22 +1062,22 @@ endfunc bm
 //------------------------------------------------------------------------------
 // returns the a version string by splitting the bits as specified
 //------------------------------------------------------------------------------
-function GetVersion$( plat as integer, major as integer, minor as integer, engb as integer) as string
+function GetVersion$(plat as integer, major as integer, minor as integer, engb as integer) as string
     dim v$, cv[4], compId
-    
+
     compId = SysInfo(3)
-    
+
     //platform
-    cv[0] = (compId >> (major+minor+engb)) & GetBitMask(plat)    
+    cv[0] = (compId >> (major+minor+engb)) & GetBitMask(plat)
     //major
     cv[1] = (compId >> (minor+engb)) & GetBitMask(major)
     //minor
     cv[2] = (compId >> (engb)) & GetBitMask(minor)
     //engbuild
     cv[3] = compId  & GetBitMask(engb)
-    
+
     sprint #v$, "(";cv[0];".";cv[1];".";cv[2];".";cv[3];")"
-    
+
 endfunc v$
 
 //------------------------------------------------------------------------------
@@ -1103,11 +1091,11 @@ endfunc 0
 //------------------------------------------------------------------------------
 //##CMD##  ver
 //------------------------------------------------------------------------------
-function _ver(byref bufferStr$)        
+function _ver(byref bufferStr$)
     bufferStr$ = "\nVSP Squared version " + AppVer + " updated " + AppUpdated + " on "
     if (DevID == BL600_DEV_ID) then
         //Running on BL600
-        bufferStr$ = bufferStr$ + "BL600 " + GetVersion$( 6,6,14,6)            
+        bufferStr$ = bufferStr$ + "BL600 " + GetVersion$(6,6,14,6)
     elseif (DevID == BL652_DEV_ID) then
         //Running on BL652
         bufferStr$ = bufferStr$ + "BL652 " + GetVersion$( 8,6,12,6)
@@ -1150,7 +1138,7 @@ endfunc -1
 //------------------------------------------------------------------------------
 //##CMD##  erase
 //------------------------------------------------------------------------------
-function _erase(byref bufferStr$)        
+function _erase(byref bufferStr$)
     rc = EraseFileSystem(1)
     if (rc != 0) then
         //Erase failure
@@ -1162,7 +1150,7 @@ endfunc rc
 //##CMD##  cfg rd #INTid
 //##CMD##  cfg wr #INTid #INTval
 //------------------------------------------------------------------------------
-function _cfg(byref bufferStr$, byref cmdStr$)        
+function _cfg(byref bufferStr$, byref cmdStr$)
     dim tkn$, tlen
     tlen = ExtractStrToken(cmdStr$,tkn$)
     if tlen == 0 then
@@ -1178,7 +1166,7 @@ function _cfg(byref bufferStr$, byref cmdStr$)
       sprint #tkn$, ConfigKeyGet(i[1])
       bufferStr$ = BufferStr$ + tkn$
       exitfunc 0
-    endif  
+    endif
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"wr")==0 then
       //extract 2 (#INTid #INTval) and store starting at i[1]
@@ -1187,14 +1175,14 @@ function _cfg(byref bufferStr$, byref cmdStr$)
         exitfunc rc
       endif
       exitfunc ConfigKeySet(i[1],i[2])
-    endif      
+    endif
 endfunc 5
 
 //------------------------------------------------------------------------------
 //##CMD##  cfg$ rd #INTid
 //##CMD##  cfg$ wr #INTid #STRval
 //------------------------------------------------------------------------------
-function _cfg$(byref bufferStr$, byref cmdStr$) as integer      
+function _cfg$(byref bufferStr$, byref cmdStr$) as integer
     dim tkn$, tlen
     tlen = ExtractStrToken(cmdStr$,tkn$)
     if tlen == 0 then
@@ -1209,7 +1197,7 @@ function _cfg$(byref bufferStr$, byref cmdStr$) as integer
       endif
       bufferStr$ = bufferStr$ + ConfigKeyGet$(i[1])
       exitfunc 0
-    endif  
+    endif
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if strcmp(tkn$,"wr")==0 then
       //extract 1 (#INTid) and store starting at i[1]
@@ -1223,7 +1211,7 @@ function _cfg$(byref bufferStr$, byref cmdStr$) as integer
         exitfunc rc
       endif
       exitfunc ConfigKeySet$(i[1],s$[1])
-    endif      
+    endif
 endfunc 5
 
 //------------------------------------------------------------------------------
@@ -1243,13 +1231,13 @@ endfunc rc
 //------------------------------------------------------------------------------
 //##CMD##  client
 //------------------------------------------------------------------------------
-function _client(byref bufferStr$)        
+function _client(byref bufferStr$)
     dim tmpStr$
     //Outputs client BT address (if one is connected)
     if (ConnectionID != 0) then
         //Connection: output address
         rc = BleGetAddrFromConnHandle(ConnectionID, tmpStr$)
-        #cmpif 0x00000001 : AssertRC(rc, 11420)
+        #cmpif 0x00000001 : AssertRC(rc, 1240)
         BufferStr$ = BufferStr$ + strhexize$(tmpStr$)
     else
         //No connection
@@ -1276,7 +1264,7 @@ endfunc 0
 //------------------------------------------------------------------------------
 //##CMD##  si$ #INTid
 //------------------------------------------------------------------------------
-function _si$(byref bufferStr$, byref cmdStr$) as integer        
+function _si$(byref bufferStr$, byref cmdStr$) as integer
     dim tmpStr$
     //Outputs sysinfo(id)
     //extract 1 (#INTid) and store starting at i[1]
@@ -1290,18 +1278,18 @@ endfunc 0
 
 //==============================================================================
 //==============================================================================
-sub AppendRspEnd(rsp as integer, byref bufferStr$ )
+sub AppendRspEnd(rsp as integer, byref bufferStr$)
     if strlen(bufferStr$) > 1 then
         bufferStr$ = bufferStr$ + "\r\n"
     endif
-    
+
     if rsp == 0 then
         bufferStr$ = bufferStr$ + "OK\r\n>"
     elseif rsp > 0 then
         dim tmpStr$
         sprint #tmpStr$, integer.h' rsp
         bufferStr$ = bufferStr$ + "ER " + tmpStr$ + "\r\n>"
-    endif    
+    endif
 endsub
 
 //------------------------------------------------------------------------------
@@ -1310,10 +1298,10 @@ endsub
 function ParseCommand(SentFrom, byref CommandStr$)
     //Parses UART/VSP command when in application command mode, SentFrom indicates where the command came from (0: UART, 1: VSP)
     dim bufferStr$, tkn$, tlen
-    
+
     bufferStr$ = "\n"
-    rc=1 //assume there is an error    
-    
+    rc=1 //assume there is an error
+
     tlen = ExtractStrToken(CommandStr$,tkn$) //get first token
     if tlen == 0 then
         rc=0
@@ -1323,15 +1311,15 @@ function ParseCommand(SentFrom, byref CommandStr$)
         if     strcmp(tkn$,"reset")==0 then
             //Reset module
             rc = _reset()
-            
+
         elseif strcmp(tkn$,"ver")==0 then
             //output platform and version information
             rc = _ver(bufferStr$)
-            
+
         elseif (strcmp(tkn$, "addr") == 0) then
             //Output module Bluetooth address
             rc = _addr(bufferStr$)
-            
+
         elseif (strcmp(tkn$, "bridge") == 0) then
             //Switch to bridge mode
             rc = _bridge(bufferStr$)
@@ -1339,38 +1327,38 @@ function ParseCommand(SentFrom, byref CommandStr$)
         elseif (strcmp(tkn$, "erase") == 0) then
             //Erase module
             rc = _erase(bufferStr$)
-            
+
         elseif (strcmp(tkn$, "cfg") == 0) then
             //read/write an integer configuration
             rc = _cfg(bufferStr$, CommandStr$)
-            
+
         elseif (strcmp(tkn$, "cfg$") == 0) then
             //read/write a string configuration
             rc = _cfg$(bufferStr$, CommandStr$)
-            
+
         elseif (strcmp(tkn$, "discon") == 0) then
             //disconnect
             rc = _discon(bufferStr$)
-            
+
         elseif (strcmp(tkn$, "client") == 0) then
             //Outputs client BT address (if one is connected)
             rc = _client(bufferStr$)
-            
+
         elseif (strcmp(tkn$, "exit") == 0) then
             //Returns to module command mode
             exitfunc 0
-            
+
         elseif (strcmp(tkn$, "si") == 0) then
             //Returns sysinfo
             rc = _si(bufferStr$, CommandStr$)
-            
+
         elseif (strcmp(tkn$, "si$") == 0) then
             //Returns sysinfo
             rc = _si$(bufferStr$, CommandStr$)
-            
+
         endif
     endif
-    
+
     // Add an OK or ERROR to the response
     AppendRspEnd(rc,bufferStr$)
 
@@ -1384,7 +1372,7 @@ function ParseCommand(SentFrom, byref CommandStr$)
 
     //Send out data waiting in buffer
     rc = SendBufferedData()
-    
+
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -1426,7 +1414,7 @@ endfunc 1
 function HndlrUARTCommand()
     //Data received from UART
     rc = UARTReadN(UARTRecBuf$, MaxStringSize)
-    
+
     //Check if any commands are present
     dim CmdLen, SearchStr$, CmdStr$
     SearchStr$ = "\r"
@@ -1457,7 +1445,7 @@ endfunc 1
 sub SetupGPIOs()
     //Checks if mode should be application-based command mode or application-based bridge mode
     rc = GPIOSetFunc(AppModeGPIOPin, 1, AppModeGPIOPull)
-    #cmpif 0x00000001 : AssertRC(rc, 13480)
+    #cmpif 0x00000001 : AssertRC(rc, 1448)
     if (GPIORead(AppModeGPIOPin) == AppModeGPIOSetup) then
         //Set application to run in command mode
         AppMode = AppModeAppCmd
@@ -1467,7 +1455,7 @@ sub SetupGPIOs()
     //Setup LED1 as output if configured to be used as connection indicator
     rc = 0
     #cmpif 0x00000002 : rc = GPIOSetFunc(GPIOLED1Pin, 2, 0)
-    #cmpif 0x00000001 : AssertRC(rc, 13580)
+    #cmpif 0x00000001 : AssertRC(rc, 1458)
 
     //Set LED state if LED2 status is enabled
     rc = 0
@@ -1477,21 +1465,21 @@ sub SetupGPIOs()
     #cmpif 0x00000004 : else
     #cmpif 0x00000004 :     GPIOWrite(GPIOLED2Pin, 0)
     #cmpif 0x00000004 : endif
-    #cmpif 0x00000001 : AssertRC(rc, 13680)
+    #cmpif 0x00000001 : AssertRC(rc, 1468)
 
     //Determine which pins are to be used
-    CONNPin = ConfigKeyGet( CONNPinConfigID)   
-    ENCRPin = ConfigKeyGet( ENCRPinConfigID)   
+    CONNPin = ConfigKeyGet(CONNPinConfigID)
+    ENCRPin = ConfigKeyGet(ENCRPinConfigID)
 
     //Setup CONN as output GPIO for connection status
     if CONNPin>= 0 then
         rc = GPIOSetFunc(CONNPin, 2, 0) //0 = initial is low, 1 = initial is high
-        #cmpif 0x00000001 : AssertRC(rc, 13720)
+        #cmpif 0x00000001 : AssertRC(rc, 1477)
     endif
     //Setup ENCR as output GPIO for connection encryption status
     if ENCRPin>= 0 then
         rc = GPIOSetFunc(ENCRPin, 2, 0) //0 = initial is low, 1 = initial is high
-        #cmpif 0x00000001 : AssertRC(rc, 13720)
+        #cmpif 0x00000001 : AssertRC(rc, 1482)
     endif
 endsub
 
@@ -1501,7 +1489,7 @@ endsub
 function SetupUART()
     //Sets up the UART to use the required baud rate, flow control and parity options
     dim TmpStr$, UARTSpeed, UARTTxBuf, UARTRxBuf, UARTFlags$
-    
+
     rc = UARTInfo(0)
     if (rc != 0) then
         //UART is opened, close
@@ -1509,17 +1497,17 @@ function SetupUART()
     endif
 
     //Read UART Baud rate and check it is sane
-    UARTSpeed = ConfigKeyGet( UARTSpeedConfigID)
+    UARTSpeed = ConfigKeyGet(UARTSpeedConfigID)
     //Read UART Tx buffer size and check it is sane
-    UARTTxBuf = ConfigKeyGet( UARTTxBufConfigID)    
+    UARTTxBuf = ConfigKeyGet(UARTTxBufConfigID)
     //Read UART Rx buffer size and check it is sane
-    UARTRxBuf = ConfigKeyGet( UARTRxBufConfigID)
+    UARTRxBuf = ConfigKeyGet(UARTRxBufConfigID)
     //Read UART flags and check it is sane
-    UARTFlags$ = ConfigKeyGet$( UARTFlagsConfigID )
+    UARTFlags$ = ConfigKeyGet$(UARTFlagsConfigID)
 
     //Reopen the UART
     rc = UartOpen(UARTSpeed, UARTTxBuf, UARTRxBuf, UARTFlags$)
-    #cmpif 0x00000001 : AssertRC(rc, 14020)
+    #cmpif 0x00000001 : AssertRC(rc, 1510)
 endfunc 1
 
 //------------------------------------------------------------------------------
@@ -1550,6 +1538,39 @@ function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
     rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
 endfunc 1
 
+//==============================================================================
+// This handler is called when there is a passkey/numerical compare event
+//==============================================================================
+function HandlerBlePasskey(BYVAL Conn, BYVAL Passkey, BYVAL Flags)
+    #cmpif 0x80000000 : if (Flags == 0) then
+    #cmpif 0x80000000 :     //This is a passkey
+    #cmpif 0x80000000 :     PRINT "Pass Key Request (NOT Numerical Comparison), Handle: ";integer.h'Conn;", Key: ";Passkey;"\n"
+    #cmpif 0x80000000 : elseif (Flags == 1) then
+    #cmpif 0x80000000 :     //This is a numerical comparison
+    #cmpif 0x80000000 :     PRINT "Numerical Comparison Request (NOT Pass key), Handle: ";integer.h'Conn;", Key: ";Passkey;"\n"
+    #cmpif 0x80000000 : else
+    #cmpif 0x80000000 :     PRINT "Unknown Pass Key Request, Handle: ";integer.h'Conn;", Type: ";Flags;" Value: ";Passkey;"\n"
+    #cmpif 0x80000000 : endif
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is an authkey request event
+//==============================================================================
+function HandlerBleAuthkey(BYVAL Conn, BYVAL Type, BYVAL Flags)
+    #cmpif 0x80000000 : PRINT "Auth Key Request, Handle: ";integer.h'Conn;", Type: ";Type;"\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when a device attempts to bond with a private
+// resolvable/non-resolvable address and overwrite an existing bond of a
+// public/random address
+//==============================================================================
+function HandlerBleOverwriteBond(BYVAL Conn, BYVAL Flags, BYVAL Address$)
+    //Note that this sample application will accept any bond overwrite as it is a sample application only. This behavior should not exist in real life/world applications
+    dim rc
+    #cmpif 0x80000000 : PRINT "Bond overwritten, Handle: ";integer.h'Conn;", Flags: ";integer.h'Flags;", Address: ";strhexize$(Address$);"\n"
+    rc = BleOverwriteBond(Conn, 1)
+endfunc 1
 
 //******************************************************************************
 // Start up code from here -equivalent to main() in a 'C' application
@@ -1577,6 +1598,8 @@ endif
 CreateAdverts()
 StartAdvertising()
 
+//Disable all pairing confirmation, this allows any device to bond even if an existing bond exists without confirmation as this is a sample application only. This behavior should not exist in real life/world applications
+rc = BleSecMngrPairConf(0)
 
 //******************************************************************************
 //Setup event handlers
@@ -1597,10 +1620,14 @@ if (ApplicationError == 0) then
         ONEVENT EVUARTTXEMPTY CALL HndlrBridge
     endif
 endif
-ONEVENT EVTMR0 CALL HndlrTmr0   //disconnects
-// Phy related events
-OnEvent EVBLE_PHY_UPDATED   call HandlerPhyChngd
-OnEvent EVBLE_PHY_REQUEST   call HandlerPhyReq
+ONEVENT EVTMR0             CALL HndlrTmr0         //disconnects
+ONEVENT EVBLE_PHY_UPDATED  CALL HandlerPhyChngd   //PHY changed
+ONEVENT EVBLE_PHY_REQUEST  CALL HandlerPhyReq     //PHY change request
+
+ONEVENT EVBLE_PASSKEY      CALL HandlerBlePasskey
+ONEVENT EVBLE_AUTHKEY      CALL HandlerBleAuthkey
+
+ONEVENT EVBLEOVERWRITEBOND CALL HandlerBleOverwriteBond
 
 //******************************************************************************
 //Wait in a lower-power mode for an event to occur
