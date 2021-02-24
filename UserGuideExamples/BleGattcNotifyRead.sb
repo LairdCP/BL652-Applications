@@ -1,7 +1,7 @@
 //Example :: BleGattcNotifyRead.sb
 //
-// Charactersitic at handle 15 has notify   (16==cccd)
-// Charactersitic at handle 18 has indicate (19==cccd)
+// Characteristic at handle 15 has notify   (16==cccd)
+// Characteristic at handle 18 has indicate (19==cccd)
 
 DIM rc,at$,conHndl,uHndl,atHndl
 

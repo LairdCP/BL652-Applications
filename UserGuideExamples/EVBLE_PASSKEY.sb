@@ -17,35 +17,35 @@ DIM addr$ : addr$=""
 // Ble event handler
 //------------------------------------------------------------------------------
 FUNCTION HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) AS INTEGER
-	SELECT nMsgId
-		CASE BLE_EVBLEMSGID_CONNECT
-			connHandle = nCtx
-			PRINT "## Ble Connection :: Handle=";integer.h' nCtx;"\n"
-		
-		CASE BLE_EVBLEMSGID_DISCONNECT
-			PRINT "## Disconnected :: Handle=";integer.h' nCtx;"\n"
-			EXITFUNC 0
+    SELECT nMsgId
+        CASE BLE_EVBLEMSGID_CONNECT
+            connHandle = nCtx
+            PRINT "## Ble Connection :: Handle=";integer.h' nCtx;"\n"
 
-		CASE BLE_EVBLEMSGID_ENCRYPTED
-			PRINT "## Encrypted Connection :: Handle=";integer.h' nCtx;"\n"
-		CASE BLE_EVBLEMSGID_NEW_BOND
-			PRINT "## New Bond :: Handle=";integer.h' nCtx;"\n"
-		CASE BLE_EVBLEMSGID_LESC_PAIRING
-			PRINT "## LESC Pairing :: Handle=";integer.h' nCtx;"\n"
-		CASE   BLE_EVBLEMSGID_AUTHENTICATION_FAILED
-			PRINT "## Pairing Failed :: Handle=";integer.h' nCtx;"\n"
-		CASE ELSE
-			// Do nothing
-	ENDSELECT
+        CASE BLE_EVBLEMSGID_DISCONNECT
+            PRINT "## Disconnected :: Handle=";integer.h' nCtx;"\n"
+            EXITFUNC 0
+
+        CASE BLE_EVBLEMSGID_ENCRYPTED
+            PRINT "## Encrypted Connection :: Handle=";integer.h' nCtx;"\n"
+        CASE BLE_EVBLEMSGID_NEW_BOND
+            PRINT "## New Bond :: Handle=";integer.h' nCtx;"\n"
+        CASE BLE_EVBLEMSGID_LESC_PAIRING
+            PRINT "## LESC Pairing :: Handle=";integer.h' nCtx;"\n"
+        CASE   BLE_EVBLEMSGID_AUTHENTICATION_FAILED
+            PRINT "## Pairing Failed :: Handle=";integer.h' nCtx;"\n"
+        CASE ELSE
+            // Do nothing
+    ENDSELECT
 ENDFUNC 1
 
 //------------------------------------------------------------------------------
 // Pairing attempt in progress - Passkey needs to be displayed
 //------------------------------------------------------------------------------
 Function HandlerBlePasskey(BYVAL nConnHandle, BYVAL nPasskey, BYVAL nFlags)
-	// The following passkey should be entered by remote
-	print "## Pairing Attempt :: Handle=";integer.h' nConnHandle;"\n"
-	print "## Please enter the following passkey: ";nPasskey;"\n"
+    // The following passkey should be entered by remote
+    print "## Pairing Attempt :: Handle=";integer.h' nConnHandle;"\n"
+    print "## Please enter the following passkey: ";nPasskey;"\n"
 Endfunc 1
 
 //------------------------------------------------------------------------------
@@ -59,10 +59,10 @@ ONEVENT  EVBLE_PASSKEY  CALL HandlerBlePasskey
 rc = BleSecMngrIoCap(3)
 
 // Start advertising
-IF BleAdvertStart(0,addr$,25,60000,0)==0 THEN	  
-    PRINT "## Adverts Started\n"					
+IF BleAdvertStart(0,addr$,25,60000,0)==0 THEN
+    PRINT "## Adverts Started\n"
 	PRINT "## Make a connection to the BL652\n"
-ELSE											
+ELSE
     PRINT "## Advertisement not successful\n"
 ENDIF
 

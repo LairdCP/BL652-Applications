@@ -1,0 +1,25 @@
+//Example :: BleGetAdvertisingAddr$.sb
+
+DIM rc, addr$ : addr$=""
+
+FUNCTION HndlrBlrAdvTimOut()
+   PRINT "\nAdvert stopped via timeout"
+   PRINT "\nExiting..."
+ENDFUNC 0
+
+// Set address type as non-resolvable random address
+rc = BleSetAddressTypeEx(3,1000)
+
+//The advertising interval is set to 25 milliseconds. The module will stop
+//advertising after 60000 ms (1 minute)
+IF BleAdvertStart(0,addr$,25,60000,0)==0 THEN
+    PRINT "\nAdverts Started\n"
+    rc = BleGetAdvertisingAddress$(0,addr$)
+    PRINT "\nAdvertising address is: ";StrHexize$(addr$);"\n"
+ELSE
+    PRINT "\n\nAdvertisement not successful"
+ENDIF
+
+ONEVENT  EVBLE_ADV_TIMEOUT  CALL HndlrBlrAdvTimOut
+
+WAITEVENT

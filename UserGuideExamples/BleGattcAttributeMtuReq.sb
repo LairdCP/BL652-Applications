@@ -1,4 +1,3 @@
-
 // Example :: BleGattcAttributeMtuRequest.sb
 
 // IMPORTANT: before running this application, the ATT_MTU is set using the
@@ -11,8 +10,19 @@
 //BLE EVENT MSG IDs
 #define BLE_EVBLEMSGID_CONNECT                          0 // msgCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT                       1 // msgCtx = connection handle
+#define ATTRIBUTE_MTU_KEY_ID                     211    // CFG ID 211
+#define ATTRIBUTE_MTU_MAXIMUM                    247    // Attribute Maximum Trnasmission Unit - Range:23-247
 
-DIM rc, stRsp$, addr$
+DIM rc, nAttributeMTU, stRsp$, addr$
+
+'//------------------------------------------------------------------------------
+'// Print any error codes      
+'//------------------------------------------------------------------------------
+Sub AssertRC(rc,ln)   
+    if rc!=0 then
+        print "\nFail :";integer.h' rc;" at tag ";ln
+    endif
+EndSub
 
 //==============================================================================
 // This handler is called when there is a BLE message
@@ -62,14 +72,27 @@ endfunc 1
 // Enable synchronous event handlers
 //------------------------------------------------------------------------------
 OnEvent  EVBLEMSG                 call HandlerBleMsg
-OnEvent  EVATTRIBUTEMTU    	      call HandlerAttrMTU
-OnEvent  EVPACKETLENGTH    	      call HandlerPacketLength
+OnEvent  EVATTRIBUTEMTU           call HandlerAttrMTU
+OnEvent  EVPACKETLENGTH           call HandlerPacketLength
 
 
 // Initialise LE routines
 rc = BleAdvertStart(0,addr$,100,0,0)
 // Set maximum packet length to be 251
-rc = BleMaxPacketLengthSet(251)
+rc = NvCfgKeyGet(ATTRIBUTE_MTU_KEY_ID, nAttributeMTU)
+AssertRC(rc, 83)
+IF (nAttributeMTU != ATTRIBUTE_MTU_MAXIMUM) THEN
+    // Change the Attribute MTU to be the maximum allowed by the BL652 (247)
+    rc = NvCfgKeySet(ATTRIBUTE_MTU_KEY_ID, ATTRIBUTE_MTU_MAXIMUM)
+    AssertRC(rc, 87)
+    // Reset the module so that the data is overwritten
+    print "The module is being reset to use the new MTU setting. Please re-run app"
+    // Allow the UART tx buffer to empty before resetting
+    while (UartInfo(5)) != 0
+        //Wait for buffer to empty
+    endwhile
+    Reset(0)
+ENDIF
 // Open the gatt client. Specify the buffer size to be 251 to be able to receive
 // notifications up to 244 bytes long (maximum supported by BL652 when ATT_MTU = 247)
 rc = BleGattcOpen(251, 0)

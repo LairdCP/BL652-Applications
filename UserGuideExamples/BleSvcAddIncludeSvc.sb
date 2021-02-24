@@ -3,9 +3,9 @@
 #define BLE_SERVICE_PRIMARY                             1
 
 //----------------------------------------------------------------------------
-//Create a Battery SECONDARY service attribure which has a uuid of 0x180F
+//Create a Battery SECONDARY service attribute which has a uuid of 0x180F
 //----------------------------------------------------------------------------
-dim hBatSvc    //composite handle for batteru primary service
+dim hBatSvc    //composite handle for battery primary service
 dim rc               //or we could have reused nHtsSvc
 dim metaSuccess
 DIM charMet : charMet = BleAttrMetaData(1,1,10,1,metaSuccess)
@@ -18,7 +18,7 @@ rc = BleCharCommit(hBatSvc, s$ ,hBatChar)
 rc = BleServiceCommit(hBatSvc)
 
 //----------------------------------------------------------------------------
-//Create a Health Thermometer PRIMARY service attribure which has a uuid of 0x1809
+//Create a Health Thermometer PRIMARY service attribute which has a uuid of 0x1809
 //----------------------------------------------------------------------------
 DIM hHtsSvc    //composite handle for hts primary service
 

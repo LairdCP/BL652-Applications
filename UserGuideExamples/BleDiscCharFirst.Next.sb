@@ -44,7 +44,7 @@ FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
         EXITFUNC 0
     ELSEIF nMsgID==0 THEN
         PRINT "\n- Connected, so scan remote Gatt Table for first service"
-        PRINT "\n- and a characeristic scan will be initiated in the event"
+        PRINT "\n- and a characteristic scan will be initiated in the event"
 		rc = BleDiscServiceFirst(conHndl,0,0)
 		IF rc==0 THEN
 		    //wait for start and end handles for first primary service

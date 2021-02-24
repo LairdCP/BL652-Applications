@@ -35,4 +35,4 @@ ENDIF
 rc=BleServiceCommit(hHtsSvc)
 
 //the characteristic will now be visible in the GATT table
-//and is refrenced by ‘hHtsMeas’for subsequent calls
+//and is referenced by ‘hHtsMeas’for subsequent calls

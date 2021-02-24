@@ -1,4 +1,4 @@
-﻿//Example :: DoWhile.sb
+//Example :: DoWhile.sb
 DIM a AS INTEGER	//don’t really need to supply AS INTEGER
 a=1
 DO

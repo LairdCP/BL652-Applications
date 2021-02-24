@@ -2,4 +2,9 @@
 
 DIM rc
 
-BleBondMngrErase(0)
+rc = BleBondMngrErase(0)
+if rc==0 then
+    print "\nBonding database cleared"
+else
+    print "\nBonding database clearing error"
+endif

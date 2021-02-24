@@ -1,22 +1,19 @@
 //Example :: GpioUnAssignEvent.sb
-FUNCTION Btn0Press()
-	PRINT "\nHello"	
+FUNCTION Btn1Press()
+	PRINT "\nHello"
 ENDFUNC 1
 
 FUNCTION Tmr0TimedOut()
 	PRINT "\nNothing happened"
 ENDFUNC 0
 
-PRINT GpioAssignEvent(0,16,1);"\n"	
-		
-ONEVENT EVDETECTCHAN0 CALL Btn0Press
-ONEVENT EVTMR0 		CALL Tmr0TimedOut	
+PRINT GpioAssignEvent(0,11,1);"\n"
+
+ONEVENT EVDETECTCHAN0  CALL Btn1Press
+ONEVENT EVTMR0 	       CALL Tmr0TimedOut
 
 PRINT GpioUnAssignEvent(0);"\n"
-PRINT "\nPress button 0\n"
-TimerStart(0,8000,0)	
+PRINT "\nPress button 1\n"
+TimerStart(0,8000,0)
 
-WAITEVENT									
-
-                   
-
+WAITEVENT

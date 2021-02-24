@@ -6,7 +6,7 @@ DIM hMyChar,rc,at$,conHndl
 // Initialise and instantiate service, characteristic, start adverts
 //==============================================================================
 FUNCTION OnStartup()
-    DIM rc, hSvc, metaSuccess, at$, attr$, adRpt$, addr$, scRpt$  
+    DIM rc, hSvc, metaSuccess, at$, attr$, adRpt$, addr$, scRpt$
     attr$="Hi"
     DIM svcUuid : svcUuid=0x18EE
     DIM charUuid : charUuid = BleHandleUuid16(1)
@@ -17,12 +17,12 @@ FUNCTION OnStartup()
     //Commit svc with handle 'hSvcUuid'
     rc=BleServiceNew(1, BleHandleUuid16(svcUuid), hSvc)
     //Initialise char, write/read enabled, accept signed writes, indicatable
-    rc=BleCharNew(0x6A,charUuid,charMet,mdCccd,0)     
+    rc=BleCharNew(0x6A,charUuid,charMet,mdCccd,0)
     //Commit char initialised above, with initial value "hi" to service 'hMyChar'
     rc=BleCharCommit(hSvc,attr$,hMyChar)
     //Commit the service
     rc = BleServiceCommit(hSvc)
-    rc=BleScanRptInit(scRpt$) 
+    rc=BleScanRptInit(scRpt$)
     //Add 1 service handle to scan report
     rc=BleAdvRptAddUuid16(scRpt$,hSvc,-1,-1,-1,-1,-1)
     //Commit reports to GATT table - adRpt$ is empty
@@ -43,7 +43,7 @@ ENDSUB
 //==============================================================================
 // Ble event handler
 //==============================================================================
-FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
     conHndl=nCtx
     IF nMsgID==1 THEN
         PRINT "\n\n--- Disconnected from client"
@@ -56,7 +56,7 @@ ENDFUNC 1
 //==============================================================================
 // Indication acknowledgement from client handler
 //==============================================================================
-FUNCTION HndlrCharHvc(BYVAL charHandle AS INTEGER) AS INTEGER 
+FUNCTION HndlrCharHvc(BYVAL charHandle AS INTEGER) AS INTEGER
   IF charHandle == hMyChar THEN
     PRINT "\nGot confirmation of recent indication"
   ELSE
@@ -65,7 +65,7 @@ FUNCTION HndlrCharHvc(BYVAL charHandle AS INTEGER) AS INTEGER
 ENDFUNC 1
 
 //==============================================================================
-// Handler to service button 0 pressed
+// Handler to service button 1 pressed
 //==============================================================================
 FUNCTION HndlrBtn1Pr() AS INTEGER
     CloseConnections()
@@ -83,7 +83,7 @@ FUNCTION HndlrAuthCccd(BYVAL connHandle,BYVAL charHandle, BYVAL readWrite) AS IN
             rc=BleAuthorizeDesc(connHandle,charHandle, -1 ,3)  //grant access
             IF readWrite == 0x10002 THEN
                 PRINT "\nSending indication..."
-                value$="hello"  
+                value$="hello"
                 IF BleCharValueIndicate(hMyChar,value$)!=0 THEN
                     PRINT "\nFailed to indicate new value"
                 ENDIF

@@ -1,0 +1,6 @@
+// Example :: BleMaxPacketLengthGet.sb
+
+dim rc, nSize
+// Get the maximum packet length
+rc = BleMaxPacketLengthGet(nSize)
+PRINT "\nThe maximum packet size is ";nSize

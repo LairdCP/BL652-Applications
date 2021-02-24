@@ -46,7 +46,7 @@ function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as intege
     ghConn = nCtx
 
   case BLE_EVBLEMSGID_DISCONNECT
-    print "\n --- Disonnect: (";integer.h' nCtx;")"
+    print "\n --- Disconnect: (";integer.h' nCtx;")"
 
   case BLE_EVBLEMSGID_DISPLAY_PASSKEY
     print "\nDisplay Pairing Passkey ";nCtx
@@ -159,9 +159,8 @@ OnEvent  EVLESCKEYPRESS           call HandlerLescKeypress
 '// Wait for a synchronous event.
 '// An application can have multiple <WaitEvent> statements
 '//------------------------------------------------------------------------------
-
+dim prAdr$ : prAdr$=""
 // Start Adverts
-dim prAdr$
 rc = BleAdvertStart(0,prAdr$,25,0,0)
 PRINT "\nAdverts start"
 // Enable keypress notifications

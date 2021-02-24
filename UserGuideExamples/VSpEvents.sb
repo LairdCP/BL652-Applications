@@ -37,7 +37,7 @@ ONEVENT  EVVSPRX      CALL HandlerBleVSpRx
 ONEVENT  EVVSPTXEMPTY  CALL HandlerVSpTxEmpty
 
 tx$="tx buffer empty"
-PRINT "\nUse the iOS 'BL652 Serial' app to test this"
+PRINT "\nUse the iOS/Android 'ModuleLink' app to test this"
 
 //wait for events and messages
 WAITEVENT

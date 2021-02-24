@@ -1,0 +1,101 @@
+//Example :: BleGetResolvedAddr.sb
+
+dim rc, hHtsSvc, mdCharVal, hHtsMeas, addr$, attr$
+
+#define BLE_SERVICE_SECONDARY                     0
+#define BLE_SERVICE_PRIMARY                       1
+
+#define BLE_EVBLEMSGID_CONNECT                    0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                 1    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTHENTICATION_FAILED      26   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_AUTHENTICATION_SUCCESSFUL  29   //msgCtx = connection handle
+
+sub AssertRC(rc, line)
+    if rc!=0 then
+        print "Failed with ";integer.h' rc;" on line ";line;"\n"
+    endif
+endsub
+
+sub AddressOutput(nCtx)
+    dim resolvedaddr$, resolvehandle, handle
+
+    rc = BleGetAddrFromConnHandle(nCtx, addr$)
+    AssertRC(rc, 23)
+    print "Handle: ";nCtx;", Address: ";strhexize$(addr$);", "
+
+    rc = BleGetResolvedAddrFromConnHandle(nCtx, resolvedaddr$)
+
+    if (rc == 0) then
+        print "Resolved address: ";strhexize$(resolvedaddr$);", "
+    else
+        print "Resolved address not available (";integer.h'rc;"), "
+    endif
+
+    rc = BleGetConnHandleFromResolvedAddr(resolvedaddr$, resolvehandle)
+
+    if (rc == 0) then
+        print " Handle from resolved address: ";resolvehandle;"\n"
+    else
+        print " Handle from resolved address not available (";integer.h'rc;")\n"
+    endif
+endsub
+
+//------------------------------------------------------------------------------
+// This handler is called when BLE advertising times out
+//------------------------------------------------------------------------------
+function HndlrBlrAdvTimOut()
+    print "Advertising timed out\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is a significant BLE event
+//------------------------------------------------------------------------------
+function HndlrBleMsg(byval nMsgId as integer, byval nCtx as integer)
+    if (nMsgId == BLE_EVBLEMSGID_CONNECT) then
+        print "Connected - Try reading from Service UUID 0x1809 Characteristic UUID 0x2A1C to initiate pairing from a mobile phone\n"
+        AddressOutput(nCtx)
+    elseif (nMsgId == BLE_EVBLEMSGID_DISCONNECT) then
+        print "Disconnected\n"
+    elseif (nMsgId == BLE_EVBLEMSGID_AUTHENTICATION_FAILED) then
+        print "Authentication failed (";nCtx;")\n"
+    elseif (nMsgId == BLE_EVBLEMSGID_AUTHENTICATION_SUCCESSFUL) then
+        print "Authentication successful (";nCtx;")\n"
+        AddressOutput(nCtx)
+    endif
+endfunc 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//Set IO capability to just works
+rc = BleSecMngrIoCap(0)
+
+//Create a service with single encryption-required read-only characteristic
+mdCharVal = BleAttrMetaDataEx(2, 0, 20, 0, rc)
+AssertRC(rc, 76)
+attr$ = "hello\00worl\64" 
+rc = BleServiceNew(BLE_SERVICE_PRIMARY, BleHandleUuid16(0x1809), hHtsSvc)
+AssertRC(rc, 79)
+rc = BleCharNew(0x2, BleHandleUuid16(0x2A1C), mdCharVal, 0, 0)
+AssertRC(rc, 81)
+rc = BleCharCommit(hHtsSvc, attr$, hHtsMeas)
+AssertRC(rc, 83)
+rc = BleServiceCommit(hHtsSvc)
+AssertRC(rc, 85)
+
+//Start advertising over BLE
+if BleAdvertStart(0, addr$, 250, 60000, 0) == 0 then
+    addr$ = sysinfo$(4)
+    print "Adverts Started - connect to device named: ";BleGetDeviceName$();", address: ";strhexize$(addr$);"\n"
+else
+    AssertRC(rc, 92)
+    print "Adverts failed to start\n"
+endif
+
+//Register event handlers
+OnEvent  EVBLEMSG           call HndlrBleMsg
+OnEvent  EVBLE_ADV_TIMEOUT  call HndlrBlrAdvTimOut
+
+//Wait for an event
+WAITEVENT

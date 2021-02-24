@@ -1,8 +1,0 @@
-dim rc, nSize
-rc = BleMaxPacketLengthSet(155)
-if rc == 0 THEN
-    PRINT "\nMaximum packet length changed to 155 bytes"
-endif
-// Now get the maximum packet length
-rc = BleMaxPacketLengthGet(nSize)
-PRINT "\nThe maximum packet size is ";nSize

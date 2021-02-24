@@ -6,12 +6,12 @@ DIM hMyChar,rc,at$,conHndl
 // Initialise and instantiate service, characteristic, start adverts
 //==============================================================================
 FUNCTION OnStartup()
-    DIM rc, hSvc, at$, attr$, adRpt$, addr$, scRpt$ , rc2  
+    DIM rc, hSvc, at$, attr$, adRpt$, addr$, scRpt$ , rc2
     attr$="Hi"
     DIM charMet : charMet = BleAttrMetaDataex(1,1,20,0,rc)
 
     //Commit svc with handle 'hSvcUuid'
-    rc=BleServiceNew(1,BleHandleUuid16(0x18EE),hSvc)            
+    rc=BleServiceNew(1,BleHandleUuid16(0x18EE),hSvc)
     //Initialise char, read enabled, accept signed writes, broadcast capable
     rc=BleCharNew(0x4B,BleHandleUuid16(1),charMet,0,BleAttrMetadataex(1,1,2,8,rc2))
     //Commit char initialised above, with initial value "hi" to service 'hMyChar'
@@ -19,7 +19,7 @@ FUNCTION OnStartup()
     //Commit svc
     rc=BleServiceCommit(hSvc)
 
-    rc=BleAdvRptInit(adRpt$,0x02,0,20) 
+    rc=BleAdvRptInit(adRpt$,0x02,0,20)
     //Add 'hSvc' and 'hMyChar' to the advert report
     rc=BleAdvRptAddUuid16(adRpt$,hSvc,hMyChar,-1,-1,-1,-1)
     //Commit reports to GATT table - adRpt$ is empty
@@ -40,7 +40,7 @@ ENDSUB
 //==============================================================================
 // Ble event handler
 //==============================================================================
-FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
     conHndl=nCtx
     IF nMsgID==1 THEN
         PRINT "\n\n--- Disconnected from client"

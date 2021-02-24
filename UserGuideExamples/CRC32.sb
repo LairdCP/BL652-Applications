@@ -1,0 +1,14 @@
+//Example :: CRC32.sb
+DIM rc
+DIM nType : nType = 0
+DIM Data$ : Data$ = "RandomData"
+DIM nCRC32 : nCRC32 = 0
+
+rc = CRC32Generate(nType, Data$, nCRC32)
+IF rc == 0 THEN
+    PRINT "\nThe computed CRC32 value is ";nCRC32
+ELSE
+    PRINT "\nFailed to generate CRC32 value"
+ENDIF
+
+

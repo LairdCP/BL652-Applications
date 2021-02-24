@@ -1,0 +1,68 @@
+//Example :: BleGetChannelMap.sb
+
+dim rc, hc, channelMap$, addr$
+
+#define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
+
+sub AssertRC(rc, line)
+    if rc!=0 then
+        print "Failed with ";integer.h' rc;" on line ";line;"\n"
+    endif
+endsub
+
+sub PrintChanelMap(nCtx)
+    rc = BleGetChannelMap(nCtx, channelMap$)
+    print " - Channel map is: 0x";strhexize$(channelMap$);"\n"
+endsub
+
+//------------------------------------------------------------------------------
+// This handler is called when BLE advertising times out
+//------------------------------------------------------------------------------
+function HndlrBlrAdvTimOut()
+    print "Advertising timed out\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is a significant BLE event
+//------------------------------------------------------------------------------
+function HndlrBleMsg(byval nMsgId as integer, byval nCtx as integer)
+    if (nMsgId == BLE_EVBLEMSGID_CONNECT) then
+        hc = nCtx
+        print "Connected"
+        PrintChanelMap(nCtx)
+        TimerStart(0, 3000, 0)
+    elseif (nMsgId == BLE_EVBLEMSGID_DISCONNECT) then
+        print "Disconnected\n"
+        TimerCancel(0)
+    endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when timer 0 elapses
+//------------------------------------------------------------------------------
+function HndlrTimer0()
+    print "After 3 seconds"
+    PrintChanelMap(hc)
+endfunc 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//Start advertising over BLE
+if BleAdvertStart(0, addr$, 250, 60000, 0) == 0 then
+    addr$ = sysinfo$(4)
+    print "Adverts Started - connect to device named: ";BleGetDeviceName$();", address: ";strhexize$(addr$);"\n"
+else
+    AssertRC(rc, 58)
+    print "Adverts failed to start\n"
+endif
+
+//Register event handlers
+OnEvent  EVBLEMSG           call HndlrBleMsg
+OnEvent  EVBLE_ADV_TIMEOUT  call HndlrBlrAdvTimOut
+OnEvent  EVTMR0             call HndlrTimer0
+
+//Wait for an event
+WAITEVENT

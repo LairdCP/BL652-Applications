@@ -34,18 +34,18 @@ function HndlrBleMsg(byval nMsgId as integer, byval nCtx as integer)
             hC = nCtx
             print "\nConnected, Finding Temp Measurement Char"
             rc=BleGattcFindDesc(nCtx,  BleHandleUuid16(SERVICE_UUID), 0, BleHandleUuid16(CHAR_UUID), 0, BleHandleUuid16(DESC_UUID), 0)
-            AssertRC(rc,35)
+            AssertRC(rc, 37)
         case 1
-            print "\n\n --- Disconnected"                     
+            print "\n\n --- Disconnected"
         case 10
             print "\nNew bond created"           
             print "\n\nAttempting to enable indications again"
             rc=BleGattcWrite(hC, hDesc, s$)
-            AssertRC(rc,58)            
+            AssertRC(rc, 44)
         case 11
             print "\nPair request: Accepting"
             rc=BleAcceptPairing(hC,1)
-            AssertRC(rc,52)
+            AssertRC(rc, 48)
             print "\nPairing in progress"
         case 17   
             print "\nNew pairing/bond has replaced old key"
@@ -64,11 +64,11 @@ function HndlrFindDesc(hConn, hD)
         print "\nCCCD not found"
         exitfunc 0
     endif
-    
+
     hDesc = hD
     print "\nTemp Measurement Char CCCD Found. Attempting to enable indications"
     rc=BleGattcWrite(hConn, hDesc, s$)
-    AssertRC(rc,58)  
+    AssertRC(rc, 71)
 endfunc 1
 
 
@@ -94,7 +94,7 @@ function HndlrAttrWrite(hConn, hAttr, nSts)
         print "\n\nAuthentication required."       
         '//bond with the peer
         rc=BlePair(hConn, 1) 
-        AssertRC(rc,75)        
+        AssertRC(rc, 97)
         print " Bonding..."         
     endif
 endfunc 1
@@ -104,12 +104,11 @@ endfunc 1
 // Equivalent to main() in C
 //******************************************************************************
 rc=BleSecMngrIoCap(0)           //set io capability to just works
-rc=BleSecMngrJustWorksConf(1)   //module will wait for confirmation (EVBLEMSG 11) before just works pairing
 
 rc=BleGattcOpen(0,0)
 pr$ = GATT_SERVER_ADDRESS
 rc=BleConnect(pr$, 10000, 25, 100, 30000000)
-AssertRC(rc,91)
+AssertRC(rc, 111)
 
 //------------------------------------------------------------------------------
 // Enable synchronous event handlers

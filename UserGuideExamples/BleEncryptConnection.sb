@@ -30,7 +30,7 @@ function HndlrBleMsg(byval nMsgId as integer, byval nCtx as integer)
             if rc==0 then
                 print "\nEncrypting connection"
             else
-                AssertRC(rc,28)
+                AssertRC(rc, 33)
             endif
         case 1
             print "\n\n --- Disconnected"
@@ -41,7 +41,7 @@ function HndlrBleMsg(byval nMsgId as integer, byval nCtx as integer)
         case 11
             print "\nPair request: Accepting"
             rc=BleAcceptPairing(hC,1)
-            AssertRC(rc,52)
+            AssertRC(rc, 44)
             print "\nPairing in progress"
         case 17   
             print "\nNew pairing/bond has replaced old key"
@@ -54,11 +54,10 @@ endfunc 1
 
 
 rc=BleSecMngrIoCap(0)           //set io capability to just works
-rc=BleSecMngrJustWorksConf(0)   //module will  not wait for confirmation (EVBLEMSG 11) before just works pairing
 
 pr$ = GATT_SERVER_ADDRESS
 rc=BleConnect(pr$, 10000, 25, 100, 30000000)
-AssertRC(rc,91)
+AssertRC(rc, 60)
 
 onevent evblemsg   call HndlrBleMsg
 

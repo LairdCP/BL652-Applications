@@ -19,17 +19,17 @@ ENDFUNC 1
 
 
 //==============================================================================
-// Handler to service button 0 pressed
+// Handler to service button 1 pressed
 //==============================================================================
-FUNCTION HndlrBtn0Pr() AS INTEGER
+FUNCTION HndlrBtn1Pr() AS INTEGER
     //just exit and stop waiting for events
 ENDFUNC 0
 
 
-ONEVENT  EVBLEMSG   CALL HandlerBleMsg
-ONEVENT  EVGPIOCHAN1 CALL HndlrBtn0Pr     
+ONEVENT  EVBLEMSG    CALL HandlerBleMsg
+ONEVENT  EVGPIOCHAN1 CALL HndlrBtn1Pr
 
-rc=GpioBindEvent(1,16,1)     //Channel 1, bind to low transition on GPIO pin 16
+rc=GpioBindEvent(1,11,1)     //Channel 1, bind to low transition on GPIO pin 11
 PRINT "\nSupply voltage is "; ReadPwrSupplyMv();"mV\n"
 mv=2700
 rc=SetPwrSupplyThreshMv(mv)

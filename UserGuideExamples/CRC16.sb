@@ -1,0 +1,14 @@
+//Example :: CRC16.sb
+DIM rc
+DIM nType : nType = 0
+DIM Data$ : Data$ = "RandomData"
+DIM nCRC16 : nCRC16 = 0
+
+rc = CRC16Generate(nType, Data$, nCRC16)
+IF rc == 0 THEN
+    PRINT "\nThe computed CRC16 value is ";nCRC16
+ELSE
+    PRINT "\nFailed to generate CRC16 value"
+ENDIF
+
+

@@ -15,7 +15,7 @@ FOR i = 1 TO 3
     IF rc != 0 then 
         PRINT "\nFailed to write into the circular buffer\n"
 	ELSE
-		PRINT i;" was successfuly written to the circular buffer\r"
+		PRINT i;" was successfully written to the circular buffer\r"
     ENDIF
 NEXT 
 

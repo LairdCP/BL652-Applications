@@ -5,25 +5,25 @@ DIM hMyChar,rc,at$,conHndl
 // Initialise and instantiate service, characteristic, start adverts
 //==============================================================================
 FUNCTION OnStartup()
-    DIM rc, hSvc, metaSuccess, at$, attr$, adRpt$, addr$, scRpt$  
+    DIM rc, hSvc, metaSuccess, at$, attr$, adRpt$, addr$, scRpt$
     attr$="Hi"
     DIM svcUuid : svcUuid=0x18EE
     DIM charUuid : charUuid = BleHandleUuid16(1)
     DIM charMet : charMet = BleAttrMetaData(0,0,20,1,metaSuccess)
     DIM hSvcUuid : hSvcUuid = BleHandleUuid16(svcUuid)
     DIM mdCccd : mdCccd = BleAttrMetadata(1,1,2,0,rc)   //CCCD metadata for char
-    
+
     //Create service
-    rc=BleServiceNew(1,hSvcUuid,hSvc) 
-    
+    rc=BleServiceNew(1,hSvcUuid,hSvc)
+
     //initialise char, write/read enabled, accept signed writes, indicatable
-    rc=BleCharNew(0x20,charUuid,charMet,mdCccd,0)  
-    
+    rc=BleCharNew(0x20,charUuid,charMet,mdCccd,0)
+
     //commit char initialised above, with initial value "hi" to service 'hMyChar'
     rc=BleCharCommit(hSvc,attr$,hMyChar)
-    
+
     //commit service to GATT table
-    rc=BleServiceCommit(hSvc) 
+    rc=BleServiceCommit(hSvc)
 
     rc=BleAdvertStart(0,addr$,20,300000,0)
 ENDFUNC rc
@@ -40,7 +40,7 @@ ENDSUB
 //==============================================================================
 // Ble event handler
 //==============================================================================
-FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
     conHndl=nCtx
     IF nMsgID==1 THEN
         PRINT "\n\n--- Disconnected from client"
@@ -53,10 +53,10 @@ ENDFUNC 1
 //==============================================================================
 // Indication acknowledgement from client handler
 //==============================================================================
-FUNCTION HndlrCharHvc(BYVAL charHandle AS INTEGER) AS INTEGER 
-	IF charHandle == hMyChar THEN
-		PRINT "\nGot confirmation of recent indication"
-	ELSE
+FUNCTION HndlrCharHvc(BYVAL charHandle AS INTEGER) AS INTEGER
+  IF charHandle == hMyChar THEN
+    PRINT "\nGot confirmation of recent indication"
+  ELSE
         PRINT "\nGot confirmation of some other indication: ";charHandle
     ENDIF
 ENDFUNC 1
@@ -75,7 +75,7 @@ FUNCTION HndlrCharCccd(BYVAL charHandle, BYVAL nVal) AS INTEGER
     IF charHandle==hMyChar THEN
         IF nVal & 0x02 THEN
             PRINT "\nIndications have been enabled by client"
-            value$="hello" 
+            value$="hello"
             IF BleCharValueIndicate(hMyChar,value$)!=0 THEN
                 PRINT "\nFailed to indicate new value"
             ENDIF

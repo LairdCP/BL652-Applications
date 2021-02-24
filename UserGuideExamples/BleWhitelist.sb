@@ -71,7 +71,7 @@ sub WhiteListInit()
     //so that connection requests are disallowed
     rc=BleWhitelistSetFilter(hWlist,1)
     AssertRC(150)
-    //now check the whitelist by interogating the whitelist handle
+    //now check the whitelist by interrogating the whitelist handle
     rc=BleWhiteListInfo(hWlist,101, val)  //get current number of mac addresses
     AssertRC(160)
     print "\n Current number of addresses = "; val

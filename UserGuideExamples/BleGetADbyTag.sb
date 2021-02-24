@@ -11,7 +11,7 @@ fullAD$ = ad1$ + ad2$
 PRINT "\n\n"; Strhexize$(fullAD$);"\n"
 
 nADTag = 0xDD
-rc=BleGetADbyTag(fullAD$ , nADTag, ADval$ )
+rc=BleGetADbyTag(fullAD$ , nADTag, ADval$)
 IF rc==0 THEN
     PRINT "\nAD element with tag 0x"; INTEGER.H'nADTag ;" is ";StrHexize$(ADval$)
 ELSE

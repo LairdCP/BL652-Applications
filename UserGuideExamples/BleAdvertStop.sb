@@ -2,24 +2,24 @@
 DIM addr$ : addr$=""
 DIM rc
 
-FUNCTION HndlrBlrAdvTimOut() 
+FUNCTION HndlrBlrAdvTimOut()
    PRINT "\nAdvert stopped via timeout"
    PRINT "\nExiting..."
 ENDFUNC 0
 
-FUNCTION Btn0Press()
-    IF BleAdvertStop()==0 THEN      
-        PRINT "\nAdvertising Stopped"                    
-    ELSE                                            
+FUNCTION Btn1Press()
+    IF BleAdvertStop()==0 THEN
+        PRINT "\nAdvertising Stopped"
+    ELSE
         PRINT "\n\nAdvertising failed to stop"
     ENDIF
 
     PRINT "\nExiting..."
 ENDFUNC 0
-                                           
-IF BleAdvertStart(0,addr$,25,60000,0)==0 THEN      
-    PRINT "\nAdverts Started. Press button 0 to stop.\n"                    
-ELSE                                            
+
+IF BleAdvertStart(0,addr$,25,60000,0)==0 THEN
+    PRINT "\nAdverts Started. Press button 1 to stop.\n"
+ELSE
     PRINT "\n\nAdvertisement not successful"
 ENDIF
 
@@ -27,6 +27,6 @@ rc = GpioSetFunc(11,1,2)
 rc = GpioBindEvent(0,11,1)
 
 ONEVENT  EVBLE_ADV_TIMEOUT  CALL HndlrBlrAdvTimOut
-ONEVENT  EVGPIOCHAN0        CALL Btn0Press
+ONEVENT  EVGPIOCHAN0        CALL Btn1Press
 
 WAITEVENT

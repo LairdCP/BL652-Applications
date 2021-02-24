@@ -1,0 +1,75 @@
+//Example :: BleChannelMap.sb
+
+dim rc, hc, channelMap$, addr$
+
+//Put BLE address of target peripheral device here
+#define GATT_SERVER_ADDRESS         "01C5BE6A445028"
+
+#define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
+
+sub AssertRC(rc, line)
+    if rc!=0 then
+        print "Failed with ";integer.h' rc;" on line ";line;"\n"
+    endif
+endsub
+
+sub PrintChanelMap(nCtx)
+    rc = BleGetChannelMap(nCtx, channelMap$)
+    print " - Channel map is: 0x";strhexize$(channelMap$);"\n"
+endsub
+
+//------------------------------------------------------------------------------
+// This handler is called when connecting to the remote BLE device times out
+//------------------------------------------------------------------------------
+function HndlrBlrConnTimOut()
+    print "Connection attempt timed out\n"
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when there is a significant BLE event
+//------------------------------------------------------------------------------
+function HndlrBleMsg(byval nMsgId as integer, byval nCtx as integer)
+    if (nMsgId == BLE_EVBLEMSGID_CONNECT) then
+        hc = nCtx
+        print "Connected"
+        PrintChanelMap(nCtx)
+        TimerStart(0, 3000, 0)
+    elseif (nMsgId == BLE_EVBLEMSGID_DISCONNECT) then
+        print "Disconnected\n"
+        TimerCancel(0)
+    endif
+endfunc 1
+
+//------------------------------------------------------------------------------
+// This handler is called when timer 0 elapses
+//------------------------------------------------------------------------------
+function HndlrTimer0()
+    print "After 3 seconds"
+    PrintChanelMap(hc)
+endfunc 1
+
+//******************************************************************************
+// Equivalent to main() in C
+//******************************************************************************
+
+//Set the channel map
+channelMap$ = "FF10000000"
+channelMap$ = strdehexize$(channelMap$)
+rc = BleChannelMap(channelMap$)
+AssertRC(rc, 60)
+
+//Connect to the remote device
+addr$ = GATT_SERVER_ADDRESS
+addr$ = StrDehexize$(addr$)
+rc = BleConnect(addr$, 10000, 25, 100, 30000000)
+AssertRC(rc, 66)
+print "Connecting to ";GATT_SERVER_ADDRESS;"\n"
+
+//Register event handlers
+OnEvent  EVBLEMSG            call HndlrBleMsg
+OnEvent  EVBLE_CONN_TIMEOUT  call HndlrBlrConnTimOut
+OnEvent  EVTMR0              call HndlrTimer0
+
+//Wait for an event
+WAITEVENT

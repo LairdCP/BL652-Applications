@@ -5,14 +5,14 @@ FUNCTION HndlrUartRx()
     PRINT "\nData has arrived\r"
 ENDFUNC 1 //remain blocked in WAITEVENT
 
-FUNCTION Btn0Pressed()
+FUNCTION Btn1Pressed()
     UartClose()
 ENDFUNC 0
 
-rc = GPIOBindEvent(0,16,1)                  //For button0
+rc = GPIOBindEvent(0,11,1)                  //For button 1
 
-ONEVENT EVUARTRX CALL HndlrUartRx
-ONEVENT EVGPIOCHAN0 CALL Btn0Pressed 
+ONEVENT EVUARTRX    CALL HndlrUartRx
+ONEVENT EVGPIOCHAN0 CALL Btn1Pressed
 
 UartClose()                                 //Since Uart port is already open we must
                                             //close it before opening it again with
@@ -28,7 +28,7 @@ ELSE
     PRINT "\nUART open success"
 ENDIF
 
-PRINT "\nPress button 0 to exit this application\n"
+PRINT "\nPress button 1 to exit this application\n"
 
 WAITEVENT                                   //wait for rx, events
 PRINT "\nExiting..."

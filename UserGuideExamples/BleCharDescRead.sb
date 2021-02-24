@@ -3,13 +3,13 @@
 DIM rc,conHndl,hMyChar
 
 //----------------------------------------------------------------------------
-//Create some PRIMARY service attribure which has a uuid of 0x18FF
+//Create some PRIMARY service attribute which has a uuid of 0x18FF
 //----------------------------------------------------------------------------
 SUB OnStartup()
     DIM hSvc,attr$,scRpt$,adRpt$,addr$    
 
     rc = BleServiceNew(1, BleHandleUuid16(0x18FF), hSvc)
-    //Add one or more characteristics 
+    //Add one or more characteristics
     rc = BleCharNew(0x0a,BleHandleUuid16(0x2AFF),BleAttrMetadata(1,1,20,1,rc),0,0)
 
     //Add a user description

@@ -55,7 +55,7 @@ endfunc 1
 // Program starts here
 //==============================================================================
 // Disable auto accept so that we get an event when peripheral requests
-// new connection parameteres. Set to 0 to re-enable auto accept
+// new connection parameters. Set to 0 to re-enable auto accept
 rc = BleConnectConfig(8,1)
 // Connect to peripheral
 DIM addr$ : addr$ = BTAddr

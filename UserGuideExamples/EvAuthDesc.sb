@@ -59,7 +59,7 @@ FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
 ENDFUNC 1
 
 //==============================================================================
-// Handler to service button 0 pressed
+// Handler to service button 1 pressed
 //==============================================================================
 FUNCTION HndlrBtn1Pr() AS INTEGER
     CloseConnections()
@@ -74,7 +74,7 @@ FUNCTION HndlrAuthDesc(BYVAL hConn AS INTEGER, BYVAL hChar AS INTEGER, BYVAL hDe
         rc = BleAuthorizeDesc(hConn, hChar, hDesc, 3)
         rc = BleCharDescRead(hChar,hDesc,0,512,duid,a$)
         IF rc ==0 THEN 
-            PRINT "\nNew value for desriptor ";hDesc;" is ";a$
+            PRINT "\nNew value for descriptor ";hDesc;" is ";a$
         ELSE
             PRINT "\nCould not access the uuid"
         ENDIF

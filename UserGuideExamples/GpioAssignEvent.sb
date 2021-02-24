@@ -1,14 +1,11 @@
 //Example :: GpioAssignEvent.sb
-FUNCTION Btn0Press()
-	PRINT "\nHello"
+FUNCTION Btn1Press()
+    PRINT "\nHello"
 ENDFUNC 0
 
-PRINT GpioAssignEvent(0,16,1)			//Assign event 0 to high low transition on sio16 (button0)            
-ONEVENT EVDETECTCHAN0 CALL Btn0Press	//When event 0 is detected, call Btn0Press
-	
-PRINT "\nPress button 0"	
+PRINT GpioAssignEvent(0,11,1)           //Assign event 0 to high low transition on sio11 (button1)
+ONEVENT EVDETECTCHAN0 CALL Btn1Press    //When event 0 is detected, call Btn1Press
 
-WAITEVENT									
+PRINT "\nPress button 1"
 
-                   
-
+WAITEVENT

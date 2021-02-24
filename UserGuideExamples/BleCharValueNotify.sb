@@ -5,19 +5,19 @@ DIM hMyChar,rc,at$,conHndl
 // Initialise and instantiate service, characteristic, start adverts
 //==============================================================================
 FUNCTION OnStartup()
-    DIM rc, hSvc, at$, attr$, adRpt$, addr$, scRpt$  
+    DIM rc, hSvc, at$, attr$, adRpt$, addr$, scRpt$
     attr$="Hi"
     DIM mdCccd : mdCccd = BleAttrMetadata(1,1,2,0,rc)   //CCCD metadata for char
-    
+
     //Commit svc with handle 'hSvcUuid'
-	rc=BleServiceNew(1, BleHandleUuid16(0x18EE), hSvc)
+    rc=BleServiceNew(1, BleHandleUuid16(0x18EE), hSvc)
     //initialise char, write/read enabled, accept signed writes, notifiable
-    rc=BleCharNew(0x12,BleHandleUuid16(1),BleAttrMetaData(1,0,20,0,rc),mdCccd,0)     
+    rc=BleCharNew(0x12,BleHandleUuid16(1),BleAttrMetaData(1,0,20,0,rc),mdCccd,0)
     //commit char initialised above, with initial value "hi" to service 'hMyChar'
     rc=BleCharCommit(hSvc,attr$,hMyChar)
-	//commit changes to service
-	rc=BleServiceCommit(hSvc)
-    rc=BleScanRptInit(scRpt$) 
+    //commit changes to service
+    rc=BleServiceCommit(hSvc)
+    rc=BleScanRptInit(scRpt$)
     //Add 1 service handle to scan report
     rc=BleAdvRptAddUuid16(scRpt$,0x18EE,-1,-1,-1,-1,-1)
     //commit reports to GATT table - adRpt$ is empty
@@ -36,7 +36,7 @@ ENDSUB
 //==============================================================================
 // Ble event handler
 //==============================================================================
-FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx) 
+FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
     conHndl=nCtx
     IF nMsgID==1 THEN
         PRINT "\n\n--- Disconnected from client"
@@ -59,7 +59,7 @@ FUNCTION HndlrCharCccd(BYVAL charHandle, BYVAL nVal) AS INTEGER
             IF BleCharValueNotify(hMyChar,value$)!=0 THEN
                 PRINT "\nFailed to notify new value :";INTEGER.H'rc
             ELSE
-                PRINT "\nSuccessful notification of new value"              
+                PRINT "\nSuccessful notification of new value"
                 EXITFUNC 0
             ENDIF
         ELSE

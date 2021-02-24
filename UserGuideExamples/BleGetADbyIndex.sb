@@ -10,7 +10,7 @@ ad2$="\07\EE\AA\BB\CC\DD\EE\FF"
 fullAD$ = ad1$ + ad2$
 PRINT "\n\n"; Strhexize$(fullAD$);"\n"
 
-rc=BleGetADbyIndex(0, fullAD$ , nADTag, ADval$ )
+rc=BleGetADbyIndex(0, fullAD$ , nADTag, ADval$)
 IF rc==0 THEN
     PRINT "\nFirst AD element with tag 0x"; INTEGER.H'nADTag ;" is  ";StrHexize$(ADval$)
 ELSE

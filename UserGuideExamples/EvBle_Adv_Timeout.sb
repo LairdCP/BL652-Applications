@@ -4,7 +4,7 @@ DIM peerAddr$
 //handler to service an advert timeout
 FUNCTION HndlrBleAdvTimOut() 
 	PRINT "\nAdvert stopped via timeout"
-    //DbgMsg( "\n   - could use SystemStateSet(0) to switch off" )
+    //DbgMsg("\n   - could use SystemStateSet(0) to switch off")
  
     //------------------------------------------------------------
     //  Switch off the system - requires a power cycle to recover

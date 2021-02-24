@@ -78,7 +78,7 @@ FUNCTION HndlrBleMsg(BYVAL nMsgId, BYVAL nCtx)
         dim addr$
         rc=BleAdvertStart(0,addr$,20,300000,0)
         IF rc==0 THEN
-            PRINT "\nYou should now see the new characteristic value in the advertisment data"
+            PRINT "\nYou should now see the new characteristic value in the advertisement data"
         ENDIF
     ELSEIF nMsgID==0 THEN
         PRINT "\n--- Connected to client"

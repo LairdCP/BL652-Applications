@@ -1,0 +1,72 @@
+//Example :: BleOverwriteBond.sb
+
+dim rc, pr$
+
+#define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_UPDATED_BOND                     17   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                        18   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONFIRM_PAIRING                  30   //msgCtx = connection handle
+
+sub AssertRC(rc, line)
+    if rc!=0 then
+        print "Failed with ";integer.h' rc;" on line ";line;"\n"
+    endif
+endsub
+
+//==============================================================================
+// This handler is called when BLE advertising times out
+//==============================================================================
+function HndlrBlrAdvTimOut()
+    print "Advertising timed out\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when a bond has been overwritten
+//==============================================================================
+function HandlerBleOverwriteBond(BYVAL Conn, BYVAL Flags, BYVAL Address$)
+    //Note that this sample application will accept any bond overwrite as it is a sample application only. This behavior should not exist in real life/world applications
+    dim rc
+    print "\nBond overwritten, Handle: ";integer.h'Conn;", Flags: ";integer.h'Flags;", Address: ";strhexize$(Address$)
+    rc = BleOverwriteBond(Conn, 1)
+    AssertRC(rc, 33)
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a BLE message
+//==============================================================================
+function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as integer
+    select nMsgId
+        case BLE_EVBLEMSGID_CONNECT
+            print "\nConnected"
+        case BLE_EVBLEMSGID_DISCONNECT
+            print "\nDisconnected"
+            rc = BleAdvertStart(0, pr$, 250, 0, 0)
+            print "\nAdvertising started";
+            AssertRC(rc, 47)
+        case BLE_EVBLEMSGID_NEW_BOND
+            print "\nNew bond created"
+        case BLE_EVBLEMSGID_UPDATED_BOND
+            print "\nBond updated"
+        case BLE_EVBLEMSGID_ENCRYPTED
+            print "\nConnection now encrypted"
+        case BLE_EVBLEMSGID_CONFIRM_PAIRING
+            print "\nConfirming pairing"
+            rc = BlePairingResponse(nCtx, 1, 0)
+            AssertRC(rc, 57)
+        case else
+    endselect
+endfunc 1
+
+OnEvent  EVBLEOVERWRITEBOND  call HandlerBleOverwriteBond
+OnEvent  EVBLEMSG            call HandlerBleMsg
+OnEvent  EVBLE_ADV_TIMEOUT   call HndlrBlrAdvTimOut
+
+// Start adverts
+rc = BleAdvertStart(0, pr$, 250, 0, 0)
+print "\nAdverts started"
+AssertRC(rc, 69)
+
+//Wait for an event
+WAITEVENT

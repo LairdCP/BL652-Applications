@@ -4,14 +4,14 @@ FUNCTION HndlrUartRx()
   PRINT "\nData has arrived\r"
 ENDFUNC 1 		//remain blocked in WAITEVENT
 
-FUNCTION Btn0Pressed()
+FUNCTION Btn1Pressed()
 ENDFUNC 0
-	
-rc = GPIOBindEvent(0,16,1)  
-PRINT "\nPress Button 0 to exit this application \n"
 
-ONEVENT EVUARTRX 	CALL HndlrUartRx
-ONEVENT EVGPIOCHAN0 CALL Btn0Pressed     
+rc = GPIOBindEvent(0,11,1)
+PRINT "\nPress Button 1 to exit this application \n"
 
-WAITEVENT     	//wait for rx, tx and modem status events
+ONEVENT EVUARTRX    CALL HndlrUartRx
+ONEVENT EVGPIOCHAN0 CALL Btn1Pressed
+
+WAITEVENT       //wait for rx, tx and modem status events
 PRINT "Exiting..."

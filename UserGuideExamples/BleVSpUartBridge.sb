@@ -9,14 +9,14 @@ SUB OnStartup()
     DIM rc, hndl, tx$, scRpt$, addr$, adRpt$ 
     
     rc=BleVSpOpen(128,128,0,hndl)
-    rc=BleScanRptInit(scRpt$) 
+    rc=BleScanRptInit(scRpt$)
     rc=BleAdvRptAddUuid128(scRpt$,hndl)
     rc=BleAdvRptsCommit(adRpt$,scRpt$)
     rc=BleAdvertStart(0,addr$,20,300000,0)
-    rc=GpioBindEvent(1,16,1)     //Channel 1, bind to low transition on GPIO pin 16
+    rc=GpioBindEvent(1,11,1)     //Channel 1, bind to low transition on GPIO pin 11
     PRINT "\nDevice name is "; BleGetDeviceName$();"\n"
-    
-    tx$="\nSend me some text. \nPress button 0 to exit\n"
+
+    tx$="\nSend me some text. \nPress button 1 to exit\n"
     rc = BleVSpWrite(tx$)
 ENDSUB
 
@@ -45,9 +45,9 @@ ENDFUNC 1
 
 
 //==============================================================================
-//handler to service button 0 pressed
+//handler to service button 1 pressed
 //==============================================================================
-FUNCTION HndlrBtn0Pr() AS INTEGER
+FUNCTION HndlrBtn1Pr() AS INTEGER
     //just exit and stop waiting for events
 ENDFUNC 0
 
@@ -66,8 +66,8 @@ ONEVENT  EVVSPRX            CALL HandlerBridge
 ONEVENT  EVUARTRX           CALL HandlerBridge
 ONEVENT  EVVSPTXEMPTY       CALL HandlerBridge
 ONEVENT  EVUARTTXEMPTY      CALL HandlerBridge
-ONEVENT  EVBLEMSG          CALL HndlrBleMsg
-ONEVENT  EVGPIOCHAN1       CALL HndlrBtn0Pr     
+ONEVENT  EVBLEMSG           CALL HndlrBleMsg
+ONEVENT  EVGPIOCHAN1        CALL HndlrBtn1Pr
 
 
 OnStartup()

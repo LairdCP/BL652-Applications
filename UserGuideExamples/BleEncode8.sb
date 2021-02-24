@@ -11,11 +11,11 @@ PRINT "\nattr$=";attr$
 
 //write 'C' to index 2 -- '111' will be ignored
 rc=BleEncode8(attr$,0x11143,2)
-//write 'A' to index 0 
+//write 'A' to index 0
 rc=BleEncode8(attr$,0x41,0)
 //write 'B' to index 1
 rc=BleEncode8(attr$,0x42,1)
-//write 'D' to index 3 
+//write 'D' to index 3
 rc=BleEncode8(attr$,0x44,3)
 //write 'y' to index 10 -- attr$ will be extended
 rc=BleEncode8(attr$,0x67, 7)

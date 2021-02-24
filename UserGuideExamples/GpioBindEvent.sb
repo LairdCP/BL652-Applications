@@ -2,26 +2,26 @@
 
 dim rc
 
-function HandlerBtn0()
+function HandlerBtn1()
     dim i : i = GpioRead(11)
-    
-    '//if button 0 was pressed
+
+    '//if button 1 was pressed
     if i==0 then
-        print "\nButton 0 Pressed"
+        print "\nButton 1 Pressed"
         
-    '//if button 0 was released
+    '//if button 1 was released
     elseif i==1 then
-        print "\nButton 0 Released"
+        print "\nButton 1 Released"
     endif
 endfunc 1
 
 function HandlerUartRx()
 endfunc 0
 
-rc= GpioBindEvent(0,11,2)         //Bind event 0 to high or low transition on SIO11 (button 1)         
+rc= GpioBindEvent(0,11,2)         //Bind event 0 to high or low transition on SIO11 (button 1)
 if rc==0 then
-    onevent evgpiochan0 call HandlerBtn0  //When event 0 happens, call Btn0Press
-    print "\nSIO11 - Button 0 is bound to event 0. Press button 0"    
+    onevent evgpiochan0 call HandlerBtn1  //When event 0 happens, call HandlerBtn1
+    print "\nSIO11 - Button 1 is bound to event 0. Press button 1"
 else
     print "\nGpioBindEvent Err: ";integer.h'rc
 endif

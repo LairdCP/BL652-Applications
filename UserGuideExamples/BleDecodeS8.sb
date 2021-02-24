@@ -8,7 +8,7 @@
  //create random service just for this example
  rc=BleServiceNew(1, BleHandleUuid16(uuid), svcHandle)
 
- //create char and commit as part of service commited above
+ //create char and commit as part of service committed above
  rc=BleCharNew(0x07,BleHandleUuid16(0x2A1C),mdVal,0,0)
  rc=BleCharCommit(svcHandle,attr$,chrHandle)
 

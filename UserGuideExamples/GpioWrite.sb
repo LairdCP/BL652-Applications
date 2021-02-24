@@ -17,21 +17,21 @@ Sub AssertRC(rc,ln)
 EndSub
 
 rc=GpioSetFunc(17,2,1)
-AssertRC(rc,20)
+AssertRC(rc, 20)
 
 rc=GpioSetFunc(19,2,1)
-AssertRC(rc,23)
+AssertRC(rc, 23)
 
 function HandlerTmr0()
     i1=!i1
     GpioWrite(19,i1)
-    AssertRC(rc,30)
+    AssertRC(rc, 28)
 endfunc 1
 
 function HandlerTmr1()
     i2=!i2
     GpioWrite(17,i2)
-    AssertRC(rc,42)
+    AssertRC(rc, 34)
 endfunc 1
 
 function HandlerUartRx()
