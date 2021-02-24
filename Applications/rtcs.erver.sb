@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Laird
+// Copyright (c) 2015-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -236,6 +236,24 @@ FUNCTION HndlrCharVal(BYVAL charHandle, BYVAL offset, BYVAL len)
     ENDIF
 ENDFUNC 1
 
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    //print "BLE PHY CHANGED: \n"
+    //print "Handle: ";integer.h' hConn;"\n"
+    //print "Status: ";integer.h' nStatus;"\n"
+    //print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a requiest for PHY change
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
 //Open I2C
 rc = I2COpen(I2CSpeed, 0, I2Ch)
 IF (rc != 0) THEN
@@ -274,44 +292,44 @@ I2CClose(I2Ch)
 
 //Start a BLE server
 rc = BleGAPSvcInit("CurrentTimeServer", 0, 256, 80000, 100000, 4000000, 0)
-AssertRC(rc, 277)
+AssertRC(rc, 295)
 rc = BleSvcRegDevInfo("Laird", "BL652", "", "1.0", "1.0", "", "", "")
-AssertRC(rc, 279)
+AssertRC(rc, 297)
 
 //Create service
 rc = BleServiceNew(BLE_SERVICE_PRIMARY, Service1UUID, Service1)
-AssertRC(rc, 283)
+AssertRC(rc, 301)
 
 //Add first characteristics
 dim hrs$ : hrs$ = "          "
 rc = BleCharNew(0x1A, BleHandleUuid16(0x2A2B), BleAttrMetadata(1,1,10,0,rc), BleAttrMetadata(1,1,2,0,rc),0) //Current time (Read, write & Notify) with CCCD
-AssertRC(rc, 288)
+AssertRC(rc, 306)
 rc = BleCharCommit(Service1, hrs$, Char1)
-AssertRC(rc, 290)
+AssertRC(rc, 308)
 
 //Second characteristic
 hrs$ = "00"
 rc = BleCharNew(0x2, BleHandleUuid16(0x2A0F), BleAttrMetadata(1,0,2,0,rc), 0, 0) //Local time (Read)
-AssertRC(rc, 295)
+AssertRC(rc, 313)
 rc = BleCharCommit(Service1, hrs$, Char2)
-AssertRC(rc, 297)
+AssertRC(rc, 315)
 
 //Third characteristic
 hrs$ = "0000"
 rc = BleCharNew(0x2, BleHandleUuid16(0x2A14), BleAttrMetadata(1,0,4,0,rc), 0, 0) //Reference time (Read)
-AssertRC(rc, 302)
+AssertRC(rc, 320)
 rc = BleCharCommit(Service1, hrs$, Char3)
-AssertRC(rc, 304)
+AssertRC(rc, 322)
 
 //Forth (and final) characteristic
 rc = BleCharNew(0x2, BleHandleUuid16(0x2B04), BleAttrMetadata(1,0,5,0,rc), 0, 0) //Version (Read)
-AssertRC(rc, 308)
+AssertRC(rc, 326)
 rc = BleCharCommit(Service1, APP_VERSION$, Char4)
-AssertRC(rc, 310)
+AssertRC(rc, 328)
 
 //Commit services
 rc = BleServiceCommit(Service1)
-AssertRC(rc, 314)
+AssertRC(rc, 332)
 
 //Setup local time information characteristic
 dim TmpStr$ : TmpStr$ = ""
@@ -337,7 +355,7 @@ TimerStart(0, 1000, 1)
 //Start BLE adverts
 dim addr$ : addr$ = ""
 rc = BleAdvertStart(0,addr$,500,0,0)
-AssertRC(rc, 340)
+AssertRC(rc, 358)
 
 //Run initial time send
 rc = HndlrTmr0()
@@ -348,9 +366,11 @@ BTAddr$ = SysInfo$(4)
 PRINT "\nrtcs.erver running with Bluetooth address: ";STRHEXIZE$(BTAddr$);"\nNow accepting connections...\n\n"
 
 //Events
-ONEVENT EVTMR0 CALL HndlrTmr0          //Runs when timer0 expires
-ONEVENT EVBLEMSG CALL BleEvent         //Runs on BLE event
-ONEVENT EVCHARCCCD CALL HndlrCharCccd  //Runs when CCCD is written
-ONEVENT EVCHARVAL CALL HndlrCharVal    //Runs when characteristic is written
+ONEVENT EVTMR0             CALL HndlrTmr0         //Runs when timer0 expires
+ONEVENT EVBLEMSG           CALL BleEvent          //Runs on BLE event
+ONEVENT EVCHARCCCD         CALL HndlrCharCccd     //Runs when CCCD is written
+ONEVENT EVCHARVAL          CALL HndlrCharVal      //Runs when characteristic is written
+ONEVENT EVBLE_PHY_UPDATED  CALL HandlerPhyChngd   //PHY changed
+ONEVENT EVBLE_PHY_REQUEST  CALL HandlerPhyReq     //PHY change request
 
 WAITEVENT

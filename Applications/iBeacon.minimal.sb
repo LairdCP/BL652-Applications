@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Laird
+// Copyright (c) 2015-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -37,7 +37,7 @@
 #define ADVERT_TIMEOUT 60000
     //If set to 1, will restart advertising when it times out, otherwise sits idle
 #define RESTART_ADVERTISING 1
-    //Desired transmit power level (dBm). BL600 can be: 4, 0, -4, -8, -12, -16, -20, -55. BT900 can be: 8, 4, 0, -4, -8, -12, -16, -20.
+    //Desired transmit power level (dBm). BL652 can be: 4, 3, 0, -4, -8, -12, -16, -20, -40
 #define TXPOWER -4
     //When set to 1: enables erasing the module if the pin specified below is toggled low (module must be set in VSP mode)
 #define ENABLE_WIPE 1

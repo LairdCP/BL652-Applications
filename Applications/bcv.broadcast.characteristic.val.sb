@@ -1,4 +1,4 @@
-// Copyright (c) 2013, Laird
+// Copyright (c) 2013-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -109,7 +109,7 @@ sub MakeAdvertRpts()
     AssertRC(rc, 109)
 
     rc=BleEncodeFloat(tempVal$, TEMP_MANTISSA, TEMP_EXPONENT, 2)   //Encode temp (342 * 10^-1) as float from index 2 in tempVal$
-    AssertRC(rc, 111)
+    AssertRC(rc, 112)
     //Append temperature value to the advert report
     rc=BleAdvRptAppendAD(advRpt$, BLE_CHARVAL_AD_TAG, tempVal$)
     AssertRC(rc, 115)

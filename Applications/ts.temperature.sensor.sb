@@ -1,4 +1,4 @@
-// Copyright (c) 2016, Laird
+// Copyright (c) 2016-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -32,7 +32,7 @@
         //The temperature sensor is polled this timeout
 #define TEMPERATURE_POLL_MS     (2000)
 
-	//SIO that the temperature sensor is connected to
+        //SIO that the temperature sensor is connected to
 #define GPIO_TEMP_SENSOR        3
 
 //******************************************************************************
@@ -160,7 +160,7 @@ OnEvent  EVTMR0             call HandlerTimer0
 // Initialise and then wait for events
 //------------------------------------------------------------------------------
 
-DbgMsg( "\nPoll Temperature")
+DbgMsg("\nPoll Temperature")
 
 InitTempSensor()
 
@@ -168,6 +168,6 @@ InitTempSensor()
 // Wait for a synchronous event.
 // A Script can have multiple <WaitEvent> statements
 //------------------------------------------------------------------------------
-DbgMsg( "\nWait for event")
+DbgMsg("\nWait for event")
 WaitEvent
-DbgMsg( "\nPost WAITEVENT" )
+DbgMsg("\nPost WAITEVENT")

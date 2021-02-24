@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Laird
+// Copyright (c) 2015-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -144,8 +144,8 @@
 // *Instructions*
 //      1. Set BTAddr to the BT Address of the peer device you want to connect to by default
 //      2. Set CONNECT_ON_STARTUP to 1 to automatically connect
-//      3. Start a VSP server on a BT900/BL600/BL652 with the other VSP application (on github) or by bridging SIO_19 to GND to enable command VSP mode (bridge SIO_7 to VCC on a BL600 development kit)
-//      4. Download and run this application to a BT900/BL652 and it will automatically connect to the VSP server
+//      3. Start a VSP server on a BT900/BL600/BL652/BL653/BL654 with the other VSP application (on github) or by bridging SIO_19 to GND to enable command VSP mode (bridge SIO_7 to VCC on a BL600 development kit)
+//      4. Download and run this application to a BT900/BL652/BL653/BL654 and it will automatically connect to the VSP server
 //
 //
 // ::Note::
@@ -205,17 +205,8 @@
 //BLE EVENT MSG IDs
 #define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
-#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2    //msgCtx = alert level
-#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3    //msgCtx = alert level
 #define BLE_EVBLEMSGID_SERVICE_ERROR                    4    //msgCtx = resultcode
-#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5    //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6    //msgCtx = not used
-#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7    //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8    //msgCtx = not used
-#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9    //msgCtx = passcode to display
 #define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                 11   //msgCtx = 1 for passkey, 2 for 16 byte OOB data
-#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE           12   //msgCtx = new notification state 0=off, 1=on
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE                14   //msgCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL           15   //msgCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER            16   //msgCtx = connection handle
@@ -393,14 +384,14 @@ FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
             UUID1$ = BASEUUID
             UUID2$ = RXUUID
             rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-            #cmpif 0x00000001 : AssertRC(rc, 325)
+            #cmpif 0x00000001 : AssertRC(rc, 387)
         ELSE
             MIHandle = hVal
             Mode = 2
             UUID1$ = BASEUUID
             UUID2$ = MOUUID
             rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-            #cmpif 0x00000001 : AssertRC(rc, 332)
+            #cmpif 0x00000001 : AssertRC(rc, 394)
         ENDIF
     ELSEIF (Mode == 2) THEN
         //Modem out
@@ -409,7 +400,7 @@ FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
         UUID1$ = BASEUUID
         UUID2$ = RXUUID
         rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-        #cmpif 0x00000001 : AssertRC(rc, 341)
+        #cmpif 0x00000001 : AssertRC(rc, 403)
     ELSEIF (Mode == 3) THEN
         //RX
         IF (cProp == 0 && hVal == 0 && isUuid == 0) THEN
@@ -423,7 +414,7 @@ FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
             UUID1$ = BASEUUID
             UUID2$ = TXUUID
             rc = BLEGATTCFINDCHAR(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-            #cmpif 0x00000001 : AssertRC(rc, 355)
+            #cmpif 0x00000001 : AssertRC(rc, 417)
         ENDIF
     ELSEIF (Mode == 4) THEN
         //TX
@@ -438,7 +429,7 @@ FUNCTION HndlrFindChar(cHndl,cProp,hVal,isUuid)
             UUID1$ = BASEUUID
             UUID2$ = MOUUID
             rc = BLEGATTCFINDDESC(BleHandle, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0, 0xFE012902, 0)
-            #cmpif 0x00000001 : AssertRC(rc, 370)
+            #cmpif 0x00000001 : AssertRC(rc, 432)
         ENDIF
     ENDIF
 ENDFUNC 1
@@ -450,7 +441,7 @@ FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
     if (nSts !=0) then
         #cmpif 0x80000000 : DbgMsg("## Pairing..")
         rc = BlePair(cHndl,1)
-        #cmpif 0x00000001 : AssertRC(rc, 381)
+        #cmpif 0x00000001 : AssertRC(rc, 444)
         exitfunc 1
     endif
 
@@ -459,7 +450,7 @@ FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
         Mode = 8
         UUID1$ = "\01\00"
         rc = BLEGATTCWRITE(BleHandle, TXCCCDHandle, UUID1$)
-        #cmpif 0x00000001 : AssertRC(rc, 390)
+        #cmpif 0x00000001 : AssertRC(rc, 453)
     ELSEIF (Mode == 8) THEN
         //Write to Modem In
         IF (ModemInOutExists == 1) THEN
@@ -467,7 +458,7 @@ FUNCTION HndlrAttrWrite(cHndl,aHndl,nSts)
             UUID1$ = "\01"
             BufferFull = 0
             rc = BLEGATTCWRITE(BleHandle, MIHandle, UUID1$)
-            #cmpif 0x00000001 : AssertRC(rc, 398)
+            #cmpif 0x00000001 : AssertRC(rc, 461)
         ELSE
             BufferFull = 0
             BufferState = 0
@@ -575,13 +566,13 @@ FUNCTION HndlrFindDesc(nCtx, Hndl)
             //Enable modem out notifications
             UUID1$ = "\01\00"
             rc = BLEGATTCWRITE(BleHandle, MOCCCDHandle, UUID1$)
-            #cmpif 0x00000001 : AssertRC(rc, 506)
+            #cmpif 0x00000001 : AssertRC(rc, 569)
         ELSE
             //Modem in doesn't exist - enable TX notifications
             Mode = 8
             UUID1$ = "\01\00"
             rc = BLEGATTCWRITE(BleHandle, TXCCCDHandle, UUID1$)
-            #cmpif 0x00000001 : AssertRC(rc, 512)
+            #cmpif 0x00000001 : AssertRC(rc, 575)
         ENDIF
     ENDIF
 ENDFUNC 1
@@ -628,7 +619,7 @@ ENDFUNC 1
 #cmpif 0x80000000 : sub ShowConnParms(nCtx)
 #cmpif 0x80000000 :   dim intrvl,sprvto,slat
 #cmpif 0x80000000 :   rc = BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
-#cmpif 0x80000001 :   AssertRC(rc, 8740)
+#cmpif 0x80000001 :   AssertRC(rc, 622)
 #cmpif 0x80000000 :   if rc==0 then
 #cmpif 0x80000000 :     print "\n## Conn :: Interval=";intrvl;",Supervision Tout=";sprvto;",Slave Latency=";slat
 #cmpif 0x80000000 :   endif
@@ -647,14 +638,14 @@ FUNCTION HndlrBleMsg(nMsgId, nCtx)
         #cmpif 0x80000000 : ShowConnParms(nCtx)
         //Opening the GATT client only when connected to save memory
         rc = BleGattcOpen(256, 0)
-        #cmpif 0x00000001 : AssertRC(rc, 565)
+        #cmpif 0x00000001 : AssertRC(rc, 641)
         BleHandle = nCtx
         Mode = 1
         dim UUID1$, UUID2$
         UUID1$ = BASEUUID
         UUID2$ = MIUUID
         rc = BLEGATTCFINDCHAR(nCtx, BleHandleUuid128(UUID1$), 0, BleHandleUuid128(UUID2$), 0)
-        #cmpif 0x00000001 : AssertRC(rc, 572)
+        #cmpif 0x00000001 : AssertRC(rc, 648)
         PRINT "Connected!\n"
         InConnection = 1
 
@@ -687,23 +678,16 @@ FUNCTION HndlrBleMsg(nMsgId, nCtx)
         Mode = 6
         exitfunc HndlrFindDesc(0, TXCCCDHandle)
 
-        
-    #cmpif 0x80000000 : case BLE_EVBLEMSGID_DISPLAY_PASSKEY
-    #cmpif 0x80000000 :     DbgMsgVal("## Display Pairing Passkey ",nCtx)
-
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER
     #cmpif 0x80000000 :     DbgMsg("## Conn to Bonded Master ")
-
-    #cmpif 0x80000000 : case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
-    #cmpif 0x80000000 :     DbgMsgVal("## Auth Key Request, type=",nCtx)
       
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
     #cmpif 0x80000000 :     ShowConnParms(nCtx)
-        
+
     #cmpif 0x80000000 : case BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL
     #cmpif 0x80000000 :     DbgMsg("## Conn Parm Negotiation FAILED")
-    
-    case else        
+
+    case else
     endselect
 ENDFUNC 1
 
@@ -798,7 +782,7 @@ function _connect()
     //default min and max interval
     i[1] = 7500
     i[2] = 30000
-            
+
     rc = ExtractStrTokens(urtcmd$,1,1)
 
     //Use #defined/stored mac address if none given
@@ -1074,11 +1058,31 @@ function HndlrGpioChan0()
     endif
 endfunc 1
 
+//==============================================================================
+// This handler is called when there is a passkey/numerical compare event
+//==============================================================================
+#cmpif 0x80000000 : function HndlrBlePasskey(BYVAL Conn, BYVAL Passkey, BYVAL Flags)
+#cmpif 0x80000000 :     if (Flags == 0) then
+#cmpif 0x80000000 :         //This is a passkey
+#cmpif 0x80000000 :         PRINT "Pass Key Request (NOT Numerical Comparison), Handle: ";integer.h'Conn;", Key: ";Passkey;"\n"
+#cmpif 0x80000000 :     elseif (Flags == 1) then
+#cmpif 0x80000000 :         //This is a numerical comparison
+#cmpif 0x80000000 :         PRINT "Numerical Comparison Request (NOT Pass key), Handle: ";integer.h'Conn;", Key: ";Passkey;"\n"
+#cmpif 0x80000000 :     else
+#cmpif 0x80000000 :         PRINT "Unknown Pass Key Request, Handle: ";integer.h'Conn;", Type: ";Flags;" Value: ";Passkey;"\n"
+#cmpif 0x80000000 :     endif
+#cmpif 0x80000000 : endfunc 1
+
+//==============================================================================
+// This handler is called when there is an authkey request event
+//==============================================================================
+#cmpif 0x80000000 : function HndlrBleAuthkey(BYVAL Conn, BYVAL Type, BYVAL Flags)
+#cmpif 0x80000000 :     PRINT "Auth Key Request, Handle: ";integer.h'Conn;", Type: ";Type;"\n"
+#cmpif 0x80000000 : endfunc 1
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 sub Initialise()
-  //Just works pairing will work without confirmation
-  rc = BleSecMngrJustWorksConf(0)
   //Use 'Just Works' pairing
   rc = BleSecMngrIoCap(0)
   //Bond when pairing
@@ -1122,6 +1126,8 @@ OnEvent EVBLE_SCAN_TIMEOUT CALL HndlrScanTO
 OnEvent EVBLE_ADV_REPORT   CALL HndlrScanResp
 OnEvent EVMSGAPP           CALL SetMode
 OnEvent EVTMR0             CALL _disconnect
+#cmpif 0x80000000 : ONEVENT EVBLE_PASSKEY CALL HndlrBlePasskey
+#cmpif 0x80000000 : ONEVENT EVBLE_AUTHKEY CALL HndlrBleAuthkey
 
 //------------------------------------------------------------------------------
 // Wait for a synchronous event.

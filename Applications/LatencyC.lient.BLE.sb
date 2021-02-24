@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Laird
+// Copyright (c) 2015-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -156,11 +156,11 @@ FUNCTION ResetTest()
         TmpStr$ = "test data"
         timer = GETTICKCOUNT()
         rc = BLEGATTCWRITE(cHndl, charHndl, TmpStr$)
-        AssertRC(rc, 141)
+        AssertRC(rc, 159)
     ELSEIF (Connected == 0) THEN
         //No connection, attempt to connect to other device
         rc = BLECONNECT(addr$, 5000, 7500, 100000, 500000)
-        AssertRC(rc, 145)
+        AssertRC(rc, 163)
     ENDIF
 ENDFUNC 1
 
@@ -170,9 +170,9 @@ ENDFUNC 1
 //Connect to other device
 addr$ = strdehexize$(addr$)
 rc = BLECONNECT(addr$, 5000, 7500, 100000, 500000)
-AssertRC(rc, 155)
+AssertRC(rc, 173)
 rc = BLEGATTCOPEN(0, 0)
-AssertRC(rc, 157)
+AssertRC(rc, 175)
 
 //------------------------------------------------------------------------------
 // Enable synchronous event handlers

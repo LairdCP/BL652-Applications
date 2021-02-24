@@ -1,4 +1,4 @@
-// Copyright (c) 2013, Laird
+// Copyright (c) 2013-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,7 @@
 // Virtual Serial Port "External" Loopback app
 // Instructions:
 // - Run the app by entering the app name "upass<cr>"
-// - The module will start advertising a serial port service. 
+// - The module will start advertising a serial port service.
 // - if you rename this application as "$autorun$" , it will run automatical after every power cycle or reset providing the autorun jumper is set
 // - Connect to the devkit and start sending data. If you bridge TX&RX, CTS&RTS on the dev board, any data received are looped back by
 //   this app i.e. all data received are sent back to the central unit.
@@ -91,8 +91,8 @@
         //Effective Conn interval will be (SLAVE_LATENCY+1)*ACTUAL_CONN_INTERVAL
 #define SLAVE_LATENCY                        0
         //Connection supervisory timeout (4 seconds) - max 32 seconds
-//#define CONN_SUP_TIMEOUT                     500000 
-#define CONN_SUP_TIMEOUT                     10000000 
+//#define CONN_SUP_TIMEOUT                     500000
+#define CONN_SUP_TIMEOUT                     10000000
         //DiscoverableMode, set to BLE_DISCOVERABILITY_xxx
 #define DISCOVERY_MODE                       BLE_DISCOVERABILITY_GENERAL
 #define MAX_DEVNAME_CHRS                     10
@@ -231,23 +231,11 @@
 #define ADV_FILTERPOLICY_CONNREQ                        2
 #define ADV_FILTERPOLICY_BOTH                           3
 
-
-
 //BLE EVENT MSG IDs
 #define BLE_EVBLEMSGID_CONNECT                          0 //msgCtx = connection handle
 #define BLE_EVBLEMSGID_DISCONNECT                       1 //msgCtx = connection handle
-#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2 //msgCtx = alert level
-#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3 //msgCtx = alert level
 #define BLE_EVBLEMSGID_SERVICE_ERROR                    4 //msgCtx = resultcode
-#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5 //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6 //msgCtx = not used
-#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7 //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8 //msgCtx = not used
-#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9 //msgCtx = passcode to display
 #define BLE_EVBLEMSGID_NEW_BOND                        10 //msgCtx = connection handle
-#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                11 //msgCtx = 1 for passkey, 2 for 16 byte OOB data
-#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE          12 //msgCtx = new notification state 0=off, 1=on
-//#define FUTURE_USE                                   13
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE               14 //msgCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL          15 //msgCtx = connection handle
 #define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER           16 //msgCtx = connection handle
@@ -255,7 +243,7 @@
 #define BLE_EVBLEMSGID_ENCRYPTED                       18 //msgCtx = connection handle
 #define BLE_EVBLEMSGID_POWER_FAILURE_WARNING           19 //msgCtx = current supply voltage
 #define BLE_EVBLEMSGID_UNENCRYPTED                     20 //msgCtx = connection handle
-#define BLE_EVBLEMSGID_DEVICENAME_WRITE                21 //msgCtx = connection handle 
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE                21 //msgCtx = connection handle
 
 //BLE Alert Levels
 #define BLE_ALERT_LEVEL_NO_ALERT                        0
@@ -507,7 +495,7 @@ function StopAdverts() as integer
   if advState != 0 then
     //currently advertising
     rc = BleAdvertStop()
-    AssertRC(rc, 510)
+    AssertRC(rc, 498)
     if rc==0 then
       //adverts stopped successfully
       advState=0
@@ -533,11 +521,11 @@ function StartAdverts(adv as integer) as integer
     elseif (adv<0)||(adv>3) then
       //invalid advertising type
       rc=0xEF01
-      AssertRC(rc, 536)
+      AssertRC(rc, 524)
       exitfunc rc
     endif
     rc = BleAdvertStart(adv,addr$,advInt,advTmout,advFilPol)
-    AssertRC(rc, 540)
+    AssertRC(rc, 528)
     //
     // Warning: If you get an error here it is most likely that you
     //          have limited discoverability and the advert timeout is > 180000
@@ -550,7 +538,7 @@ function StartAdverts(adv as integer) as integer
   else
     //Currently advertising
     rc=0xEF00
-    AssertRC(rc, 553)
+    AssertRC(rc, 541)
   endif
 endfunc rc
 
@@ -568,7 +556,7 @@ sub AdvMngrOnBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER)
   case BLE_EVBLEMSGID_DISCONNECT
     //Restart advertising
     rc=StartAdverts(-1)
-    AssertRC(rc, 571)
+    AssertRC(rc, 559)
 
   case else
     //Do nothing
@@ -615,19 +603,19 @@ sub InitAdvReports(advFlags as integer)
 
   //Create a minimal advertise report
   rc = BleAdvRptInit(adRpt$,advFlags,ADV_APPEARANCE,MAX_DEVNAME_CHRS)
-  AssertRC(rc, 618)
+  AssertRC(rc, 606)
 
   //Append the uuid list to the advert report
   rc = BleAdvRptAddUuid16(adRpt$,advUuid[0],advUuid[1],advUuid[2],advUuid[3],advUuid[4],advUuid[5])
-  AssertRC(rc, 622)
+  AssertRC(rc, 610)
 
   //Initialise an empty scan report
   rc = BleScanRptInit(scRpt$)
-  AssertRC(rc, 626)
+  AssertRC(rc, 614)
 
   //Commit the advert and scan report to the scan
   rc = BleAdvRptsCommit(adRpt$,scRpt$)
-  AssertRC(rc, 630)
+  AssertRC(rc, 618)
 
 endsub
 
@@ -636,7 +624,7 @@ endsub
 function ScanReportInit()
   dim rc
   rc = BleScanRptInit(scRpt$)
-  AssertRC(rc, 639)
+  AssertRC(rc, 627)
 endfunc rc
 
 //==============================================================================
@@ -644,7 +632,7 @@ endfunc rc
 function ScanReportAppend(nTag as integer, byref adData$ as string)
   dim rc
   rc = BleAdvRptAppendAD(scRpt$,nTag,adData$)
-  AssertRC(rc, 647)
+  AssertRC(rc, 635)
 endfunc rc
 
 //==============================================================================
@@ -653,7 +641,7 @@ function ScanReportCommit()
   dim rc,rpt$
   rpt$=""
   rc = BleAdvRptsCommit(rpt$,scRpt$)
-  AssertRC(rc, 656)
+  AssertRC(rc, 644)
 endfunc rc
 
 //==============================================================================
@@ -662,7 +650,7 @@ endfunc rc
 function Disconnect(hc as integer) as integer
   dim rc
   rc = BleDisconnect(hc)
-  AssertRC(rc, 665)
+  AssertRC(rc, 653)
 endfunc rc
 
 //==============================================================================
@@ -671,7 +659,7 @@ endfunc rc
 function ConnNewParms(hc as integer) as integer
   dim rc
   rc = BleSetCurConnParms(hc,minint,maxint,sprtout,slatncy)
-  AssertRC(rc, 674)
+  AssertRC(rc, 662)
 endfunc rc
 
 
@@ -697,7 +685,7 @@ function SecSendPassKey(hc as integer, byval ky as integer) as integer
   dim rc
   if hc != BLE_CONN_HANDLE_INVALID then
     rc = BleSecMngrPassKey(hc,ky)
-    AssertRC(rc, 700)
+    AssertRC(rc, 688)
   endif
 endfunc rc
 
@@ -706,7 +694,7 @@ endfunc rc
 function SecSetIoCap(ioCap as integer) as integer
   dim rc
   rc = BleSecMngrIocap(iocap)
-  AssertRC(rc, 709)
+  AssertRC(rc, 697)
 endfunc rc
 
 //==============================================================================
@@ -714,7 +702,7 @@ endfunc rc
 function SecSetLtkSizeRange(mnLtk as integer, mxLtk as integer) as integer
   dim rc
   rc = BleSecMngrKeySizes(mnLtk,mxLtk)
-  AssertRC(rc, 717)
+  AssertRC(rc, 705)
 endfunc rc
 
 //==============================================================================
@@ -730,7 +718,7 @@ endsub
 sub InitGapService()
   dim rc
   rc = BleGapSvcInit(DEVICENAME,DEVICENAME_WRITABLE,APPEARANCE,MIN_CONN_INTERVAL,MAX_CONN_INTERVAL,CONN_SUP_TIMEOUT,SLAVE_LATENCY)
-  AssertRC(rc, 733)
+  AssertRC(rc, 721)
 endsub
 
 //==============================================================================
@@ -748,7 +736,7 @@ sub InitDisService()
   if (rc==0) || (rc==RESCODE_BLE_SVC_REGISTERED) then
      AddUuid(UUID_DEVICE_INFORMATION_SERVICE)
   else
-    AssertRC(rc, 751)
+    AssertRC(rc, 739)
   endif
 
 endsub
@@ -827,7 +815,7 @@ sub ShowConnParms(nCtx as integer)
   dim rc
   dim intrvl,sprvto,slat
   rc= BleGetCurConnParms(nCtx,intrvl,sprvto,slat)
-  AssertRC(rc, 830)
+  AssertRC(rc, 818)
   if rc==0 then
     DbgMsgVal("Conn Interval",intrvl)
     DbgMsgVal("Conn Supervision Timeout",sprvto)
@@ -854,7 +842,7 @@ endfunc rc
 function VSpOpen()
   dim rc
   rc = BleVSpOpen(tsz,rsz,flgs,uuhdl)
-  AssertRC(rc, 857)
+  AssertRC(rc, 845)
   if rc==0 then
     print "\nBleVSpOpen() OK  (uuhdl=";uuhdl;")\n"
     //Get the rx read block size, and limit to 60 so that large block
@@ -921,11 +909,11 @@ endfunc 0
 function VSpAdvert()
   dim rc,rpt$
   rc = BleAdvRptAddUuid128(scRpt$,uuhdl)
-  AssertRC(rc, 924)
+  AssertRC(rc, 912)
   if rc == 0 then
     rpt$=""
     rc = BleAdvRptsCommit(rpt$,scRpt$)
-    AssertRC(rc, 928)
+    AssertRC(rc, 916)
   endif
   if rc == 0 then
     print "\nVSP added 128 uuid to scanrpt"
@@ -950,11 +938,11 @@ sub OnStartup()
 
   //Initialise VSP service
   rc = VSpOpen()
-  AssertRC(rc, 953)
+  AssertRC(rc, 941)
 
   //Add the VSP service to the scan report
   rc = VSpAdvert()
-  AssertRC(rc, 957)
+  AssertRC(rc, 945)
 rc = StartAds(ADV_IND)
 
 endsub
@@ -981,13 +969,6 @@ function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as intege
   case BLE_EVBLEMSGID_DISCONNECT
     DbgMsgVal(" --- Disconnect : ",nCtx)
 
-  case BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT
-    DbgMsgVal( "\n --- Immediate Alert Service Alert ", nCtx)
-    DbgMsg("\n")
-
-  case BLE_EVBLEMSGID_DISPLAY_PASSKEY
-    DbgMsgVal("Display Pairing Passkey ",nCtx)
-
   case BLE_EVBLEMSGID_NEW_BOND
     DbgMsg(" +++ New Bond")
 
@@ -999,9 +980,6 @@ function HandlerBleMsg(BYVAL nMsgId AS INTEGER, BYVAL nCtx AS INTEGER) as intege
 
   case BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER
     DbgMsgVal(" -- Conn to Bonded Master ",nCtx)
-
-  case BLE_EVBLEMSGID_AUTH_KEY_REQUEST
-    DbgMsgVal(" +++ Auth Key Request, type=",nCtx)
 
   case BLE_EVBLEMSGID_CONN_PARMS_UPDATE
     ShowConnParms(nCtx)
@@ -1029,14 +1007,14 @@ function HandlerBlrAdvTimOut() as integer
 
   if AdvMngrOnAdvTimeOut() == 0 then
 
-    DbgMsg( "\nAdvert stopped via timeout" )
-    //DbgMsg( "\n   - could use SystemStateSet(0) to switch off" )
+    DbgMsg("\nAdvert stopped via timeout")
+    //DbgMsg("\n   - could use SystemStateSet(0) to switch off")
 
     //------------------------------------------------------------
     //  Switch off the system - requires a power cycle to recover
     //------------------------------------------------------------
     //  rc = SystemStateSet(0)
-    //  AssertRC(rc, 1039)
+    //  AssertRC(rc, 1017)
   endif
 
 endfunc 1
@@ -1055,9 +1033,31 @@ endfunc 1
 // This handler is called when there is a requiest for PHY change
 //==============================================================================
 function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
-    dim rc
     // Accept incoming PHY request by default
+    dim rc
     rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a passkey/numerical compare event
+//==============================================================================
+function HandlerBlePasskey(BYVAL Conn, BYVAL Passkey, BYVAL Flags)
+    if (Flags == 0) then
+        //This is a passkey
+        PRINT "Pass Key Request (NOT Numerical Comparison), Handle: ";integer.h'Conn;", Key: ";Passkey;"\n"
+    elseif (Flags == 1) then
+        //This is a numerical comparison
+        PRINT "Numerical Comparison Request (NOT Pass key), Handle: ";integer.h'Conn;", Key: ";Passkey;"\n"
+    else
+        PRINT "Unknown Pass Key Request, Handle: ";integer.h'Conn;", Type: ";Flags;" Value: ";Passkey;"\n"
+    endif
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is an authkey request event
+//==============================================================================
+function HandlerBleAuthkey(BYVAL Conn, BYVAL Type, BYVAL Flags)
+    PRINT "Auth Key Request, Handle: ";integer.h'Conn;", Type: ";Type;"\n"
 endfunc 1
 
 //******************************************************************************
@@ -1077,9 +1077,11 @@ OnEvent  EVUARTRX           call HandlerLoop    //EVUARTRX  = data has arrived a
 OnEvent  EVVSPTXEMPTY       call HandlerLoop
 OnEvent  EVUARTTXEMPTY      call HandlerLoop
 
-// PHY related events
-OnEvent  EVBLE_PHY_UPDATED  call HandlerPhyChngd
-OnEvent  EVBLE_PHY_REQUEST  call HandlerPhyReq
+OnEvent  EVBLE_PHY_UPDATED  call HandlerPhyChngd   // PHY changed
+OnEvent  EVBLE_PHY_REQUEST  call HandlerPhyReq     // PHY change request
+
+OnEvent  EVBLE_PASSKEY      call HandlerBlePasskey
+OnEvent  EVBLE_AUTHKEY      call HandlerBleAuthkey
 
 //------------------------------------------------------------------------------
 // Initialise Services and then wait for events

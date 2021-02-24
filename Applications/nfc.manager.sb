@@ -1,4 +1,4 @@
-// Copyright (c) 2016, Laird
+// Copyright (c) 2016-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -54,7 +54,7 @@
 // -----------------------------------------------------------------------------
 // nfc enable #INTstate#
 //   - Enables or disables the NFC field for reading by other devices:
-//   -   0: Disable NFC field 
+//   -   0: Disable NFC field
 //   -   1: Enable NFC field
 //   - This needs to be used after tags have been created and committed.
 //
@@ -874,7 +874,7 @@ function _NFC()
             else
                 rc = 0
             endif
-            AssertRC(rc, 1)
+            AssertRC(rc, 877)
             q = q+1
         endwhile
 

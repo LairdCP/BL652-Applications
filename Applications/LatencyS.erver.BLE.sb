@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Laird
+// Copyright (c) 2015-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -181,17 +181,17 @@ endfunc 1
 //Create service with one characteristic
 addr$ = "a"
 rc = BleServiceNew(1, BleHandleUuid16(0x180D), svcID)
-AssertRC(rc, 165)
+AssertRC(rc, 184)
 rc = BleCharNew(62, BleHandleUuid16(0x2020), BleAttrMetadata(1,1,20,1,rc), BleAttrMetadata(1,1,2,0,rc), 0)
-AssertRC(rc, 167)
+AssertRC(rc, 186)
 rc = BleCharCommit(svcID, addr$, charID)
-AssertRC(rc, 169)
+AssertRC(rc, 188)
 rc = BleServiceCommit(svcID)
-AssertRC(rc, 171)
+AssertRC(rc, 190)
 
 //Start advertising
 rc = BleAdvertStart(0, addr$, 250, 0, 0)
-AssertRC(rc, 175)
+AssertRC(rc, 194)
 
 //------------------------------------------------------------------------------
 // Enable synchronous event handlers

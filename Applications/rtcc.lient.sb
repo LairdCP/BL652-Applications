@@ -1,4 +1,4 @@
-// Copyright (c) 2016, Laird
+// Copyright (c) 2016-2021, Laird Connectivity
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -114,7 +114,7 @@
 // -----------------------------------------------------------------------------
 //
 // connect
-//    - Connects to an RTC host if a Bluetooth
+//    - Connects to the RTC address that was configured using "set addr"
 //
 // -----------------------------------------------------------------------------
 //
@@ -257,29 +257,27 @@ FUNCTION HndlrAdvRpt()
     DIM periphAddr$, advData$, nDiscarded, nRssi
     //Read all cached advert reports
     DO
-   rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
-//       IF strcmp(TargetBT$, periphAddr$) == 0 THEN
-           //Decode time and date data
-           dim adval$
-           dim Tmp
-           rc=BLEGETADBYTAG(advData$, 0x16, ADval$)
-           IF (strlen(ADval$) == 10) THEN
-               PRINT "From: "; StrHexize$(periphAddr$);" (RSSI: ";nRssi;")\n"
-               PRINT "Date & Time: "
-               rc=BleDecodeU8(ADVal$,Tmp,4)
-               PRINT Tmp;":"
-               rc=BleDecodeU8(ADVal$,Tmp,5)
-               PRINT Tmp;":"
-               rc=BleDecodeU8(ADVal$,Tmp,6)
-               PRINT Tmp;" on "
-               rc=BleDecodeU8(ADVal$,Tmp,3)
-               PRINT Tmp;"/"
-               rc=BleDecodeU8(ADVal$,Tmp,2)
-               PRINT Tmp;"/"
-               rc=BleDecodeU16(ADVal$,Tmp,0)
-               PRINT Tmp;"\n"
-           ENDIF
-//       ENDIF
+        rc=BleScanGetAdvReport(periphAddr$, advData$, nDiscarded, nRssi)
+        //Decode time and date data
+        dim adval$
+        dim Tmp
+        rc=BLEGETADBYTAG(advData$, 0x16, ADval$)
+        IF (strlen(ADval$) == 10) THEN
+            PRINT "From: "; StrHexize$(periphAddr$);" (RSSI: ";nRssi;")\n"
+            PRINT "Date & Time: "
+            rc=BleDecodeU8(ADVal$,Tmp,4)
+            PRINT Tmp;":"
+            rc=BleDecodeU8(ADVal$,Tmp,5)
+            PRINT Tmp;":"
+            rc=BleDecodeU8(ADVal$,Tmp,6)
+            PRINT Tmp;" on "
+            rc=BleDecodeU8(ADVal$,Tmp,3)
+            PRINT Tmp;"/"
+            rc=BleDecodeU8(ADVal$,Tmp,2)
+            PRINT Tmp;"/"
+            rc=BleDecodeU16(ADVal$,Tmp,0)
+            PRINT Tmp;"\n"
+        ENDIF
     UNTIL rc!=0
 ENDFUNC 1
 
@@ -736,7 +734,6 @@ FUNCTION HndlrNtfyDo()
     dim nCtX, Hndl, Dat$, discard, Tmp
     rc = BLEGATTCNOTIFYREAD(nCtX, Hndl, Dat$, discard)
 
-//    IF (Hndl == TimeUUID && strlen(Dat$) == 10) THEN - Might not have TimeUUID handle at this point
     IF (strlen(Dat$) == 10) THEN
         IF (strlen(Dat$) == 10) THEN
             //We have the time & date data from the notifications
@@ -757,6 +754,24 @@ FUNCTION HndlrNtfyDo()
     ENDIF
 ENDFUNC 1
 
+//==============================================================================
+// This handler is called when the BLE PHY is changed
+//==============================================================================
+function  HandlerPhyChngd(BYVAL hConn, BYVAL nStatus, BYVAL PhyTx, BYVAL PhyRx)
+    //print "BLE PHY CHANGED: \n"
+    //print "Handle: ";integer.h' hConn;"\n"
+    //print "Status: ";integer.h' nStatus;"\n"
+    //print "PhyTx=";PhyTx;" PhyRx =";PhyRx;"\n"
+endfunc 1
+
+//==============================================================================
+// This handler is called when there is a requiest for PHY change
+//==============================================================================
+function  HandlerPhyReq(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
+    // Accept incoming PHY request by default
+    rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
+endfunc 1
+
 //Open GATT Client
 rc = BleGattcOpen(0,0)
 PRINT "RTC Client ready!\n"
@@ -765,15 +780,17 @@ PRINT "RTC Client ready!\n"
 TargetBT$ = STRDEHEXIZE$(TargetBT$)
 
 //Events
-ONEVENT EVUARTRX             CALL HndlrUartRx //Runs when UART gets data
-ONEVENT EVBLE_SCAN_TIMEOUT   CALL HndlrScanTO //Runs when BLE scan times out
-ONEVENT EVBLE_ADV_REPORT     CALL HndlrAdvRpt //Runs when a BLE scan report is ready
-ONEVENT EVBLE_CONN_TIMEOUT   CALL HndlrCnTOut //Runs on connection timeout
-ONEVENT EVBLEMSG             CALL HndlrBleMsg //Runs on BLE message
-ONEVENT EVATTRREAD           CALL HndlrGCData //Runs on GATT Client data ready for reading
-ONEVENT EVFINDCHAR           CALL HndlrFindCh //Runs on characteristic found
-ONEVENT EVATTRWRITE          CALL HndlrWrtnCh //Runs on characteristic written
-ONEVENT EVFINDDESC           CALL HndlrFindDe //Runs on descriptor found
-ONEVENT EVATTRNOTIFY         CALL HndlrNtfyDo //Runs on notification received
+ONEVENT EVUARTRX             CALL HndlrUartRx      //Runs when UART gets data
+ONEVENT EVBLE_SCAN_TIMEOUT   CALL HndlrScanTO      //Runs when BLE scan times out
+ONEVENT EVBLE_ADV_REPORT     CALL HndlrAdvRpt      //Runs when a BLE scan report is ready
+ONEVENT EVBLE_CONN_TIMEOUT   CALL HndlrCnTOut      //Runs on connection timeout
+ONEVENT EVBLEMSG             CALL HndlrBleMsg      //Runs on BLE message
+ONEVENT EVATTRREAD           CALL HndlrGCData      //Runs on GATT Client data ready for reading
+ONEVENT EVFINDCHAR           CALL HndlrFindCh      //Runs on characteristic found
+ONEVENT EVATTRWRITE          CALL HndlrWrtnCh      //Runs on characteristic written
+ONEVENT EVFINDDESC           CALL HndlrFindDe      //Runs on descriptor found
+ONEVENT EVATTRNOTIFY         CALL HndlrNtfyDo      //Runs on notification received
+ONEVENT EVBLE_PHY_UPDATED    CALL HandlerPhyChngd  //PHY changed
+ONEVENT EVBLE_PHY_REQUEST    CALL HandlerPhyReq    //PHY change request
 
 WAITEVENT

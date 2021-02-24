@@ -1,5 +1,5 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Copyright (c) 2017, Laird                                                  ++
+// Copyright (c) 2017-2021, Laird Connectivity                                ++
 //                                                                            ++
 // Permission to use, copy, modify, and/or distribute this software for any   ++
 // purpose with or without fee is hereby granted                              ++
@@ -29,7 +29,7 @@
 // serial port profile so that data can be transparently relayed from a host
 // connected to the uart and ble connection and vice versa.
 //
-// In addition if there is no activity, while the BLE connection is up, the 
+// In addition if there is no activity, while the BLE connection is up, the
 // uart is closed but with the RX line configured for a high to low transition
 // detection so that it can be opened. This comes at the expense of the first
 // uncoming uart character potentially lost (depending on baudrate).
@@ -37,58 +37,58 @@
 // There is a state machine that this application maintains to manage this optimised
 // operation and to ensure that host connected to the uart can follow it, various
 // functions (callbacks) are called that can be used to customise the behaviour
-// as follow (these callbacks are in file custom.low.power.vsp.uart.bridge.sb ):-
+// as follow (these callbacks are in file custom.low.power.vsp.uart.bridge.sb):-
 //
-//  OnInitGPIO() 
+//  OnInitGPIO()
 //    --Called very early on startup AFTER the Uart has been opened
 //
-//  OnStartupDone() 
+//  OnStartupDone()
 //    --Called when startup is done
 //
-//  OnAdvertStart() 
+//  OnAdvertStart()
 //    --Called after adverts have been started
 //
-//  OnAdvertStopped() 
-//    --Called after adverts have been stopped ( when connection happens )
+//  OnAdvertStopped()
+//    --Called after adverts have been stopped (when connection happens)
 //
-//  OnUartClosing(fConn) 
+//  OnUartClosing(fConn)
 //    --Called just before uart is to be closed because of no activity.
 //    -- Return 0 to allow, otherise time in msec to extend the timer
 //    -- If the exten value is negative, then default UART_IDLE_TIMEOUT_MS used
 //
-//  OnUartClose() 
+//  OnUartClose()
 //    --Called after uart is actually closed
 //
-//  OnUartOpen(fConn) 
-//    --Called on uart is opened. 
+//  OnUartOpen(fConn)
+//    --Called on uart is opened.
 //    -- The fConn==0 when no connection, and 1 when in a BLE connected state
 //
 //  OnUartRxNoConn(byref uartRx$)
 //    --Called when uart data has arrived when there is no connection
 //                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //
-//  OnConnect(hConn,intrvl,sprvto,slat) 
-//    --Called on connection 
+//  OnConnect(hConn,intrvl,sprvto,slat)
+//    --Called on connection
 //            hConn  = the connection handle
 //            intrvl = connection interval in microseconds
 //            sprvto = link supervision timeout in microseconds
 //            slat   = slave latency
 //
 //  OnConnParmChange(hConn,intrvl,sprvto,slat)
-//    --Called on conn parm change 
+//    --Called on conn parm change
 //            hConn  = the connection handle
 //            intrvl = connection interval in microseconds
 //            sprvto = link supervision timeout in microseconds
 //            slat   = slave latency
 //
-//  OnDisconnection(hConn)  
+//  OnDisconnection(hConn)
 //    --Called on disconnection, the connection handle can be found in hVspConn
 //
 // Examination of the messages shows that the character ! is used when there is
 // no ble connection and the character ^ is ised when there is a connection so
 // a useful way to infer connection status.
 // Also \n is the linefeed chr (0x0A) and \r is the carriage return chr (0x0D)
-// 
+//
 // Warning: An incmoming uart character will result in the uart being opened
 // automatically and that character will be lost, unless the baudate is very low
 //
@@ -104,19 +104,19 @@
 // character or a uart_break.
 //                ^^^^^^^^^^
 // It is recommended that if a sacrificial character is sent then it be one of the
-// following values :- 
+// following values :-
 //   0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE
 // Because it will result in a single low to high transition and so NOT result
 // in any extraneous random data from being received.
-// 
+//
 // -----------------------------------
 // Option 2 (Use CTS input)
 // -----------------------------------
-// Change UART_REOPEN_SIONUM to the pin number for the UART_CTS line and the 
+// Change UART_REOPEN_SIONUM to the pin number for the UART_CTS line and the
 // value for UART_REOPEN_STATE_CHANGE to UART_REOPEN_TRANSITION_HI_to_LO.
 // Then the uart host can deassert and reassert its RTS output line to force
 // the module to open the uart.
-// 
+//
 //******************************************************************************
 
 //******************************************************************************
@@ -130,7 +130,7 @@
 //             stops and then the next blocks only came after sending some
 //             characters to trigger the next block. Fixed by adding the event
 //             EVVSPTXEMEPTY to keep the pump primed.
-//  - Enhancement : 
+//  - Enhancement :
 //             When the uart is closed, the state of the RTS line is specified
 //             via the UART_RTS_STATE_ON_CLOSE in the custom file and that
 //             is now set for 1 so that when uart is closed the peer's CTS
@@ -143,7 +143,7 @@
 //v1.20 (13 Jun 2017)
 //  - Improved customisation so that customer does not need to alter this file
 //    but the customisation one
-//  - Added the OnConnParmChange callback 
+//  - Added the OnConnParmChange callback
 //
 //v1.10 (31 May 2017)
 //  Improved the wakeup and callback mechanism
@@ -198,35 +198,26 @@
 #define STATE_TIMER                                   0
 
 //BLE EVENT MSG IDs
-#define BLE_EVBLEMSGID_CONNECT                          0    //msgCtx = connection handle
-#define BLE_EVBLEMSGID_DISCONNECT                       1    //msgCtx = connection handle
-#define BLE_EVBLEMSGID_IMMEDIATE_ALERT_SERVICE_ALERT    2    //msgCtx = alert level
-#define BLE_EVBLEMSGID_LINKLOSS_SERVICE_ALERT           3    //msgCtx = alert level
-#define BLE_EVBLEMSGID_SERVICE_ERROR                    4    //msgCtx = resultcode
-#define BLE_EVBLEMSGID_HTS_INDICATION_STATE             5    //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_HTS_INDICATION_CNF               6    //msgCtx = not used
-#define BLE_EVBLEMSGID_BPS_INDICATION_STATE             7    //msgCtx = new indication state 0=off, 1=on
-#define BLE_EVBLEMSGID_BPS_INDICATION_CNF               8    //msgCtx = not used
-#define BLE_EVBLEMSGID_DISPLAY_PASSKEY                  9    //msgCtx = passcode to display
-#define BLE_EVBLEMSGID_NEW_BOND                         10   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_AUTH_KEY_REQUEST                 11   //msgCtx = 1 for passkey, 2 for 16 byte OOB data
-#define BLE_EVBLEMSGID_HRS_NOTIFICATION_STATE           12   //msgCtx = new notification state 0=off, 1=on
-#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE                14   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL           15   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER            16   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_UPDATED_BOND                     17   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_ENCRYPTED                        18   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING            19   //msgCtx = current supply voltage
-#define BLE_EVBLEMSGID_UNENCRYPTED                      20   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_DEVICENAME_WRITE                 21   //msgCtx = connection handle
-#define BLE_EVBLEMSGID_DEVICENAME_WRITE                 21   //msgCtx = connection handle */
-#define BLE_EVBLEMSGID_BOND_ADDFAIL                     22   //msgCtx = connection handle */
-#define BLE_EVBLEMSGID_SRVCCHNG_IND_SENT                23   //msgCtx = connection handle */
-#define BLE_EVBLEMSGID_SRVCCHNG_IND_CNF                 24   //msgCtx = connection handle */
-#define BLE_EVBLEMSGID_OOB_AVAILABLE_REQEST             25   //msgCtx = connection handle */
-#define BLE_EVBLEMSGID_AUTHENTICATION_FAILED            26   //msgCtx = connection handle */
-#define BLE_EVBLEMSGID_LESC_PAIRING                     27   //msgCtx = connection handle */
-#define BLE_EVBLEMSGID_LESC_OOB_REQUEST                 28   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_CONNECT                        0    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DISCONNECT                     1    //msgCtx = connection handle
+#define BLE_EVBLEMSGID_SERVICE_ERROR                  4    //msgCtx = resultcode
+#define BLE_EVBLEMSGID_NEW_BOND                       10   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE              14   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL         15   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER          16   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_UPDATED_BOND                   17   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                      18   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING          19   //msgCtx = current supply voltage
+#define BLE_EVBLEMSGID_UNENCRYPTED                    20   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE               21   //msgCtx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE               21   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_BOND_ADDFAIL                   22   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_SRVCCHNG_IND_SENT              23   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_SRVCCHNG_IND_CNF               24   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_OOB_AVAILABLE_REQEST           25   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_AUTHENTICATION_FAILED          26   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_LESC_PAIRING                   27   //msgCtx = connection handle */
+#define BLE_EVBLEMSGID_LESC_OOB_REQUEST               28   //msgCtx = connection handle */
 
 //******************************************************************************
 // Global Variable Declarations
@@ -272,7 +263,7 @@ dim idleTimeoutMs
 //------------------------------------------------------------------------------
 // Change state
 //------------------------------------------------------------------------------
-sub NewState( nState )
+sub NewState(nState)
   if nState != curState then
     #cmpif 0x00000004 : sprint #dbgmsg$, "NewState = "; nState
     #cmpif 0x00000004 : DbgMsg(dbgmsg$)
@@ -285,31 +276,31 @@ endsub
 //------------------------------------------------------------------------------
 function UartCloseConditional()
   dim fClosed : fClosed=0
-  
+
   if UartInfo(0) then
     //Uart is open so try to close it if rx/tx ring buffers are empty
-    rc=UartCloseEx(1)    
+    rc=UartCloseEx(1)
   endif
-  
+
   if UartInfo(0) then
     //the uart is still open so restart the time
     TimerStart(STATE_TIMER,UART_IDLE_REPOLL_TIMEOUT_MS,0)
   else
     //closed, so configure the TX and RTS as outputs and adjust outputs
     rc=gpiosetfunc(UART_SIONUM_TX,2,1)   //TX - set high on default
-      #cmpif 0x00000003 : AssertRC(rc, 3620)
+      #cmpif 0x00000003 : AssertRC(rc, 291)
     rc=gpiosetfunc(UART_SIONUM_RTS,2,UART_RTS_STATE_ON_CLOSE)   //Adjust RTS state on closure
-      #cmpif 0x00000003 : AssertRC(rc, 3640)
+      #cmpif 0x00000003 : AssertRC(rc, 293)
     rc=GpioSetFunc(UART_SIONUM_RX,1,2)   //RX  - Pull high input & irq on hi2lo transition
-      #cmpif 0x00000003 : AssertRC(rc, 3660)
-    rc=GpioSetFunc(UART_SIONUM_CTS,1,1)   //CTS  - Pull low input & irq on lo2hi transition
-      #cmpif 0x00000003 : AssertRC(rc, 3670)
+      #cmpif 0x00000003 : AssertRC(rc, 295)
+    rc=GpioSetFunc(UART_SIONUM_CTS,1,1)  //CTS  - Pull low input & irq on lo2hi transition
+      #cmpif 0x00000003 : AssertRC(rc, 297)
     rc=GpioAssignEvent(UART_GPIO_ASSIGN_CHANNEL, UART_REOPEN_SIONUM, UART_REOPEN_STATE_CHANGE)
-      #cmpif 0x00000003 : AssertRC(rc, 3680)
-      
+      #cmpif 0x00000003 : AssertRC(rc, 299)
+
     fClosed = 1
-    OnUartClose()  //Do your custom stuff in this function 
-  endif  
+    OnUartClose()  //Do your custom stuff in this function
+  endif
 endfunc fClosed
 
 //------------------------------------------------------------------------------
@@ -318,23 +309,23 @@ endfunc fClosed
 //------------------------------------------------------------------------------
 sub UartReOpen()
   if UartInfo(0)==0 then
-    //Uart was actually closed  
+    //Uart was actually closed
 
     //Free up the level transition detection
     rc=GpioUnAssignEvent(UART_GPIO_ASSIGN_CHANNEL)
-      #cmpif 0x00000003 : AssertRC(rc, 3840)
+      #cmpif 0x00000003 : AssertRC(rc, 316)
     //Open the uart
     rc=UartOpen(UART_BAUDRATE,UART_TX_BUFLEN,UART_RX_BUFLEN,"CN81H")
-      #cmpif 0x00000003 : AssertRC(rc, 3870)
-      
+      #cmpif 0x00000003 : AssertRC(rc, 319)
+
     if hVspConn == INVALID_CONN_HANDLE then
-      OnUartOpen(0)  //Do your custom stuff in this function 
+      OnUartOpen(0)  //Do your custom stuff in this function
     else
-      OnUartOpen(1)  //Do your custom stuff in this function 
+      OnUartOpen(1)  //Do your custom stuff in this function
     endif
-          
-  endif  
-  
+
+  endif
+
   //Start the uart inactivity timer
   TimerStart(STATE_TIMER,idleTimeoutMs,0)
 endsub
@@ -355,9 +346,9 @@ sub AdvertsStop()
   #cmpif 0x00000004 : DbgMsg("Called AdvertsStop()")
   if IsAdvertising() then
     rc=BleAdvertStop()
-    #cmpif 0x00000003 : AssertRC(rc, 4080)
+    #cmpif 0x00000003 : AssertRC(rc, 349)
     #cmpif 0x00000004 : DbgMsg("Adverts Stopped")
-    OnAdvertStopped()  //Do your custom stuff in this function 
+    OnAdvertStopped()  //Do your custom stuff in this function
   endif
 endsub
 
@@ -369,17 +360,17 @@ sub AdvertsStart()
 
   if IsAdvertising()==0 then
     rc = BleAdvertStart(ADVERT_TYPE, addr$, ADV_INTERVAL_MS, ADV_TIMEOUT_MS, 0)
-      #cmpif 0x00000003 : AssertRC(rc, 4220)
+      #cmpif 0x00000003 : AssertRC(rc, 363)
       #cmpif 0x00000004 : DbgMsg("Vsp Adverts Started")
   endif
-  OnAdvertStart()  //Do your custom stuff in this function 
+  OnAdvertStart()  //Do your custom stuff in this function
 endsub
 
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 sub InitGPIO()
-  OnInitGpio()  //Do your custom stuff in this function 
+  OnInitGpio()  //Do your custom stuff in this function
 endsub
 
 //------------------------------------------------------------------------------
@@ -387,14 +378,14 @@ endsub
 sub InitGapService()
   dim dn$ : dn$=DEVICENAME
   rc=BleGapSvcInit(dn$, DEVICENAME_WRITABLE, APPEARANCE, MIN_CONN_INTERVALus, MAX_CONN_INTERVALus, CONN_SUP_TIMEOUTus, SLAVE_LATENCY)
-    #cmpif 0x00000003 : AssertRC(rc, 4400)
+    #cmpif 0x00000003 : AssertRC(rc, 381)
 endsub
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 sub InitAndConfigVsp()
   rc = BleVspOpen(VSP_TX_BUFLEN, VSP_RX_BUFLEN, 0, hVspUuid)
-    #cmpif 0x00000003 : AssertRC(rc, 4470)
+    #cmpif 0x00000003 : AssertRC(rc, 388)
 endsub
 
 //------------------------------------------------------------------------------
@@ -402,33 +393,33 @@ endsub
 sub InitAndConfigAdv()
   dim advRpt$,scnRpt$
   rc = BleAdvRptInit(advRpt$, AD_FLAGS, APPEARANCE, MAX_DEVICENAME_LEN_IN_ADVERTS)
-    #cmpif 0x00000003 : AssertRC(rc, 4550)
-  
-  rc = BleScanRptInit(scnRpt$) 
-    #cmpif 0x00000003 : AssertRC(rc, 4580)
-  
+    #cmpif 0x00000003 : AssertRC(rc, 396)
+
+  rc = BleScanRptInit(scnRpt$)
+    #cmpif 0x00000003 : AssertRC(rc, 399)
+
   rc = BleAdvRptAddUuid128(advRpt$, hVspUuid)
-    #cmpif 0x00000003 : AssertRC(rc, 4610)
-  
+    #cmpif 0x00000003 : AssertRC(rc, 402)
+
   rc = BleAdvRptsCommit(advRpt$, scnRpt$)
-    #cmpif 0x00000003 : AssertRC(rc, 4640)
+    #cmpif 0x00000003 : AssertRC(rc, 405)
 endsub
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 sub _OnConnect(hConn)
   dim intrvl,sprvto,slat
-  
+
   hVspConn = hConn
-  
+
   UartReOpen()
-  
+
   NewState(STATE_CONN_UART_OPEN)
-  
-  OnAdvertStopped() //Do your custom stuff in this function 
-  
+
+  OnAdvertStopped() //Do your custom stuff in this function
+
   rc = BleGetCurConnParms(hConn,intrvl,sprvto,slat)
-  
+
   OnConnect(hConn,intrvl,sprvto,slat)
   //Start the uart inactivity timer
   TimerStart(STATE_TIMER,idleTimeoutMs,0)
@@ -437,21 +428,21 @@ endsub
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 sub _OnConnParmChg(hConn)
-  dim intrvl,sprvto,slat  
+  dim intrvl,sprvto,slat
   rc = BleGetCurConnParms(hConn,intrvl,sprvto,slat)
-  if rc==0 then  
+  if rc==0 then
     UartReOpen()
     OnConnParmChange(hConn,intrvl,sprvto,slat)
     //Start the uart inactivity timer
-    TimerStart(STATE_TIMER,idleTimeoutMs,0)        
+    TimerStart(STATE_TIMER,idleTimeoutMs,0)
     //Change state - destination is same from both places
-    NewState(STATE_CONN_UART_OPEN)    
+    NewState(STATE_CONN_UART_OPEN)
   endif
 endsub
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-sub StateTmrOnTimeout( nTmrExtMsec, nextState )
+sub StateTmrOnTimeout(nTmrExtMsec, nextState)
   if nTmrExtMsec<UART_IDLE_TIMEOUT_MS then
     nTmrExtMsec = UART_IDLE_TIMEOUT_MS
   endif
@@ -468,7 +459,7 @@ endsub
 //------------------------------------------------------------------------------
 function HndlrTmrState()
   dim nTmrExtMsec
-  
+
   //If in the meantime the timer was restarted do nothing
   if TimerRunning(STATE_TIMER) == 0 then
     //timer was not restarted so action this
@@ -480,9 +471,9 @@ function HndlrTmrState()
 
     case STATE_CONN_UART_OPEN
       //Start state timer
-      nTmrExtMsec=OnUartClosing(1) 
+      nTmrExtMsec=OnUartClosing(1)
       StateTmrOnTimeout(nTmrExtMsec,STATE_CONN_UART_CLOSE)
-      
+
     case STATE_IDLE_UART_CLOSE,STATE_CONN_UART_CLOSE
       //the buffers have to empty and transmit register should be empty too
       if UartCloseConditional() then
@@ -508,7 +499,7 @@ function HndlrUartRx()
       StrShiftLeft(uartRecBuf$,dontcare)
       dontcare = UARTReadN(uartRecBuf$, MAX_UART_READ_LEN)
     endwhile
-    
+
   case STATE_IDLE_UART_CLOSE
     UartReOpen()
     NewState(STATE_IDLE_UART_OPEN)
@@ -519,20 +510,20 @@ function HndlrUartRx()
       StrShiftLeft(uartRecBuf$,dontcare)
       dontcare = UARTReadN(uartRecBuf$, MAX_UART_READ_LEN)
     endwhile
-    
+
   case STATE_CONN_UART_CLOSE
     UartReOpen()
     NewState(STATE_CONN_UART_OPEN)
     //Pass data between UART and VSP service
     BleVspUartBridge()
-    
+
   case STATE_CONN_UART_OPEN
     //Pass data between UART and VSP service
     BleVspUartBridge()
-    
+
   case else
   endselect
-  
+
   //Start the uart inactivity timer
   TimerStart(STATE_TIMER,idleTimeoutMs,0)
 endfunc 1
@@ -547,14 +538,14 @@ function HndlrVspRx()
     NewState(STATE_CONN_UART_OPEN)
     //Pass data between UART and VSP service
     BleVspUartBridge()
-    
+
   case STATE_CONN_UART_OPEN
     //Pass data between UART and VSP service
     BleVspUartBridge()
-    
+
   case else
   endselect
-  
+
   //Start the uart inactivity timer
   TimerStart(STATE_TIMER,idleTimeoutMs,0)
 endfunc 1
@@ -569,14 +560,14 @@ function HndlrVspTxEmpty()
     NewState(STATE_CONN_UART_OPEN)
     //Pass data between UART and VSP service
     BleVspUartBridge()
-    
+
   case STATE_CONN_UART_OPEN
     //Pass data between UART and VSP service
     BleVspUartBridge()
-    
+
   case else
   endselect
-  
+
   //Start the uart inactivity timer
   TimerStart(STATE_TIMER,idleTimeoutMs,0)
 endfunc 1
@@ -596,7 +587,7 @@ function HndlrBleMsg(nMsgId, nCtx)
     //There has been a change in the connection parameters
     _OnConnParmChg(nCtx)
 
-  case else        
+  case else
     #cmpif 0x00000004 : DbgMsgVal("Unprocessed nMsgId",nMsgId)
   endselect
 endfunc 1
@@ -608,17 +599,16 @@ function HndlrDisCon(hndl as integer, rsn as integer)
   #cmpif 0x00000004 : DbgMsg("Disconnect")
 
   UartReOpen()
-  
-  OnDisconnection(hndl) //Do your custom stuff in this function 
+
+  OnDisconnection(hndl) //Do your custom stuff in this function
 
   hVspConn = INVALID_CONN_HANDLE
 
   NewState(STATE_IDLE_UART_OPEN)
-  
+
   //Start Adverts
   AdvertsStart()
-  
-endfunc 1  
+endfunc 1
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -628,13 +618,13 @@ function HndlrUartTxEmpty()
     //Start the uart inactivity timer
     TimerStart(STATE_TIMER,UART_MAX_CHARACTER_TIMEOUT_MS,0)
     //remain in this state
-  
+
   case STATE_CONN_UART_OPEN
     //Pass data between UART and VSP service
     BleVspUartBridge()
     //Start the uart inactivity timer
     TimerStart(STATE_TIMER,idleTimeoutMs,0)
-    
+
   case else
   endselect
 endfunc 1
@@ -643,7 +633,7 @@ endfunc 1
 //------------------------------------------------------------------------------
 function HndlrDetectPinRx()
   UartReOpen()
-  
+
   select curState
   case STATE_IDLE_UART_CLOSE
     //Start the uart inactivity timer

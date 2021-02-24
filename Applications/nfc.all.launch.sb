@@ -1,7 +1,27 @@
 //******************************************************************************
-// Example App File : nfc.all.launch.sb
+// Copyright (c) 2021, Laird Connectivity
 //
-// TODO: this description
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+// IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// SPDX-License-Identifier:ISC
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++++                                                                      ++
+// +++++  When UwTerminal downloads the app it will store it as a filenname   ++
+// +++++  which consists of all characters up to the first . and excluding it ++
+// +++++                                                                      ++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
 // simple app that creates 4 NDEF records (Windows launcher, android launcher, text, url)
 //
 //******************************************************************************
@@ -80,7 +100,7 @@ function NFC_AddWP(ndHandle, ByVal AppID$)
     dim Lang$ : Lang$ = ""
     dim Payload$ : Payload$ = "\00\01\0CWindowsPhone&{" + AppID$ + "}\00\01\20"
     rc = NfcNdefRecAddGeneric(ndHandle, 3, Type$, ID$, Lang$, 0xFFFFFFFF, Payload$)
-    AssertRC(rc, 84)
+    AssertRC(rc, 103)
 endfunc rc
 
 function NFC_AddAndroid(ndHandle, ByVal AppPackage$)
@@ -89,7 +109,7 @@ function NFC_AddAndroid(ndHandle, ByVal AppPackage$)
     dim ID$ : ID$= ""
     dim Lang$ : Lang$ = ""
     rc = NfcNdefRecAddGeneric(ndHandle, 4, Type$, ID$, Lang$, 0xFFFFFFFF, AppPackage$)
-    AssertRC(rc, 94)
+    AssertRC(rc, 112)
 endfunc rc
 
 function CompressURL$(URL$)
@@ -248,7 +268,7 @@ function NFC_AddURL(ndHandle, ByVal URL$)
 
     //Add URL
     rc = NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, URL$)
-    AssertRC(rc, 253)
+    AssertRC(rc, 271)
 endfunc rc
 
 function NFC_AddText(ndHandle, ByVal Text$)
@@ -258,7 +278,7 @@ function NFC_AddText(ndHandle, ByVal Text$)
     dim Lang$ : Lang$= " en" //This is the language code, change it to your desired language code if not using English text
     rc = strsetchr(Lang$, strlen(Lang$)-1, 0) //Prepend the language code length and sets encoding to UTF-8
     rc = NfcNdefRecAddGeneric(ndHandle, 1, Type$, ID$, Lang$, 0xFFFFFFFF, Text$)
-    AssertRC(rc, 263)
+    AssertRC(rc, 281)
 endfunc rc
 
 //******************************************************************************
@@ -276,15 +296,15 @@ OnEvent  EVNFC  call HandlerNfc
 
 //Enable NFC hardware interface, it already is, so will succeed
 rc = NfcHardwareState(0, 1)
-AssertRC(rc, 281)
+AssertRC(rc, 299)
 
 //Open NFC and return the handle
 rc = NfcOpen(0, "\00", nfcHandle)
-AssertRC(rc, 285)
+AssertRC(rc, 303)
 
 //Create a new NDEF message object that has a maximum size of 128 bytes
 rc = NfcNdefMsgNew(256, ndefHandle)
-AssertRC(rc, 289)
+AssertRC(rc, 307)
 
 //Add a windows phone launcher
 rc = NFC_AddWP(ndefHandle, "60332576-f8e3-4790-9677-9659bcde8a68")
@@ -306,11 +326,11 @@ endif
 
 //Commit the NDEF message to the stack
 rc = NfcNdefMsgCommit(nfcHandle,ndefHandle)
-AssertRC(rc, 311)
+AssertRC(rc, 329)
 
 //Enable field Sense
 rc = NfcFieldSense(nfcHandle,1)
-AssertRC(rc, 315)
+AssertRC(rc, 333)
 
 //------------------------------------------------------------------------------
 // Wait for an event.

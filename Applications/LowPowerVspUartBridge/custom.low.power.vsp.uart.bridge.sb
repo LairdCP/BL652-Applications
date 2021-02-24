@@ -1,5 +1,5 @@
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Copyright (c) 2017, Laird                                                  ++
+// Copyright (c) 2017-2021, Laird Connectivity                                ++
 //                                                                            ++
 // Permission to use, copy, modify, and/or distribute this software for any   ++
 // purpose with or without fee is hereby granted                              ++
@@ -25,7 +25,7 @@
 // +++++                                                                      ++
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
-// This file is included in "$autorun$.low.power.vsp.uart.bridge.sb" and 
+// This file is included in "$autorun$.low.power.vsp.uart.bridge.sb" and
 // provides custom behavior for the low power vsp to uart bridge. This file
 // contains function and subroutines that are depicted in red colour in
 // the state machine diagram shown in "LowPowerVspUartBridge.flo"
@@ -71,7 +71,7 @@
 // ------------------------------------------------------
 //
 // Higher 16 bits used for feature set
-//   0x00000000 : 
+//   0x00000000 :
 //
 // Lower 16 bits used for debugging
 //   0x00000001 : Enable debugging messages
@@ -101,12 +101,12 @@
 
 
 //Size of VSP buffers (0 uses default)
-#define VSP_TX_BUFLEN                                 512  
-#define VSP_RX_BUFLEN                                 512  
+#define VSP_TX_BUFLEN                                 512
+#define VSP_RX_BUFLEN                                 512
 
 //Size of Uart buffers (0 uses default)
-#define UART_TX_BUFLEN                                512  
-#define UART_RX_BUFLEN                                512  
+#define UART_TX_BUFLEN                                512
+#define UART_RX_BUFLEN                                512
 
 //Baudrate to use when uart is open
 #define UART_BAUDRATE                                 115200
@@ -131,7 +131,7 @@
 //Advertise type (0==Connectable, 1==do_not_use,  2&3 ==Not Connectable)
 #define ADVERT_TYPE                                   0
 //Advertising interval -- higher the number, lower the current consumption
-//Recommended range 20 to 10000 
+//Recommended range 20 to 10000
 #define ADV_INTERVAL_MS                               200
 //Advertise timeout (0==forever)
 #define ADV_TIMEOUT_MS                                0
@@ -210,7 +210,7 @@
 #cmpif 0x00000003 : endsub
 
 //------------------------------------------------------------------------------
-#cmpif 0x00000004 : dim dbgmsg$  //use this to create a message for DbgMsg() 
+#cmpif 0x00000004 : dim dbgmsg$  //use this to create a message for DbgMsg()
 //------------------------------------------------------------------------------
 #cmpif 0x00000004 : sub DbgMsg(byval msg$ as string)
 #cmpif 0x00000004 :     print "\n## ";msg$
@@ -226,7 +226,7 @@
 //------------------------------------------------------------------------------
 #cmpif 0x00000004 : sub DbgMsgVal$(byval msg$ as string, byref vl$ as string)
 #cmpif 0x00000004 :     print "\n## ";msg$;" ";vl$
-#cmpif 0x00000004 : endsub 
+#cmpif 0x00000004 : endsub
 
 //******************************************************************************
 // Custom Global Variable Declarations
@@ -252,17 +252,17 @@ endsub
 // state variable curState has been set to STATE_IDLE_UART_OPEN
 //------------------------------------------------------------------------------
 sub OnStartupDone()
-
+  dim rc
   //**************************************************************************
   //*** Using LED0 to indicate state of uart open (ON) / close (OFF)
   //*** USING LED1 to indicate state of BLE connection (ON for connected)
   //**************************************************************************
   rc=gpiosetfunc(17,2,0)  //Sets LED 0 to digital out low
-    #cmpif 0x00000003 : AssertRC(rc, 50950)
+    #cmpif 0x00000003 : AssertRC(rc, 261)
   rc=gpiosetfunc(19,2,0)  //Sets LED 1 to digital out low
-    #cmpif 0x00000003 : AssertRC(rc, 50970)
+    #cmpif 0x00000003 : AssertRC(rc, 263)
   rc=gpiosetfunc(3,2,0)   //Disables the temperature sensor
-    #cmpif 0x00000003 : AssertRC(rc, 50990)
+    #cmpif 0x00000003 : AssertRC(rc, 265)
   //**************************************************************************
 
 endsub
@@ -299,15 +299,15 @@ endfunc 0 // 0 means allow closure of uart
 //------------------------------------------------------------------------------
 sub OnUartClose()
   // hVspConn will be INVALID_CONN_HANDLE if not in a connection
-  
+
   //****************USING LED0 TO INDICATE STATE OF UART OPEN/CLOSE***********
   gpiowrite(17,0)  //Sets LED 0 to low
-  //**************************************************************************  
-  
+  //**************************************************************************
+
 endsub
 
 //------------------------------------------------------------------------------
-// Called on uart is opened. The parameter ==0 when no connection, and 1 when 
+// Called on uart is opened. The parameter ==0 when no connection, and 1 when
 // in a BLE connected state
 //------------------------------------------------------------------------------
 sub OnUartOpen(fConn)
@@ -317,16 +317,16 @@ sub OnUartOpen(fConn)
 
     //****************USING LED0 TO INDICATE STATE OF UART OPEN/CLOSE***********
     gpiowrite(17,1)  //Sets LED 0 to high
-    //**************************************************************************  
-  
+    //**************************************************************************
+
   else
     print MSG_UART_OPEN_NOCONN  //!OP!
 
     //****************USING LED0 TO INDICATE STATE OF UART OPEN/CLOSE***********
     gpiowrite(17,1)  //Sets LED 0 to high
-    //**************************************************************************  
+    //**************************************************************************
   endif
-  
+
 endsub
 
 //------------------------------------------------------------------------------
@@ -344,7 +344,7 @@ endsub
 //------------------------------------------------------------------------------
 sub OnConnect(hConn,intrvl,sprvto,slat)
   print MSG_CONNECT   //^CN^
-  
+
   //****************USING LED1 TO INDICATE CONNECTION STATE*******************
   gpiowrite(19,1)  //Sets LED 0 to high
   //**************************************************************************
@@ -357,11 +357,11 @@ endsub
 //   sprvto = link supervision timeeout in microseconds
 //   slat   = slave latency
 //------------------------------------------------------------------------------
-sub OnConnParmChange(hConn,intrvl,sprvto,slat)      
+sub OnConnParmChange(hConn,intrvl,sprvto,slat)
   #cmpif 0x00000008 : print "\n## Conn :: Interval=";intrvl;",Supervision Tout=";sprvto;",Slave Latency=";slat
 
   print MSG_CONN_PARM_START;intrvl;",";sprvto;",";slat;MSG_CONN_PARM_END  //^PA x,y,z^
-  
+
 endsub
 
 //------------------------------------------------------------------------------
@@ -369,7 +369,7 @@ endsub
 //------------------------------------------------------------------------------
 sub OnDisconnection(hConn)
   print MSG_DISCONNECT   //!DI!
-  
+
   //****************USING LED1 TO INDICATE CONNECTION STATE*******************
   gpiowrite(19,0)  //Sets LED 0 to low
   //**************************************************************************
