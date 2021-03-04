@@ -3,8 +3,8 @@
 //#############################################################################
 //
 // It is very highly recommended that this file is NOT modified by non-Laird
-// developers unless you request it to be updated in the master file maintained
-// by Laird
+// Connectivity developers unless you request it to be updated in the master
+// file maintained by Laird Connectivity
 //
 //******************************************************************************
 // Definitions
@@ -15,6 +15,8 @@
 #define SREGNUM_START_16BIT                       200
 #define SREGNUM_START_32BIT                       300
 #define SREGNUM_START_STR                         0
+#define SREGNUM_OFFSET_16BIT                      0x10000
+#define SREGNUM_OFFSET_32BIT                      0x20000
 
 //AT Response Error
 #define RSP_SUSPEND                               -1
@@ -61,31 +63,119 @@
 //#define RSP_ERROR_UNKNOWN_AG_CMD                  43
 //#define RSP_ERROR_BUSY_TRY_LATER                  44
 //#define RSP_ERROR_NOT_ALLOWED                     45
-#define RSP_ERROR_GPIO_NOT_AVAILABLE                46
-#define RSP_ERROR_TOOFEWARGS                        47
-#define RSP_ERROR_TOOMANYARGS                       48
-#define RSP_ERROR_INVALID_HEXSTR                    49
-#define RSP_ERROR_SAVE_FAIL                         50
-#define RSP_ERROR_RESTORE_FAIL                      51
-#define RSP_ERROR_VSP_OPENFAIL                      52
-#define RSP_ERROR_ADV_TYPE                          53
-#define RSP_ERROR_INVALID_UUID                      54
-#define RSP_ERROR_SVC_NOTENDED                      55
-#define RSP_ERROR_CHAR_NOTENDED                     56
-#define RSP_ERROR_SVC_NOTSTARTED                    57
-#define RSP_TOO_MANY_CHARACTERISTICS                58
-#define RSP_ERROR_CHAR_NOTSTARTED                   59
-#define RSP_ERROR_NFC_NOT_OPEN                      60
-#define RSP_ERROR_NFC_NDEF_EMPTY                    61
-#define RSP_ERROR_DIRECTED_NOPEERADDR               62
-#define RSP_ERROR_INVALID_CHANMASK                  63
-#define RSP_ERROR_INVALID_REPORTS                   64
-#define RSP_ERROR_INVALID_RPT_DATA                  65
-#define RSP_ERROR_INVALID_RPT_DATA_SIZE             66
-#define RSP_ERROR_INVALID_OOBDATA                   67
+#define RSP_ERROR_GPIO_NOT_AVAILABLE              46
+#define RSP_ERROR_TOOFEWARGS                      47
+#define RSP_ERROR_TOOMANYARGS                     48
+#define RSP_ERROR_INVALID_HEXSTR                  49
+#define RSP_ERROR_SAVE_FAIL                       50
+#define RSP_ERROR_RESTORE_FAIL                    51
+#define RSP_ERROR_VSP_OPENFAIL                    52
+#define RSP_ERROR_ADV_TYPE                        53
+#define RSP_ERROR_INVALID_UUID                    54
+#define RSP_ERROR_SVC_NOTENDED                    55
+#define RSP_ERROR_CHAR_NOTENDED                   56
+#define RSP_ERROR_SVC_NOTSTARTED                  57
+#define RSP_TOO_MANY_CHARACTERISTICS              58
+#define RSP_ERROR_CHAR_NOTSTARTED                 59
+#define RSP_ERROR_NFC_NOT_OPEN                    60
+#define RSP_ERROR_NFC_NDEF_EMPTY                  61
+#define RSP_ERROR_DIRECTED_NOPEERADDR             62
+#define RSP_ERROR_INVALID_CHANMASK                63
+#define RSP_ERROR_INVALID_REPORTS                 64
+#define RSP_ERROR_INVALID_RPT_DATA                65
+#define RSP_ERROR_INVALID_RPT_DATA_SIZE           66
+#define RSP_ERROR_INVALID_OOBDATA                 67
+#define RSP_ERROR_UART_NEWLINE_EXPECTED           68
 
-#define RSP_ERROR_TO_BE_CODED                       99
+#define RSP_ERROR_TO_BE_CODED                     99
 
+
+#define NORDICERROR_INVALID_PARM                  0x6207
+#define NORDICERROR_INVALID_DATA                  0x620B
+#define NORDICERROR_INVALID_DATA_SIZE             0x620C
+
+#define ATTRIBUTE_AUTHENTICATED_LINK_REQUIRED     0x105
+#define ATTRIBUTE_ENCRYPTED_LINK_REQUIRED_A       0x010F
+#define ATTRIBUTE_ENCRYPTED_LINK_REQUIRED_B       0x0111
+
+#define ERROR_SUCCESS                             0x0000
+#define ERROR_BLE_GATTC_NO_MORE_DATA              0x6052
+#define ERROR_BLE_DATA_SIZE                       0x620C
+#define ERROR_BLE_RESOURCES                       0x6213
+#define ERROR_BLE_NO_TX_BUFFERS                   0x6804
+
+//BLE EVENT MSG IDs
+#define BLE_EVBLEMSGID_CONNECT                      0    //msgCTx = connection handle
+#define BLE_EVBLEMSGID_NEW_BOND                     10   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE            14   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_CONN_PARMS_UPDATE_FAIL       15   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_CONN_TO_BONDED_MASTER        16   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_UPDATED_BOND                 17   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_ENCRYPTED                    18   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_POWER_FAILURE_WARNING        19   //msgCTx = current supply voltage
+#define BLE_EVBLEMSGID_UNENCRYPTED                  20   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_DEVICENAME_WRITE             21   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_BOND_ADDFAIL                 22   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_SRVCCHNG_IND_SENT            23   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_SRVCCHNG_IND_CNF             24   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_AUTHENTICATION_FAILED        26   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_LESC_PAIRING                 27   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_LESC_OOB_REQUEST             28   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_AUTHENTICATION_SUCCESSFUL    29   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_CONFIRM_PAIRING              30   //msgCTx = connection handle
+#define BLE_EVBLEMSGID_CONFIRM_TIMED_OUT            31   //msgCTx = connection handle
+
+//Key type values that arrive in event EVBLE_AUTHKEY
+#define BLE_GAP_AUTH_KEY_TYPE_NONE                  0x00 // No key (may be used to reject)
+#define BLE_GAP_AUTH_KEY_TYPE_PASSKEY               0x01 // 6-digit Passkey
+#define BLE_GAP_AUTH_KEY_TYPE_OOB                   0x02 // Out Of Band data - legacy pairing
+#define BLE_GAP_AUTH_KEY_TYPE_LESC_OOB              0x03 // Out Of Band data - LESC pairing
+
+//Pass key values that arrive in event EVBLE_PASSKEY
+#define BLE_GAP_PASS_KEY_TYPE_PASSKEY               0x00 // Passkey - legacy pairing
+#define BLE_GAP_PASS_KEY_TYPE_NUMERICAL_COMPARE     0x01 // Numerical comparison - LESC pairing
+
+#define ATTRIBUTE_MTU_KEY_ID                        211    // CFG ID
+#define ATTRIBUTE_DATA_LENGTH_KEY_ID                212    // CFG ID
+#define USE_STRINT_IN_EVENTS_KEY_ID                 213    // CFG ID
+#define BLE_TRANSMISSION_BUFFERS_KEY_ID             215    // CFG ID
+#define BLE_MAX_PACKET_LENGTH_KEY_ID                216    // CFG ID
+#define BLE_EVENT_LENGTH_PER_CONN_KEY_ID            219    // CFG ID
+#define MAX_CONNS_SLAVE_KEY_ID                      205    // CFG ID
+#define MAX_CONNS_MASTER_KEY_ID                     206    // CFG ID
+
+#define FALSE                                       0
+#define TRUE                                        (!0)
+
+#define TRANSMISSION_POWER_DEFAULT_CONNECTION       3
+#define TRANSMISSION_POWER_ACTIVE_CONNECTION        4
+
+#define ArgIDTxBufLen                               1
+#define ArgIDRxBufLen                               2
+#define ArgIDVspServiceUuid                         3
+#define ArgIDRxUUID                                 4
+#define ArgIDTxUUID                                 5
+#define ArgIDMdmInUUID                              6
+#define ArgIDMdmOutUUID                             7
+#define ArgIDEncryptionReq                          8
+
+#define ArgIDDeviceName                             0
+#define ArgIDAddress                                0
+#define ArgIDConnectionTimeout                      0
+#define ArgIDMinConnInterval                        1
+#define ArgIDMaxConnInterval                        2
+#define ArgIDLinkSupervisionTimeout                 3
+#define ArgIDAppearance                             4
+#define ArgIDSlaveLatency                           5
+#define ArgIDDeviceNameWriteable                    6
+
+#define ArgIDGPIOSIO                                0
+#define ArgIDGPIOState                              1
+#define ArgIDGPIOFunction                           1
+#define ArgIDGPIOSubFunction                        2
+
+#define MS_IN_SECONDS                               1000
+#define US_IN_SECONDS                               1000000
 
 //******************************************************************************
 // Global Variable Declarations
