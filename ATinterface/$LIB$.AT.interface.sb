@@ -39,7 +39,7 @@
 // -------------------
 // ATinterface Library Version
 // -------------------
-#define LibVer                 "4.02"  //Library version  (ATI23)
+#define LibVer                 "4.03"  //Library version  (ATI23)
 //
 //******************************************************************************
 // Compiler/Debug options
@@ -78,6 +78,9 @@
 // -------------------
 // Application History
 // -------------------
+//
+//  4.03
+//    * Fixed issue with at+csec not returning the correct data
 //
 //  4.02
 //    * Fixed issue with VSP modem changes not being sent when transmission buffers are full
@@ -4344,7 +4347,7 @@ function _atPlusCSEC(byref cmdStr$, byref rspBuf$)
         if ExtractIntToken(sArg$[0], nArg[0]) == 0 then
             exitfunc RSP_ERROR_SYNTAX_ERROR
         endif
-        rc = BleGetCurConnParms(connHandles[nArg[0]], Flags, SecMode, SecLevel)
+        rc = BleGetCurConnSecInfo(connHandles[nArg[0]], Flags, SecMode, SecLevel)
         #cmpif 0x00000003 : AssertRC(4348)
     else
         exitfunc RSP_ERROR_SYNTAX_ERROR
