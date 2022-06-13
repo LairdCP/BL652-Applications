@@ -39,7 +39,7 @@
 // -------------------
 // ATinterface Library Version
 // -------------------
-#define LibVer                 "4.09"  //Library version  (ATI23)
+#define LibVer                 "4.10"  //Library version  (ATI23)
 //
 //******************************************************************************
 // Compiler/Debug options
@@ -78,6 +78,10 @@
 // -------------------
 // Application History
 // -------------------
+//
+//  4.10
+//    * Fixed issue with AT+LSCN0 and AT+LSCNX keeping the module advertising a
+//      VSP service but being in non-VSP idle mode
 //
 //  4.09
 //    * Fixed issue with advertising interval and type overwriting cached values
@@ -3059,6 +3063,13 @@ function _atPlusLSCN(byref cmdStr$, byref rspBuf$)
             //Change state
             advPrefix$ = "\nAD0:"
             NewState(STATE_IDLE_nonVSP)
+            //If advertising in progress stop it
+            AdvertsStop()
+            //Need to start advertising in idle
+            IdleAdvCommit()
+            //Start Advertising
+            IdleStartAdverts(idleAdvType, idleAdvIntvlMs)
+
             rc = RSP_OK
         else
             //Scan timeout has to be specified in milliseconds
