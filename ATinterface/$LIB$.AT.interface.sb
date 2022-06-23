@@ -39,7 +39,7 @@
 // -------------------
 // ATinterface Library Version
 // -------------------
-#define LibVer                 "4.10"  //Library version  (ATI23)
+#define LibVer                 "5.00"  //Library version  (ATI23)
 //
 //******************************************************************************
 // Compiler/Debug options
@@ -78,6 +78,19 @@
 // -------------------
 // Application History
 // -------------------
+//
+//  5.00
+//    * Removed VSP data pump timer as it served no purpose
+//    * Switched from write without response to write with response for modem
+//      characteristic writes
+//    * Increased BL654 default DLE attribute size to 160 bytes to increase
+//      throughput
+//    * Fixed issues with switching between client and server VSP modes whereby
+//      link would be unusable or firmware would enter an infinite loop
+//    * Fixed issues with writing VSP data that would sit in an inifite loop if
+//      the other side had a smaller MTU
+//    * Fixed issues with trying to write 0 byte of data to remote devices
+//    * Fixed issue with AT&F not erasing bonds
 //
 //  4.10
 //    * Fixed issue with AT+LSCN0 and AT+LSCNX keeping the module advertising a
@@ -255,8 +268,7 @@
 
 //Timer used for encryption timeout
 #define TMRNUM_ENCR_WAIT                            0
-#define TMRNUM_DATA_PUMP                            1
-#define TMRNUM_LOWPWR_UART                          2
+#define TMRNUM_LOWPWR_UART                          1
 
 //Maximum length of attribute length in metadata when creating the GATT table
 #define MAX_ATTRIBUTE_LEN                           250
@@ -2455,7 +2467,7 @@ sub VspMasterRtsSend(nState)
             else
                 tmpVar$ = "\00"
             endif
-            rc = BleGattcWriteCmd(connHandles[HCONN_VSP], hVspAttr[VSP_ATTR_INDEX_MDMIN], tmpVar$)
+            rc = BleGattcWrite(connHandles[HCONN_VSP], hVspAttr[VSP_ATTR_INDEX_MDMIN], tmpVar$)
             if rc == 0 then
                 vspAllowRx = nState
                 vspMdmSendFail = VSP_MDM_FAIL_CACHE_NONE
@@ -2470,8 +2482,10 @@ endsub
 //------------------------------------------------------------------------------
 // We know there is 1 character in the UART buffer so process it for ^ character
 // On exit tmpVar$ contains the single character that was read from the buffer
+// Returns 0 if receive buffer is empty and disconnect was intiiated, otherwise
+// returns 1
 //------------------------------------------------------------------------------
-sub PollForEscapeSeq()
+function PollForEscapeSeq()
     dim uLen
 
     tmpVar$ = ""
@@ -2497,6 +2511,7 @@ sub PollForEscapeSeq()
                     tmpVar$ = ""
                     //Change state
                     NewState(STATE_VSP_DISCONNECTING)
+                    exitfunc 0
                 else
                     //Take snapshot of this one
                     vspEscStart = GetTickCount()
@@ -2509,7 +2524,7 @@ sub PollForEscapeSeq()
     else
         vspEscCount = 0
     endif
-endsub
+endfunc 1
 
 //------------------------------------------------------------------------------
 // Initialise the UART
@@ -2935,7 +2950,10 @@ function _atampF(byref cmdStr$, byref rspBuf$)
     endif
     rc = SRegFactoryDef()
     if rc == RSP_OK then
-        reset(0)
+        rc = BleBondingEraseAll()
+        if rc == RSP_OK then
+            reset(0)
+        endif
     endif
 endfunc rc
 
@@ -5007,6 +5025,17 @@ function HndlrDisCon(hndl as integer, rsn as integer)
 
     select curState
     case STATE_VSP_DISCONNECTING, STATE_VSP_PAIRING, STATE_VSP_CARET_CONNECTED, STATE_VSP_FAST_CONNECTED
+        //Disable VSP-related event handlers
+        OnEvent EVNOTIFYBUF disable
+        OnEvent EVATTRNOTIFY disable
+        OnEvent EVUARTTXEMPTY disable
+        OnEvent EVVSPRX disable
+        OnEvent EVVSPTXEMPTY disable
+        OnEvent EVUARTTXEMPTY disable
+
+        //Clear UART buffer
+        UARTRecBuf$ = ""
+
         //Some other error while writing to a cccd
         if vspDisconSts <= 0 then
             //Assume a normal disconnection has happened
@@ -5102,7 +5131,8 @@ function HndlrUartRxVspOutFC()
     //Read data that has arrived through via the UART
     if (vspAllowTx == 1) then
         do
-            tmpVar = UartReadN(UARTRecBuf$, vspAttrMaxLen)
+            tmpVar = UartReadN(UARTRecBuf$, vspChunkLen)
+
             if tmpVar > 0 then
                 rc = BleGattcWriteCmd(connHandles[HCONN_VSP], hVspAttr[VSP_ATTR_INDEX_RX], UARTRecBuf$)
 
@@ -5114,17 +5144,15 @@ function HndlrUartRxVspOutFC()
 
                 //Wait for a BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE event and retry which is EVNOTIFYBUF in sb
                 case ERROR_BLE_NO_TX_BUFFERS, ERROR_BLE_RESOURCES
-                    TimerStart(TMRNUM_DATA_PUMP, vspPumpToutMs, 0)
                     exitfunc 1
 
                 case ERROR_BLE_DATA_SIZE
-                    tmpVar$ = StrSplitLeft$(UARTRecBuf$, vspAttrMaxLen)
+                    tmpVar$ = StrSplitLeft$(UARTRecBuf$, vspChunkLen)
                     rc = BleGattcWriteCmd(connHandles[HCONN_VSP], hVspAttr[VSP_ATTR_INDEX_RX], tmpVar$)
                     if rc != 0 then
                         //Did not manage to send it, so put it back in the original buffer (at the beginning)
                         UARTRecBuf$ = tmpVar$+UARTRecBuf$
                         if (rc == ERROR_BLE_NO_TX_BUFFERS) || (rc == ERROR_BLE_RESOURCES) then
-                            TimerStart(TMRNUM_DATA_PUMP, vspPumpToutMs, 0)
                             exitfunc 1
                         endif
                         #cmpif 0x00000040 : else
@@ -5137,7 +5165,7 @@ function HndlrUartRxVspOutFC()
 
                 endselect
             endif
-        dowhile tmpVar
+        dowhile (tmpVar > 0)
     endif
 endfunc 1
 
@@ -5148,22 +5176,13 @@ function HndlrUartRxVspOutSC()
     //Check number of bytes in receive buffer
     tmpVar = UartInfo(3)
     if tmpVar == 1 then
-        PollForEscapeSeq()    //On exit tmpVar$ contains what was read
+        if (PollForEscapeSeq() == 0) then    //On exit tmpVar$ contains what was read
+            //Disconnected connection so exit out
+            exitfunc 1
+        endif
         UARTRecBuf$ = UARTRecBuf$+tmpVar$
     endif
 endfunc HndlrUartRxVspOutFC()
-
-//------------------------------------------------------------------------------
-// This timer was started when notify buffers ran out while calling WriteCmd
-//------------------------------------------------------------------------------
-function HndlrTmrVspPump()
-    select curState
-    case STATE_VSP_CARET_CONNECTED, STATE_VSP_FAST_CONNECTED
-        rc = HndlrUartRxVspOutFC()
-
-    case else
-    endselect
-endfunc 1
 
 //------------------------------------------------------------------------------
 // A write to an attribute has been acked/nacked
@@ -5348,7 +5367,11 @@ function HndlrBridgeInS()
         //Check number of bytes in receive buffer
         uLen = UartInfo(3)
         if uLen == 1 then
-            PollForEscapeSeq()    //On exit tmpVar$ contains what was read from UART
+            if (PollForEscapeSeq() == 0) then    //On exit tmpVar$ contains what was read from UART
+                //Disconnected, so exit out
+                exitfunc 1
+            endif
+
             rc = BleVspWrite(tmpVar$)
         endif
     endif
@@ -5598,8 +5621,10 @@ function HndlrMessageApp(nMsgId, nCtx)
             OnEvent EVUARTRX    Call HndlrUartRxVspOutSC
             OnEvent EVNOTIFYBUF Call HndlrUartRxVspOutFC  //Not HndlrUartRxVspOutSC because escape seq cannot be sent by peer
         endif
+
         OnEvent EVATTRNOTIFY  Call HndlrNotifyVspOut
         OnEvent EVUARTTXEMPTY Call HndlrUartTxEmptyOut
+
         //Enable incoming data from peer
         VspMasterRtsSend(1)
         //Change state
@@ -5615,6 +5640,7 @@ function HndlrMessageApp(nMsgId, nCtx)
         SendUartData()
         //Change UART and VSP handlers
         #cmpif 0x00080000 : OnEvent EVVSPRXOVRN Call HndlrVspRxOverrun
+
         if nCtx == STATE_VSP_FAST_CONNECTED then
             #cmpif 0x00000004 : DbgMsg("HndlrUartRxVspInFC")
             OnEvent EVVSPRX       Call HndlrBridgeInF
@@ -5806,7 +5832,6 @@ endsub
 #cmpif 0x00000200 :
 #cmpif 0x00000200 : endfunc 1
 
-
 //******************************************************************************
 //Setup event handlers
 //******************************************************************************
@@ -5835,8 +5860,6 @@ OnEvent  EVBLE_EXTADV_RPT                    Call HndlrExtAdvRpt
 OnEvent  EVBLE_EXTSCN_RPT                    Call HndlrExtScnRpt
 OnEvent  EVBLE_EXTADV_END                    Call HndlrExtAdvEnd
 
-OnEvent EVTMR1                               Call HndlrTmrVspPump
-
 #cmpif 0x00020000 : OnEvent EVDISCPRIMSVC    Call HandlerPrimSvc
 #cmpif 0x00020000 : OnEvent EVDISCCHAR       Call HandlerCharDisc
 #cmpif 0x00020000 : OnEvent EVDISCDESC       Call HandlerDescDisc
@@ -5858,7 +5881,7 @@ OnEvent EVBLEOVERWRITEBOND                   Call HandlerOverwriteBond
 
 //Override GPIO detect change handler if UART low operation is enabled
 #cmpif 0x00400000 : OnEvent EVDETECTCHAN0    Call HndlrReopenUart
-#cmpif 0x00400000 : OnEvent EVTMR2           Call HndlrTmrLowPwrUart
+#cmpif 0x00400000 : OnEvent EVTMR1           Call HndlrTmrLowPwrUart
 
 #cmpif 0x00000200 : OnEvent EVGPIOCHAN0      Call HandlerButton2
 #cmpif 0x00000200 : OnEvent EVGPIOCHAN1      Call HandlerButton1
