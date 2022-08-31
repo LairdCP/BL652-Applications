@@ -39,7 +39,7 @@
 // -------------------
 // ATinterface Library Version
 // -------------------
-#define LibVer                 "5.00"  //Library version  (ATI23)
+#define LibVer                 "5.01"  //Library version  (ATI23)
 //
 //******************************************************************************
 // Compiler/Debug options
@@ -78,6 +78,10 @@
 // -------------------
 // Application History
 // -------------------
+//
+//  5.01
+//    * Added AT+BNDL command to show stats of trusted rolling/persistent
+//      database plus list of devices in both databases
 //
 //  5.00
 //    * Removed VSP data pump timer as it served no purpose
@@ -3394,6 +3398,26 @@ function _atPlusBNDX(byref cmdStr$, byref rspBuf$)
 endfunc RSP_OK
 
 //------------------------------------------------------------------------------
+//:/ at+bndl
+//------------------------------------------------------------------------------
+function _atPlusBNDL(byref cmdStr$, byref rspBuf$)
+	dim rc, nCap, nRoll, nPers, idx, addr$, ExtraInfo
+	nCap = BleBondingStats(nRoll, nPers)
+	print "\ncapacity: "; nCap; ", rolling: "; nRoll; ", persistent: ";nPers
+
+	for idx=0 to nCap
+		addr$ = ""
+		ExtraInfo = 0
+		rc = BleBondMngrGetInfo(idx, addr$, ExtraInfo)
+		if rc == 0 then
+			print "\n"; idx, StrHexize$(addr$), INTEGER.h'ExtraInfo
+		endif
+	next
+
+    #cmpif 0x00000003 : AssertRC(3356)
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
 // Process ATD command
 //:/ATD macaddress14hexbytes
 //:/ATD L macaddress14hexbytes      //for long-range connection
@@ -4475,6 +4499,9 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
 
     elseif strcmp(tmp$, "bndd") == 0 then
         rc = _atPlusBNDD(cmdStr$, rspBuf$)
+
+    elseif strcmp(tmp$, "bndl") == 0 then
+        rc = _atPlusBNDL(cmdStr$, rspBuf$)
 
     elseif strcmp(tmp$, "bndx") == 0 then
         rc = _atPlusBNDX(cmdStr$, rspBuf$)
