@@ -39,7 +39,7 @@
 // -------------------
 // ATinterface Library Version
 // -------------------
-#define LibVer                 "5.00"  //Library version  (ATI23)
+#define LibVer                 "5.02"  //Library version  (ATI23)
 //
 //******************************************************************************
 // Compiler/Debug options
@@ -78,6 +78,14 @@
 // -------------------
 // Application History
 // -------------------
+//
+//  5.02
+//    * Implemented GPIO indication for active and encrypted connections
+//      according to S registers 138/139 and polarity by S register 137
+//
+//  5.01
+//    * Added AT+BNDL command to show stats of trusted rolling/persistent
+//      database plus list of devices in both databases
 //
 //  5.00
 //    * Removed VSP data pump timer as it served no purpose
@@ -604,6 +612,11 @@ dim vspCmdModePin
 //Which means 0 is for -- there is a connection and 1 is for no connection
 dim vspDcdPin
 
+//These are the pins from S registers 138 (indicates an active connection)
+//and 139 (indicates an encrypted connection) and the polarity from S register 137
+dim sioConnActivePin, sioConnEncryptedPin
+dim sioConnAssertState, sioEncrAssertState
+
 //Total number of connections active
 dim connCount
 
@@ -618,6 +631,10 @@ dim metaHandles[MAX_METADATA_HANDLES + 1]
 
 //Connection handles. Index 0 is used for VSP Connection (as they are mutually exclusive)
 dim connHandles[MAX_CONNECTIONS + 1]
+
+//Connection encryption status (0=non, 1=encr).
+//Used for encrypted connection indication pin
+dim connIsEncrypted[MAX_CONNECTIONS + 1]
 
 //Char Handles that we manage - only index is sent to host
 dim charHandles[MAX_CHARACTERISTICS + 1]  //index 0 is never used
@@ -1128,13 +1145,13 @@ endfunc RSP_OK
 #cmpif    0x00400000 :         else
 #cmpif    0x00400000 :             //Closed, so configure the TX and RTS as outputs and adjust outputs
 #cmpif    0x00400000 :             rc = gpiosetfunc(UART_SIONUM_TX, SIOTYPE_DOUT, OUTPUT_INIT_HI)     //TX set high on default
-#cmpifand 0x00400103 :             AssertRC(1102)
+#cmpifand 0x00400103 :             AssertRC(1148)
 #cmpif    0x00400000 :             rc = gpiosetfunc(UART_SIONUM_RTS, SIOTYPE_DOUT, OUTPUT_INIT_HI)    //RTS set high to de-assert
-#cmpifand 0x00400103 :             AssertRC(1104)
+#cmpifand 0x00400103 :             AssertRC(1150)
 #cmpif    0x00400000 :             rc = GpioSetFunc(UART_SIONUM_RX, SIOTYPE_DIN, INPUT_PULL_UP)        //RX Pull high
-#cmpifand 0x00400103 :             AssertRC(1106)
+#cmpifand 0x00400103 :             AssertRC(1152)
 #cmpif    0x00400000 :             rc = GpioSetFunc(UART_SIONUM_CTS, SIOTYPE_DIN, INPUT_PULL_DOWN) //CTS Pull low
-#cmpifand 0x00400103 :             AssertRC(1108)
+#cmpifand 0x00400103 :             AssertRC(1154)
 #cmpif    0x00400000 :         endif
 #cmpif    0x00400000 :     else
 #cmpif    0x00400000 :         //Start the UART inactivity timer
@@ -1151,7 +1168,7 @@ endfunc RSP_OK
 #cmpif    0x00400000 :     if UartInfo(0) == 0 then
 #cmpif    0x00400000 :         //UART was actually closed so open it
 #cmpif    0x00400000 :         rc = UartOpen(UARTbaud, UARTTxBuf, UARTRxBuf, UARTFlags$)
-#cmpifand 0x00400103 :         AssertRC(1125)
+#cmpifand 0x00400103 :         AssertRC(1171)
 #cmpif    0x00400000 :     endif
 #cmpif    0x00400000 :     //Start the UART inactivity timer
 #cmpif    0x00400000 :     TimerStart(TMRNUM_LOWPWR_UART, UARTIdleToutMs, 0)
@@ -1210,10 +1227,10 @@ sub GetConnInfoRsp(hConn, byref rsp$, byref intrvl)
     dim addr$, sprvto, slat
 
     rc = BleGetCurConnParms(hConn, intrvl, sprvto, slat)
-    #cmpif 0x00000003 : AssertRC(1184)
+    #cmpif 0x00000003 : AssertRC(1230)
 
     rc = BleGetAddrFromConnHandle(hConn, addr$)
-    #cmpif 0x00000003 : AssertRC(1187)
+    #cmpif 0x00000003 : AssertRC(1233)
 
     sprint #rsp$, StrHexize$(addr$);", ";intrvl;", ";sprvto;", ";slat
 endsub
@@ -1271,7 +1288,7 @@ endsub
 sub SendRingRsp(hConn as integer, byref bufferStr$)
     dim addr$, isTrusted, keyInfo, rollAge, rollCount
     rc = BleGetAddrFromConnHandle(hConn, addr$)
-    #cmpif 0x00000003 : AssertRC(1245)
+    #cmpif 0x00000003 : AssertRC(1291)
 
     isTrusted = BleBondingIsTrusted(addr$, BOND_TRUSTED_AS_CENTRAL, keyInfo, rollAge, rollCount)
 
@@ -1588,7 +1605,7 @@ sub AdvertsStop()
     #cmpif 0x00000004 : DbgMsg("Called AdvertsStop()")
     if IsAdvertising() then
         rc = BleAdvertStop()
-        #cmpif 0x00000003 : AssertRC(1562)
+        #cmpif 0x00000003 : AssertRC(1608)
         #cmpif 0x00000004 : DbgMsg("Adverts Stopped")
     endif
 endsub
@@ -1600,7 +1617,7 @@ sub ScanningStop()
     #cmpif 0x00000004 : DbgMsg("Called ScanningStop()")
     if IsScanning() then
         rc = BleScanStop()
-        #cmpif 0x00000003 : AssertRC(1574)
+        #cmpif 0x00000003 : AssertRC(1620)
         #cmpif 0x00000004 : DbgMsg("Scanning Stopped")
     endif
 endsub
@@ -1617,7 +1634,7 @@ function ScanningStart(tout, filter$, rsi, scntype)
         //Use the legacy scanning function
         rc = BleScanStart(tout, ADV_FILTER_NONE)
     endif
-    #cmpif 0x00000008 :     AssertRC(1591)
+    #cmpif 0x00000008 :     AssertRC(1637)
 
     //Set up the filtering parameters for the scan reporting
     if rc == 0 then
@@ -1714,7 +1731,7 @@ function VspOpen()
     //#cmpif 0x00000004 : DbgMsgVal("VSP Txbuf Size ", nArg[1])
     //#cmpif 0x00000004 : DbgMsgVal("VSP Rxbuf Size ", nArg[2])
     rc = BleVSPOpenEx(nArg[ArgIDTxBufLen], nArg[ArgIDRxBufLen], vspFlags, nArg[ArgIDVspServiceUuid], nArg[ArgIDRxUUID], nArg[ArgIDTxUUID], nArg[ArgIDMdmInUUID], nArg[ArgIDMdmOutUUID])
-    #cmpif 0x00000003 : AssertRC(1688)
+    #cmpif 0x00000003 : AssertRC(1734)
     if rc == 0 then
         vspAdded = 1
     endif
@@ -1730,10 +1747,10 @@ sub GenAdvCreateMinimal(byref advRpt$, byref scRpt$)
     nAppearance = SRegGet(CfgId_Appearance)
 
     rc = BleAdvRptInit(advRpt$, flgsAD, nAppearance, MaxDevNameSize)
-    #cmpif 0x00000003 : AssertRC(1704)
+    #cmpif 0x00000003 : AssertRC(1750)
 
     rc = BleScanRptInit(scRpt$)
-    #cmpif 0x00000003 : AssertRC(1707)
+    #cmpif 0x00000003 : AssertRC(1753)
 endsub
 
 //------------------------------------------------------------------------------
@@ -1750,17 +1767,17 @@ sub VspAdvCreateCommit()
     if vspLongRange then
         //Advertise for VSP on LE_CODED
         rc = BleAdvSetCreate(SETID_DEFAULT , EXTADVPROP_CONNpEXT , EXTADVPRIPHY_LECODED , EXTADV_FILTER_NONE , emptyAddr$ , "")
-        #cmpif 0x00000003 : AssertRC(1724)
+        #cmpif 0x00000003 : AssertRC(1770)
         rc = BleExtAdvRptAddUuid128(advRpt$, handleVspServiceUuid, INVALID_UUID_HANDLE, INVALID_UUID_HANDLE, INVALID_UUID_HANDLE, INVALID_UUID_HANDLE, INVALID_UUID_HANDLE)
-        #cmpif 0x00000003 : AssertRC(1726)
+        #cmpif 0x00000003 : AssertRC(1772)
         rc = BleAdvSetNewData(SETID_DEFAULT, advRpt$, scRpt$)
     else
         //Advertise for VSP on 1MPHY
         rc = BleAdvRptAddUuid128(scRpt$, handleVspServiceUuid)
-        #cmpif 0x00000003 : AssertRC(1731)
+        #cmpif 0x00000003 : AssertRC(1777)
         rc = BleAdvRptsCommit(advRpt$, scRpt$)
     endif
-    #cmpif 0x00000003 : AssertRC(1734)
+    #cmpif 0x00000003 : AssertRC(1780)
 
     #cmpif 0x00000001 : print "\n## VspAdv ";strhexize$(advRpt$)
     #cmpif 0x00000001 : print "\n## VspScn ";strhexize$(scRpt$)
@@ -1784,7 +1801,7 @@ sub VspStartAdverts()
             fExtAdvertising = FALSE
         endif
     endif
-    #cmpif 0x00000003 : AssertRC(1758)
+    #cmpif 0x00000003 : AssertRC(1804)
     #cmpif 0x00000004 : DbgMsg("Vsp Adverts Started")
 endsub
 
@@ -1808,7 +1825,7 @@ sub IdleAdvCommit()
     else
         rc = BleAdvRptsCommit(idleAdvRpt$, idleScnRpt$)
     endif
-    #cmpif 0x00000003 : AssertRC(1782)
+    #cmpif 0x00000003 : AssertRC(1828)
 endsub
 
 //------------------------------------------------------------------------------
@@ -1816,7 +1833,7 @@ endsub
 //------------------------------------------------------------------------------
 sub IdleStartAdverts(advType, adIntervalMs)
     rc = BleAdvertStart(advType, emptyAddr$, adIntervalMs, ADV_DURATION_FOREVER, ADV_FILTER_NONE)
-    #cmpif 0x00000003 : AssertRC(1790)
+    #cmpif 0x00000003 : AssertRC(1836)
     #cmpif 0x00000004 : DbgMsg("Idle Adverts Started")
     if rc == 0 then
         fExtAdvertising = FALSE
@@ -1842,6 +1859,52 @@ sub VspDcdDeassert()
 endsub
 
 //------------------------------------------------------------------------------
+// Call this to assert the active conn pin
+//------------------------------------------------------------------------------
+sub SioConnAssert()
+    if sioConnActivePin >= 0 then
+        GpioWrite(sioConnActivePin, sioConnAssertState)
+    endif
+endsub
+
+//------------------------------------------------------------------------------
+// Call this to deassert the active conn pin
+//------------------------------------------------------------------------------
+sub SioConnDeassert()
+    if sioConnActivePin >= 0 then
+        GpioWrite(sioConnActivePin, !sioConnAssertState)
+    endif
+endsub
+
+//------------------------------------------------------------------------------
+// Call this to assert the encrypted conn pin
+//------------------------------------------------------------------------------
+sub SioEncrAssert()
+    if sioConnEncryptedPin >= 0 then
+        GpioWrite(sioConnEncryptedPin, sioEncrAssertState)
+    endif
+endsub
+
+//------------------------------------------------------------------------------
+// Call this to deassert the encrypted conn pin
+//------------------------------------------------------------------------------
+sub SioEncrDeassert()
+    dim i, enc
+    if sioConnEncryptedPin >= 0 then
+        enc = FALSE  //We start assuming no encrypted connections
+        for i = 1 to MAX_CONNECTIONS
+            if connIsEncrypted[i] == TRUE then
+                enc = TRUE  //We found one encrypted connection
+                break
+            endif
+        next
+        if enc == FALSE then  //If loop ended without encrypted connection
+            GpioWrite(sioConnEncryptedPin, !sioEncrAssertState)
+        endif
+    endif
+endsub
+
+//------------------------------------------------------------------------------
 // Currently only need to initialise the GPIO for vspCmdMode Pin in Fast mode
 // or when low power UART operation is compile time enabled then the same pin
 // is used by the host to reopen the UART
@@ -1858,24 +1921,24 @@ sub InitGPIO()
     if vspCmdModePin >= 0 then
         //Set it as input
         rc = GpioSetFunc(vspCmdModePin, SIOTYPE_DIN, INPUT_PULL_UP)
-        #cmpif 0x00000003 : AssertRC(1836)
+        #cmpif 0x00000003 : AssertRC(1924)
 
         if fLowPowerUart then
             //And arrange so that we will get an event each time it goes from 0 to 1
             //because when that pin is high, it means host wants to force the UART to
             //be open
             rc = GpioSetFunc(vspCmdModePin, SIOTYPE_DIN, INPUT_PULL_DOWN)
-            #cmpif 0x00000003 : AssertRC(1843)
+            #cmpif 0x00000003 : AssertRC(1931)
 
             rc = GpioAssignEvent(0, vspCmdModePin, 0)
         else
             //And arrange so that we will get an event each time it goes from 1 to 0
             rc = GpioSetFunc(vspCmdModePin, SIOTYPE_DIN, INPUT_PULL_UP) //pullup resistor
-            #cmpif 0x00000003 : AssertRC(1849)
+            #cmpif 0x00000003 : AssertRC(1937)
 
             rc = GpioAssignEvent(0, vspCmdModePin, 1)
         endif
-        #cmpif 0x00000003 : AssertRC(1853)
+        #cmpif 0x00000003 : AssertRC(1941)
 
     endif
 
@@ -1884,7 +1947,26 @@ sub InitGPIO()
     if vspDcdPin >= 0 then
         //Set it as an output
         rc = GpioSetFunc(vspDcdPin, SIOTYPE_DOUT, DCD_DEASSERT_STATE)
-        #cmpif 0x00000003 : AssertRC(1862)
+        #cmpif 0x00000003 : AssertRC(1950)
+    endif
+
+    //Cache the connection indication pins polarity
+    tmpVar = SRegGet(CfgId_CONNENCRPol)
+    sioConnAssertState = (tmpVar & 0x01) >> 0
+    sioEncrAssertState = (tmpVar & 0x02) >> 1
+
+    //Cache the active connection indication pin and set as output if one specified
+    sioConnActivePin = SRegGet(CfgId_CONNPin)
+    if sioConnActivePin >= 0 then
+        rc = GpioSetFunc(sioConnActivePin, SIOTYPE_DOUT, !sioConnAssertState)
+        #cmpif 0x00000003 : AssertRC(1962)
+    endif
+
+    //Cache the encrypted connection indication pin and set as output if one specified
+    sioConnEncryptedPin = SRegGet(CfgId_ENCRPin)
+    if sioConnEncryptedPin >= 0 then
+        rc = GpioSetFunc(sioConnEncryptedPin, SIOTYPE_DOUT, !sioEncrAssertState)
+        #cmpif 0x00000003 : AssertRC(1969)
     endif
 endsub
 
@@ -1953,7 +2035,7 @@ function IsTrustedPeer(hConn)
 
     //Get address of connected device
     rc = BleGetAddrFromConnHandle(hConn, curAddr$)
-    #cmpif 0x00000003 : AssertRC(1931)
+    #cmpif 0x00000003 : AssertRC(2038)
     #cmpif 0x00000004 : dim a$ : a$ = StrHexize$(curAddr$)
     #cmpif 0x00000004 : DbgMsgVal$("Master Addr = ", a$)
 
@@ -2017,7 +2099,7 @@ function FindCharOrDesc()
         //#cmpif 0x00000004 : DbgMsg("BleGattcFindDesc")
         rc = BleGattcFindDesc(connHandles[HCONN_VSP], vspSvcUuid, 0, charUuid, 0, cccdUuid, 0)
     endif
-    #cmpif 0x00000003 : AssertRC(1995)
+    #cmpif 0x00000003 : AssertRC(2102)
 endfunc rc
 
 //------------------------------------------------------------------------------
@@ -2037,7 +2119,7 @@ function CccdsEnable()
                 //Found attr handle for a cccd
                 tmpVar$ = "\01\00"
                 rc = BleGattcWrite(connHandles[HCONN_VSP], hAttr, tmpVar$)
-                #cmpif 0x00000003 : AssertRC(2015)
+                #cmpif 0x00000003 : AssertRC(2122)
                 vspFindIndex = i
                 exitfunc 1
             endif
@@ -2110,7 +2192,7 @@ sub VspEnterConnState(msgId)
         #cmpif 0x00000004 : DbgMsg("Going For CARET")
         rc = SendMsgApp(msgId, STATE_VSP_CARET_CONNECTED)
     endif
-    #cmpif 0x00000003 : AssertRC(2088)
+    #cmpif 0x00000003 : AssertRC(2195)
 
     //Negotiate ATT_MTU if ATS213 is not the default minimum value
     if vspIsOutGoing != FALSE then
@@ -2146,10 +2228,11 @@ sub OnNonVspConnection(hConn)
     if nodeIdx == 0 then
         //Disconnect immediately
         rc = BleDisconnect(hConn)
-        #cmpif 0x00000003 : AssertRC(2124)
+        #cmpif 0x00000003 : AssertRC(2231)
     else
         //Cache the connection handle
         connHandles[nodeIdx] = hConn
+        connIsEncrypted[nodeIdx] = FALSE
         //Send an CONNECT response
         SendNonVspConnect(nodeIdx, UARTSndBuf$)
         //Change state
@@ -2253,6 +2336,8 @@ sub OnEncrypted(hConn)
 
     case STATE_nonVSP_CONNECTED
         nIdx = GetIdxFromHConn(hConn)
+        connIsEncrypted[nIdx] = TRUE
+        sioEncrAssert()
         sendMsg = 2
 
     case else
@@ -2506,7 +2591,7 @@ function PollForEscapeSeq()
                     vspDisconSts = CONN_ERROR_USER_DISCON
                     //Some other error, so just drop the connection
                     rc = BleDisconnect(connHandles[HCONN_VSP])
-                    #cmpif 0x00000003 : AssertRC(2482)
+                    #cmpif 0x00000003 : AssertRC(2594)
                     //The ^ caret will not get through
                     tmpVar$ = ""
                     //Change state
@@ -2548,7 +2633,7 @@ sub InitUART()
 
     //Reopen the UART with comms parms from S Registers
     rc = UartOpen(UARTbaud, UARTTxBuf, UARTRxBuf, UARTFlags$)
-    #cmpif    0x00000003 : AssertRC(2523)
+    #cmpif    0x00000003 : AssertRC(2636)
 
     #cmpif    0x00400000 : //Start the UART inactivity timer if we are in low power operation
     #cmpif    0x00400000 : TimerStart(TMRNUM_LOWPWR_UART, UARTIdleToutMs, 0)
@@ -2591,7 +2676,7 @@ sub GapServiceGetDefs()
     //Set the Tx power level
     tmpVal = SRegGet(CfgId_TxPower_dBm)
     rc = BleTxPowerSet(tmpVal)
-    #cmpif 0x00000003 : AssertRC(2566)
+    #cmpif 0x00000003 : AssertRC(2679)
 
     //Set min/max connection intervals
     nArg[ArgIDMinConnInterval] = CONN_INTERVAL_MIN_ASPERIPH_US
@@ -2619,7 +2704,7 @@ endsub
 function GapServiceUpdate()
     //Initialise the GAP service with the connection interval data and device name
     rc = BleGapSvcInit(sArg$[ArgIDDeviceName], nArg[ArgIDDeviceNameWriteable], nArg[ArgIDAppearance], nArg[ArgIDMinConnInterval], nArg[ArgIDMaxConnInterval], nArg[ArgIDLinkSupervisionTimeout], nArg[ArgIDSlaveLatency])
-    #cmpif 0x00000003 : AssertRC(2594)
+    #cmpif 0x00000003 : AssertRC(2707)
 endfunc rc
 
 //------------------------------------------------------------------------------
@@ -2630,17 +2715,17 @@ sub PairingConfig()
     tmpVar = SRegGet(CfgId_PairingIoCapability)
     pairIoCapCache = abs(tmpVar)
     rc = BleSecMngrIoCap(pairIoCapCache)
-    #cmpif 0x00000003 : AssertRC(2605)
+    #cmpif 0x00000003 : AssertRC(2718)
 
     if tmpVar<0 then
         //OOB pairing is preferred
         rc = BleSecMngrOOBPref(1)
-        #cmpif 0x00000003 : AssertRC(2610)
+        #cmpif 0x00000003 : AssertRC(2723)
     endif
 
     //Enable LESC preference
     rc = BleSecMngrLescPairingPref(1)
-    #cmpif 0x00000003 : AssertRC(2615)
+    #cmpif 0x00000003 : AssertRC(2728)
 endsub
 
 //------------------------------------------------------------------------------
@@ -2658,11 +2743,11 @@ sub CacheConfigScanParms()
 
     //And finally set them
     rc = BleScanConfig(0, scanIntervalMs)
-    #cmpif 0x00000003 : AssertRC(2633)
+    #cmpif 0x00000003 : AssertRC(2746)
     rc = BleScanConfig(1, scanWindowMs)
-    #cmpif 0x00000003 : AssertRC(2635)
+    #cmpif 0x00000003 : AssertRC(2748)
     rc = BleScanConfig(2, scanType)
-    #cmpif 0x00000003 : AssertRC(2637)
+    #cmpif 0x00000003 : AssertRC(2750)
 endsub
 
 //------------------------------------------------------------------------------
@@ -3382,7 +3467,7 @@ function _atPlusBNDD(byref cmdStr$, byref rspBuf$)
     endif
 
     rc = BleBondingEraseKey(sArg$[0])
-    #cmpif 0x00000003 : AssertRC(3347)
+    #cmpif 0x00000003 : AssertRC(3470)
 endfunc RSP_OK
 
 //------------------------------------------------------------------------------
@@ -3390,7 +3475,27 @@ endfunc RSP_OK
 //------------------------------------------------------------------------------
 function _atPlusBNDX(byref cmdStr$, byref rspBuf$)
     rc = BleBondingEraseAll()
-    #cmpif 0x00000003 : AssertRC(3355)
+    #cmpif 0x00000003 : AssertRC(3478)
+endfunc RSP_OK
+
+//------------------------------------------------------------------------------
+//:/ at+bndl
+//------------------------------------------------------------------------------
+function _atPlusBNDL(byref cmdStr$, byref rspBuf$)
+    dim rc, nCap, nRoll, nPers, idx, addr$, ExtraInfo
+    nCap = BleBondingStats(nRoll, nPers)
+    print "\ncapacity: "; nCap; ", rolling: "; nRoll; ", persistent: ";nPers
+
+    for idx=0 to nCap
+        addr$ = ""
+        ExtraInfo = 0
+        rc = BleBondMngrGetInfo(idx, addr$, ExtraInfo)
+        if rc == 0 then
+            print "\n"; idx, StrHexize$(addr$), INTEGER.h'ExtraInfo
+        endif
+    next
+
+    #cmpif 0x00000003 : AssertRC(3498)
 endfunc RSP_OK
 
 //------------------------------------------------------------------------------
@@ -3485,7 +3590,7 @@ function _atPlusCMD_I(cmdId, byref cmdStr$)
     case CMD_I_LDSC
         if hConn then
             rc = BleDisconnect(hConn)
-            #cmpif 0x00000003 : AssertRC(3450)
+            #cmpif 0x00000003 : AssertRC(3593)
         endif
 
     // Process AT+LMTU command
@@ -3511,21 +3616,21 @@ function _atPlusCMD_I(cmdId, byref cmdStr$)
     //:/====
     case CMD_I_PAIR
         rc = BlePair(hConn, 1)
-        #cmpif 0x00000003 : AssertRC(3476)
+        #cmpif 0x00000003 : AssertRC(3619)
 
     // Process AT+LENC command
     //:/AT+LENCnn
     //:/====
     case CMD_I_LENC
         rc = BleEncryptConnection(hConn, SRegGet(CfgId_MinEncryptionKeyLen), SRegGet(CfgId_MITMreqForEncryption))
-        #cmpif 0x00000003 : AssertRC(3483)
+        #cmpif 0x00000003 : AssertRC(3626)
 
     #cmpif 0x00020000 : // Process AT+GCTM command
     #cmpif 0x00020000 : //:/AT+GCTMnn
     #cmpif 0x00020000 : //:/====
     #cmpif 0x00020000 : case CMD_I_GCTM
     #cmpif 0x00020000 :     rc = InitiateTableMap(hConn)
-    #cmpif 0x00000003 :     AssertRC(3490)
+    #cmpif 0x00000003 :     AssertRC(3633)
 
     case else
     endselect
@@ -4133,7 +4238,7 @@ endfunc rc
 #cmpif 0x00200000 :         //Add a NDEF Record of type "T" and message in language code provided
 #cmpif 0x00200000 :         lang$ = "\00"+sArg$[0]
 #cmpif 0x00200000 :         rc = strsetchr(lang$, strlen(lang$) - 1, 0)
-#cmpif 0x00200000 :         //AssertRC(4098)
+#cmpif 0x00200000 :         //AssertRC(4241)
 #cmpif 0x00200000 :         id$ = ""
 #cmpif 0x00200000 :         type$ = "T"
 #cmpif 0x00200000 :         StrDeEscape(sArg$[1])
@@ -4285,7 +4390,7 @@ function _atPlusBOVR(byref cmdStr$, byref rspBuf$)
     endif
 
     rc = BleOverwriteBond(connHandles[nArg[0]], nArg[1])
-    #cmpif 0x00000003 : AssertRC(4250)
+    #cmpif 0x00000003 : AssertRC(4393)
 endfunc rc
 
 //------------------------------------------------------------------------------
@@ -4307,7 +4412,7 @@ function _atPlusADAD(byref cmdStr$, byref rspBuf$)
         rc = BleGetAdvertisingAddress$(0, tmpDta$)
         tmpVar$ = "*"
     endif
-    #cmpif 0x00000003 : AssertRC(4272)
+    #cmpif 0x00000003 : AssertRC(4415)
 
     if rc != RSP_OK then
         exitfunc rc
@@ -4332,7 +4437,7 @@ function _atPlusPCFG(byref cmdStr$, byref rspBuf$)
         endif
 
         rc = BleSecMngrPairConf(nArg[0])
-        #cmpif 0x00000003 : AssertRC(4297)
+        #cmpif 0x00000003 : AssertRC(4440)
     else
         rc = RSP_ERROR_SYNTAX_ERROR
     endif
@@ -4362,7 +4467,7 @@ function _atPlusPCNF(byref cmdStr$, byref rspBuf$)
     endif
 
     rc = BlePairingResponse(connHandles[nArg[0]], nArg[1], 0)
-    #cmpif 0x00000003 : AssertRC(4327)
+    #cmpif 0x00000003 : AssertRC(4470)
 endfunc rc
 
 //------------------------------------------------------------------------------
@@ -4388,7 +4493,7 @@ function _atPlusTXPO(byref cmdStr$, byref rspBuf$)
         rc = BleTxPowerGet(TRANSMISSION_POWER_DEFAULT_CONNECTION, 0, tmpVar)
         tmpVar$ = "*"
     endif
-    #cmpif 0x00000003 : AssertRC(4353)
+    #cmpif 0x00000003 : AssertRC(4496)
 
     if rc != RSP_OK then
         exitfunc rc
@@ -4418,7 +4523,7 @@ function _atPlusCSEC(byref cmdStr$, byref rspBuf$)
     endif
 
     rc = BleGetCurConnSecInfo(connHandles[nArg[0]], Flags, SecMode, SecLevel)
-    #cmpif 0x00000003 : AssertRC(4383)
+    #cmpif 0x00000003 : AssertRC(4526)
 
     if rc != RSP_OK then
         exitfunc rc
@@ -4475,6 +4580,9 @@ function _atPLUS(byref cmdStr$, byref rspBuf$)
 
     elseif strcmp(tmp$, "bndd") == 0 then
         rc = _atPlusBNDD(cmdStr$, rspBuf$)
+
+    elseif strcmp(tmp$, "bndl") == 0 then
+        rc = _atPlusBNDL(cmdStr$, rspBuf$)
 
     elseif strcmp(tmp$, "bndx") == 0 then
         rc = _atPlusBNDX(cmdStr$, rspBuf$)
@@ -4841,7 +4949,7 @@ sub Startup()
 
     //Manage 2MPHY change request via app rather than just auto accept the change
     #cmpif    0x00800000 : rc = BleConnectConfig(9, 1)
-    #cmpifand 0x00800103 : AssertRC(4806)
+    #cmpifand 0x00800103 : AssertRC(4952)
 
     //Get start-up flags
     vspAdded = 0
@@ -4938,6 +5046,7 @@ function HndlrConnTout()
     case STATE_nonVSP_CONNECTING
         if connCount <= 0 then
             //First outgoing non-VSP connection
+            SioConnDeassert()
             NonVspDisconRet(CONN_ERROR_TIMEOUT, 0)    //will take us back to the idle state
         else
             //Multiple non-VSP connections
@@ -5054,6 +5163,7 @@ function HndlrDisCon(hndl as integer, rsn as integer)
         else
             if connCount <= 1 then    //Comparing against 1 because it decremented at the end of this routine
                 //First outgoing non-VSP connection
+                SioConnDeassert()
                 NonVspDisconRet(rsn, nodeIdx)    //Will take us back to the idle state
             else
                 //Multiple non-VSP connections
@@ -5063,6 +5173,8 @@ function HndlrDisCon(hndl as integer, rsn as integer)
                 rc = SendMsgApp(MSGAPP_PROCESS_UART, NULL_CTX)
             endif
             connHandles[nodeIdx] = INVALID_CONN_HANDLE
+            connIsEncrypted[nodeIdx] = FALSE
+            SioEncrDeassert()
         endif
 
     case else
@@ -5219,7 +5331,7 @@ function HandlerAttrWrite(hConn, hAttr, xSts)
             #cmpif 0x00000004 : DbgMsg("EvAttrWrite Encr Req ** Start PAIRING")
             //The link requires encryption, and configured for just works
             rc = BlePair(hConn, 1)
-            #cmpif 0x00000003 : AssertRC(5183)
+            #cmpif 0x00000003 : AssertRC(5334)
             //Change state
             NewState(STATE_VSP_PAIRING)
         else
@@ -5453,7 +5565,7 @@ function HndlrBleMsg(nMsgId, nCtx)
         #cmpif 0x00000004 : DbgMsgVal("Confirm Pairing", nCtx)
         dim Initiator, Flags, IOCap, MinKeySize, MaxKeySize
         rc = BlePairingInfo(nCtx, Initiator, Flags, IOCap, MinKeySize, MaxKeySize, tmpVar)
-        #cmpif 0x00000003 : AssertRC(5413)
+        #cmpif 0x00000003 : AssertRC(5568)
         if (rc == 0) then
             tmpVar = GetIdxFromHConn(nCtx)
             sprint #tmpDta$, integer.h'Flags
@@ -5463,7 +5575,7 @@ function HndlrBleMsg(nMsgId, nCtx)
         else
             //Failed to fetch details, disconnect device
             rc = BleDisconnect(nCtx)
-            #cmpif 0x00000003 : AssertRC(5423)
+            #cmpif 0x00000003 : AssertRC(5578)
         endif
 
     case BLE_EVBLEMSGID_CONFIRM_TIMED_OUT
@@ -5598,6 +5710,8 @@ function HndlrMessageApp(nMsgId, nCtx)
 
     case MSGAPP_ENTER_NONVSP_CONN_STATE
         OnEvent EVATTRNOTIFY Call HndlrNotifyNonVsp
+        //Assert the active connection indication pin
+        SioConnAssert()
         //Also trigger a reprocessing of the UART buffer just in case
         rc = SendMsgApp(MSGAPP_PROCESS_UART, NULL_CTX)
 
@@ -5720,7 +5834,7 @@ function HandlerPhyRequest(BYVAL hConn, BYVAL PhyTx, BYVAL PhyRx)
     #cmpif    0x00800000 : endif
     #cmpif    0x00000010 : print "\n## BlePhySet(PhyTx = ";PhyTx;" PhyRx = ";PhyRx;")"
     #cmpif    0x00800000 : rc = BlePhySet(hConn, PhyTx, PhyRx, 0)
-    #cmpifand 0x00800103 : AssertRC(5677)
+    #cmpifand 0x00800103 : AssertRC(5837)
 endfunc 1
 
 //==============================================================================

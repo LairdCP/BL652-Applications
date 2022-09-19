@@ -282,19 +282,26 @@ sub SReg8SetCache()
         //#cmpif 0x00010000 : rc = BleEncode8(  SregMin8$[1], -1, offset)
         //#cmpif 0x00010000 : rc = BleEncode8(  SregMax8$[1], 31, offset)
 
+//S137 :: Polarity of the active/encrypted connection indication pins (S138/S139)
+#define CfgId_CONNENCRPol             (20+17)
+        #cmpif 0x00010000 : offset = (CfgId_CONNENCRPol - 20)
+        #cmpif 0x00010000 : rc = BleEncode8(SregCache8$[1], 3, offset)
+        #cmpif 0x00010000 : rc = BleEncode8(  SregMin8$[1], 0, offset)
+        #cmpif 0x00010000 : rc = BleEncode8(  SregMax8$[1], 3, offset)
+
 //S138 :: Pin to use to indicate there is a connection
 #define CfgId_CONNPin                 (20+18)
         #cmpif 0x00010000 : offset = (CfgId_CONNPin - 20)
-        #cmpif 0x00010000 : rc = BleEncode8(SregCache8$[1], 29, offset)
+        #cmpif 0x00010000 : rc = BleEncode8(SregCache8$[1], -1, offset)
         #cmpif 0x00010000 : rc = BleEncode8(  SregMin8$[1], -1, offset)
-        #cmpif 0x00010000 : rc = BleEncode8(  SregMax8$[1], 31, offset)
+        #cmpif 0x00010000 : rc = BleEncode8(  SregMax8$[1], MAX_SIO_NUM, offset)
 
 //S139 :: Pin to use to indicate that the connection is encrypted
 #define CfgId_ENCRPin                 (20+19)
         #cmpif 0x00010000 : offset = (CfgId_ENCRPin - 20)
-        #cmpif 0x00010000 : rc = BleEncode8(SregCache8$[1], 30, offset)
+        #cmpif 0x00010000 : rc = BleEncode8(SregCache8$[1], -1, offset)
         #cmpif 0x00010000 : rc = BleEncode8(  SregMin8$[1], -1, offset)
-        #cmpif 0x00010000 : rc = BleEncode8(  SregMax8$[1], 31, offset)
+        #cmpif 0x00010000 : rc = BleEncode8(  SregMax8$[1], MAX_SIO_NUM, offset)
 
         //-----------------------------------------------------------
         //WARNING : There should be a maximum of 20 in this IF block
@@ -746,7 +753,7 @@ sub SRegSet(regnum, regval)
             ndx = regnum / SREG_MAXSREGS8_PER_NUM_NVKEY
             ofst = regnum % SREG_MAXSREGS8_PER_NUM_NVKEY
             rc = BleEncode8(SregCache8$[ndx], regval, ofst)
-            #cmpif 0x00000003 : AssertRC(749)
+            #cmpif 0x00000003 : AssertRC(756)
             #cmpif 0x00004000 : print "\n## SregCache8$[";ndx;"]=";strhexize$(SregCache8$[ndx]);"\r"
         endif
 
@@ -755,7 +762,7 @@ sub SRegSet(regnum, regval)
             ndx = regnum / SREG_MAXSREGS16_PER_NUM_NVKEY
             ofst = (regnum % SREG_MAXSREGS16_PER_NUM_NVKEY) * 2
             rc = BleEncode16(SregCache16$[ndx], regval, ofst)
-            #cmpif 0x00000003 : AssertRC(758)
+            #cmpif 0x00000003 : AssertRC(765)
             #cmpif 0x00004000 : print "\n## SregCache16$[";ndx;"]=";strhexize$(SregCache16$[ndx]);"\r"
         endif
 
@@ -764,7 +771,7 @@ sub SRegSet(regnum, regval)
             ndx = regnum / SREG_MAXSREGS32_PER_NUM_NVKEY
             ofst = (regnum % SREG_MAXSREGS32_PER_NUM_NVKEY) * 4
             rc = BleEncode32(SregCache32$[ndx], regval, ofst)
-            #cmpif 0x00000003 : AssertRC(767)
+            #cmpif 0x00000003 : AssertRC(774)
             #cmpif 0x00004000 : print "\n## SregCache32$[";ndx;"]=";strhexize$(SregCache32$[ndx]);"\r"
         endif
     endif

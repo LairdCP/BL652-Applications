@@ -38,11 +38,15 @@
 // -------------------
 // Application Version
 // -------------------
-#define AppVer                 "4.02"  //Application version (ATI33)
+#define AppVer                 "4.03"  //Application version (ATI33)
 //
 // -------------------
 // Application History
 // -------------------
+//
+//  4.03
+//    Changed default and min/max values for S regs 137/138/139
+//
 //  4.02
 //    Fixed minimum transmit power, can now be set to -40dBm
 //    Max UART/ VSP buffer sizes reduced due to BL652 memory limitations (1024 bytes for UART Tx/Rx, 4096 bytes for VSP Tx/Rx)
@@ -142,9 +146,9 @@
 #define SREGINIT_MIN8_0  "\00\D8\00\00\00\01\01\FC\00\FF\01\03\00\88\01\07\00\FF\01\80"
 #define SREGINIT_MAX8_0  "\7F\04\03\07\7F\1F\7F\04\03\1F\78\10\01\EC\14\10\01\1F\30\7F"
 //                  120+    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5  6  7  8  9
-#define SREGINIT_VAL8_1  "\00\00\00\00\00\01\07\06\00\00\00\00\00\00\00\00\00\00\1D\1E"
-#define SREGINIT_MIN8_1  "\80\80\80\80\80\00\01\01\80\80\80\80\80\80\80\80\80\80\FF\FF"
-#define SREGINIT_MAX8_1  "\7F\7F\7F\7F\7F\01\07\06\7F\7F\7F\7F\7F\7F\7F\7F\7F\7F\1F\1F"
+#define SREGINIT_VAL8_1  "\00\00\00\00\00\01\07\06\00\00\00\00\00\00\00\00\00\03\FF\FF"
+#define SREGINIT_MIN8_1  "\80\80\80\80\80\00\01\01\80\80\80\80\80\80\80\80\80\00\FF\FF"
+#define SREGINIT_MAX8_1  "\7F\7F\7F\7F\7F\01\07\06\7F\7F\7F\7F\7F\7F\7F\7F\7F\03\1F\1F"
 //                  200+    0     1     2     3     4     5     6     7    8     9
 #define SREGINIT_VAL16_0 "\40\1F\FA\00\00\04\00\04\00\10\00\10\70\17\00\00\FA\00\00\02"
 #define SREGINIT_MIN16_0 "\E8\03\14\00\00\00\00\00\00\01\00\01\64\00\00\00\14\00\00\01"

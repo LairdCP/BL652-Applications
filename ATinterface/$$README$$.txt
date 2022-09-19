@@ -1,5 +1,5 @@
 --------
-March 2021
+Jan 2021
 --------
 
 This folder contains smartBASIC applications that when loaded in a BL65x 
